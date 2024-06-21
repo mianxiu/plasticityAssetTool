@@ -192,4 +192,5 @@ cython_debug/
 #.idea/
 
 Scripts/
+.vscode/
 /test file
