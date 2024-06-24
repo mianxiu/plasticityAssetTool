@@ -13,10 +13,18 @@ payload={
     'params':{'expression':f'''{javscritpString}'''}
 }
 
-async def hello():
-    async with websockets.connect("ws://127.0.0.1:9223/devtools/page/B92BF01F324E72FD6182CE407B1E10AD") as websocket:
-        d = await websocket.send(json.dumps(payload))
+domPayload = {
+    'id' : 1337,
+    'method':'Runtime.evaluate',
+    'params':{'expression':f'''document.querySelectorAll('input')[0].value'''}
+}
+import struct
+async def injectorJs():
+    async with websockets.connect("ws://127.0.0.1:9223/devtools/page/D1F330B6426643C50C7912FBC0ABAAC7") as websocket:
+        
+       # d = await websocket.send(json.dumps(domPayload))
+        e = await websocket.send(json.dumps(domPayload))
         g =await websocket.recv()
-        print(d)
+        print(g)
 
-asyncio.run(hello())
+asyncio.run(injectorJs())
