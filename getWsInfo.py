@@ -19,22 +19,23 @@ ports = get_ports_by_process_name(process_name)
 # 打印端口列表
 print("目标进程", process_name, "的端口列表:", ports)
 
+def get_plasticity_cdp_url():
+    ws_url=[]
+    import requests
+    import json
+    # don't use proxy
+    session = requests.Session()
+    session.trust_env = False
 
-import requests
-import json
-# don't use proxy
-session = requests.Session()
-session.trust_env = False
+    for p in ports:
+        url = f"http://127.0.0.1:{p}/json"
+        response = session.get(url,proxies={})
+        if response.status_code == 200:
+            content = response.text
+            print(response)
+            json_data = json.loads(content)
 
-url = f"http://127.0.0.1:{ports[2]}/json"
+            print(json_data[0]["webSocketDebuggerUrl"])
 
-
-response = session.get(url,proxies={})
-content = response.text
-
-json_data = json.loads(content)
-
-
-
-# 打印 JSON 数据
-print(json_data[0]["webSocketDebuggerUrl"])
+            
+get_plasticity_cdp_url()
