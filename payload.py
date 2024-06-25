@@ -27,3 +27,7 @@ getFileNamePayload = {
     'method':'Runtime.evaluate',
     'params':{'expression':f'''document.querySelector('#left-sidebar > plasticity-filename > div > span').textContent'''}
 }
+
+selectObjectPayload ={
+    
+}
