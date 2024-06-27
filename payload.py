@@ -31,3 +31,11 @@ getFileNamePayload = {
 selectObjectPayload ={
     
 }
+
+
+def event_payload(commandStr:str):
+    string = f'''
+    var existingPointerEvent = new Event("{commandStr}");
+    targetElement.dispatchEvent(existingPointerEvent);
+    '''
+    return string

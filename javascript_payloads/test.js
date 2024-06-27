@@ -18,3 +18,14 @@ targetElement.dispatchEvent(existingPointerEvent);
 
 var existingPointerEvent = new Event("point-picker:finish");
 targetElement.dispatchEvent(existingPointerEvent);
+//-----rename
+// first to select
+
+var inputElement = document.querySelector("#input_2");
+var objectElement = inputElement.parentElement;
+objectElement.dispatchEvent(new PointerEvent("pointerup"));
+objectElement.dispatchEvent(new MouseEvent("dblclick"));
+inputElement.value = "is rename 202021";
+var inputElement = document.querySelector("#input_2");
+objectElement.dispatchEvent(new PointerEvent("pointerup"));
+//targetElement.dispatchEvent(new Event("Command:SetName"));

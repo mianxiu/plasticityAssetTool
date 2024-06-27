@@ -8,6 +8,7 @@ for (let i = 0; i < objectNodes.length; i++) {
   let objectNode = objectNodes[i];
   let inputNode = inputNodes[i];
   objectNode.id = `object_${i}`;
+  objectNode.setAttribute("object-index", i);
   inputNode.id = `input_${i}`;
 }
 
