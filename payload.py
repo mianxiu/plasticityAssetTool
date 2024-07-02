@@ -1,5 +1,9 @@
 import websockets
 import json
+
+
+
+
 async def injector_js(ws_url,payload):
     async with websockets.connect(ws_url) as websocket:
         await websocket.send(json.dumps(payload))

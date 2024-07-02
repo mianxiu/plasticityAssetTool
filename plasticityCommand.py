@@ -2,36 +2,90 @@
 
 from enum import Enum
 from functools import wraps
+import json
+import inspect
 
 
-def convert_to_js_dispatchEvent_str(enum_class):
-    original_str_method = enum_class.__str__
+# def convert_to_js_dispatchEvent_str(enum_class):
+#     original_str_method = enum_class.__str__
 
-    @wraps(original_str_method)
-    def modified_str_method(self) -> str:
-        _self_class_name = self.__class__.__name__
-        if _self_class_name == "PointerEvent":
-            _event_str = f"""var e = new PointerEvent("{self.value}");targetElement.dispatchEvent(e);"""
-        else:
-            _event_command_str = f'''{_self_class_name}:{self.value}'''.lower() 
-            _event_str = f"""var e = new Event("{_event_command_str}");targetElement.dispatchEvent(e);"""
-        return _event_str
+#     @wraps(original_str_method)
+#     def modified_str_method(self) -> str:
+#         _self_class_name = self.__class__.__name__
+#         if _self_class_name == "PointerEvent":
+#             _event_str = f"""var e = new PointerEvent("{self.value}");targetElement.dispatchEvent(e);"""
+#         else:
+#             _event_command_str = f'''{_self_class_name}:{self.value}'''.lower() 
+#             _event_str = f"""var e = new Event("{_event_command_str}");targetElement.dispatchEvent(e);"""
+#         return _event_str
     
-    enum_class.__str__ = modified_str_method
-    return enum_class
+#     enum_class.__str__ = modified_str_method
+#     return enum_class
+
+
+def cdp_payload(event_type):
+    def cdp_decorator(func):
+        @wraps(func)
+        def cdp_payload_str(self,*args, **kwargs):
+            
+            if event_type == Javscript_Event_Type.EVENT.value:
+                _event_command_str = f'''{self.__class__.__name__}:{self.value}'''.lower()
+            else:              
+                _event_command_str = f'''{self.value}'''.lower()
+
+            
+            _event_str = f"""var targetElement = document.querySelector('{kwargs["selector"]}');var e = new {event_type}('{_event_command_str}');targetElement.dispatchEvent(e);"""
+            print(_event_str)
+            
+            result = func(self,*args,**kwargs)
+            return _event_str
+        return cdp_payload_str
+    return cdp_decorator
+            
+
+class Javscript_Event_Type(Enum):
+    EVENT= "Event"
+    POINTER_EVENT = "PointerEvent"
 
 
 
-@convert_to_js_dispatchEvent_str
 class App(Enum):
+    
+    __JS_EVENT_TYPE = Javscript_Event_Type.EVENT
+
     NEW_WINDOW = 'new-window'
     QUIT ='quit'
 
 
-#@convert_to_js_dispatchEvent_str
+
 class Command(Enum):
-    def selector(self,selector:str):
-        return self.__class__.name+selector
+    
+    
+    _JS_EVENT_TYPE = Javscript_Event_Type.EVENT.value
+    
+    @cdp_payload(event_type=_JS_EVENT_TYPE)
+    def _selector(self,selector:str):
+        pass
+    
+    # def _selector(self,selector:str):
+    #     _event_command_str = f'''{self.__class__.__name__}:{self.name}'''.lower() 
+    #     _event_str = f"""var targetElement = document.querySelector('{selector}');var e = new Event('{_event_command_str}');targetElement.dispatchEvent(e);"""
+    #     return _event_str
+    
+    # def cdp_payload(self,selector:str)-> str:
+    #     """
+    #     return Chrome DevTools Protocol json str
+    #     like:
+        
+    #     """
+    #     return json.dumps( {
+    #             'id' : 3,
+    #             'method':'Runtime.evaluate',
+    #             'params':{'expression':f'''{self._selector(selector)}'''}
+    #         })
+        
+
+    
     
     ABORT="abort"
     ALTERNATIVE_DUPLICATE="alternative-duplicate"
@@ -201,12 +255,17 @@ class Command(Enum):
     UNTRIM="untrim"
     UNWRAP_FACE="unwrap-face"
     WRAP_FACE="wrap-face"
-    
+
 
 class PointerEvent(Enum):
-
+  
+        _JS_EVENT_TYPE = Javscript_Event_Type.POINTER_EVENT.value
         
+        @cdp_payload(event_type=_JS_EVENT_TYPE)
+        def _selector(self,selector:str):
+            pass
     
+        
         POINTER_UP="pointerup"
         POINTER_MOVE="pointermove"
         POINTER_DOWN="pointerdown"
@@ -224,6 +283,9 @@ class Edit(Enum):
     
     
     
-n = Command.ALTERNATIVE_DUPLICATE
-b = App.NEW_WINDOW
-print(n,b)
+n = Command.ALTERNATIVE_DUPLICATE._selector(selector="#viewport > plasticity-viewport > canvas")
+p = PointerEvent.POINTER_UP._selector(selector="#viewport > plasticity-viewport > canvas")
+print(n)
+print(p)
+#print(Command.ABORT)
+#print(Command.ABORT.value)
