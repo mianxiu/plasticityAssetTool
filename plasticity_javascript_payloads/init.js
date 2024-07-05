@@ -13,3 +13,10 @@ for (let i = 0; i < objectNodes.length; i++) {
 }
 
 console.log(`PlasticityAssetTool:init node id`);
+
+// add tool node
+let node = document.createElement("iframe");
+node.id = "plasticity_asset_tool_panel";
+node.src = "http://127.0.0.1:15150/index.html";
+node.style = "display:block;width:500px;height:500px;position:fixed;";
+document.querySelector("body").appendChild(node);

@@ -3,7 +3,6 @@
 from enum import Enum
 from functools import wraps
 import json
-import inspect
 
 
 # def convert_to_js_dispatchEvent_str(enum_class):
@@ -23,7 +22,7 @@ import inspect
 #     return enum_class
 
 
-def cdp_payload(event_type):
+def _convert_javascript_event_str(event_type):
     def cdp_decorator(func):
         @wraps(func)
         def cdp_payload_str(self,*args, **kwargs):
@@ -33,9 +32,8 @@ def cdp_payload(event_type):
             else:              
                 _event_command_str = f'''{self.value}'''.lower()
 
-            
             _event_str = f"""var targetElement = document.querySelector('{kwargs["selector"]}');var e = new {event_type}('{_event_command_str}');targetElement.dispatchEvent(e);"""
-            print(_event_str)
+            #print(_event_str)
             
             result = func(self,*args,**kwargs)
             return _event_str
@@ -51,7 +49,7 @@ class Javscript_Event_Type(Enum):
 
 class App(Enum):
     
-    __JS_EVENT_TYPE = Javscript_Event_Type.EVENT
+    __JS_EVENT_TYPE = Javscript_Event_Type.EVENT.value
 
     NEW_WINDOW = 'new-window'
     QUIT ='quit'
@@ -60,10 +58,9 @@ class App(Enum):
 
 class Command(Enum):
     
-    
     _JS_EVENT_TYPE = Javscript_Event_Type.EVENT.value
     
-    @cdp_payload(event_type=_JS_EVENT_TYPE)
+    @_convert_javascript_event_str(event_type=_JS_EVENT_TYPE)
     def _selector(self,selector:str):
         pass
     
@@ -72,18 +69,6 @@ class Command(Enum):
     #     _event_str = f"""var targetElement = document.querySelector('{selector}');var e = new Event('{_event_command_str}');targetElement.dispatchEvent(e);"""
     #     return _event_str
     
-    # def cdp_payload(self,selector:str)-> str:
-    #     """
-    #     return Chrome DevTools Protocol json str
-    #     like:
-        
-    #     """
-    #     return json.dumps( {
-    #             'id' : 3,
-    #             'method':'Runtime.evaluate',
-    #             'params':{'expression':f'''{self._selector(selector)}'''}
-    #         })
-        
 
     
     
@@ -261,7 +246,7 @@ class PointerEvent(Enum):
   
         _JS_EVENT_TYPE = Javscript_Event_Type.POINTER_EVENT.value
         
-        @cdp_payload(event_type=_JS_EVENT_TYPE)
+        @_convert_javascript_event_str(event_type=_JS_EVENT_TYPE)
         def _selector(self,selector:str):
             pass
     
@@ -273,6 +258,13 @@ class PointerEvent(Enum):
         
         
 class Edit(Enum):
+    
+    _JS_EVENT_TYPE = Javscript_Event_Type.EVENT.value
+        
+    @_convert_javascript_event_str(event_type=_JS_EVENT_TYPE)
+    def _selector(self,selector:str):
+            pass
+    
     COPY="copy"
     COP_WITH_PLACEMENT="copy-with-placement"
     PASTE="paste"
@@ -283,9 +275,9 @@ class Edit(Enum):
     
     
     
-n = Command.ALTERNATIVE_DUPLICATE._selector(selector="#viewport > plasticity-viewport > canvas")
-p = PointerEvent.POINTER_UP._selector(selector="#viewport > plasticity-viewport > canvas")
-print(n)
-print(p)
+# n = Command.ALTERNATIVE_DUPLICATE._selector(selector="#viewport > plasticity-viewport > canvas")
+# p = PointerEvent.POINTER_UP._selector(selector="#viewport > plasticity-viewport > canvas")
+# print(n)
+# print(p)
 #print(Command.ABORT)
 #print(Command.ABORT.value)
