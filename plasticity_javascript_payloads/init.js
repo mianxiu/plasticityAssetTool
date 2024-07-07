@@ -12,6 +12,8 @@ for (let i = 0; i < objectNodes.length; i++) {
   inputNode.id = `input_${i}`;
 }
 
+var canvas = (document.querySelector("canvas").id = "canvas");
+
 console.log(`PlasticityAssetTool:init node id`);
 
 // add tool node
@@ -20,3 +22,5 @@ node.id = "plasticity_asset_tool_panel";
 node.src = "http://127.0.0.1:15150/index.html";
 node.style = "display:block;width:500px;height:500px;position:fixed;";
 document.querySelector("body").appendChild(node);
+
+console.log("init");

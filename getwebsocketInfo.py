@@ -1,13 +1,10 @@
 import psutil
 import asyncio
-from cdp_payload import injector_js,getFileNamePayload,screenshot_payload
+from cdp_payload import cdp_ws_injector,getFileNamePayload
 
 
 
 #ws = "ws://127.0.0.1:9223/devtools/page/D1F330B6426643C50C7912FBC0ABAAC7"
-
-
-
 
 
 
@@ -62,7 +59,7 @@ def get_plasticity_cdp_url():
                 _ws_url = ws_json["webSocketDebuggerUrl"]
                 
                 
-                filename =json.loads(asyncio.run(injector_js(_ws_url,getFileNamePayload)))["result"]["result"]["value"]
+                filename =json.loads(asyncio.run(cdp_ws_injector(_ws_url,getFileNamePayload)))["result"]["result"]["value"]
                 ws_url_info.append({'name':filename, "url":ws_json["webSocketDebuggerUrl"]})
                 #print(ws_json["title"])
                 #print(ws_url_info)

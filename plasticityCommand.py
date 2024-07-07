@@ -31,8 +31,8 @@ def _convert_javascript_event_str(event_type):
                 _event_command_str = f'''{self.__class__.__name__}:{self.value}'''.lower()
             else:              
                 _event_command_str = f'''{self.value}'''.lower()
-
-            _event_str = f"""var targetElement = document.querySelector('{kwargs["selector"]}');var e = new {event_type}('{_event_command_str}');targetElement.dispatchEvent(e);"""
+            _event_str = f"""document.querySelector('{kwargs["selector"]}').dispatchEvent(new {event_type}('{_event_command_str}'));"""
+            #_event_str = f"""var targetElement = document.querySelector('{kwargs["selector"]}');var e = new {event_type}('{_event_command_str}');targetElement.dispatchEvent(e);"""
             #print(_event_str)
             
             result = func(self,*args,**kwargs)
@@ -240,6 +240,8 @@ class Command(Enum):
     UNTRIM="untrim"
     UNWRAP_FACE="unwrap-face"
     WRAP_FACE="wrap-face"
+    # 
+    Set_NAME="set-name"
 
 
 class PointerEvent(Enum):
