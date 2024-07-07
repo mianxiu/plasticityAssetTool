@@ -193,4 +193,25 @@ cython_debug/
 
 Scripts/
 /test file
+/plasticity-asset-tool-app/node_modules/
+# Output
+/plasticity-asset-tool-app/.output
+/plasticity-asset-tool-app/.vercel
+/plasticity-asset-tool-app//.svelte-kit
+/plasticity-asset-tool-app//build
+
+# OS
+/plasticity-asset-tool-app/.DS_Store
+/plasticity-asset-tool-app/Thumbs.db
+
+# Env
+/plasticity-asset-tool-app/.env
+/plasticity-asset-tool-app/.env.*
+!.env.example
+!.env.test
+
+# Vite
+/plasticity-asset-tool-app/vite.config.js.timestamp-*
+/plasticity-asset-tool-app/vite.config.ts.timestamp-*
+
 plasticityAssetToolCache/
