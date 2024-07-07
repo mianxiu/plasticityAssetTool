@@ -2,7 +2,7 @@
 
 from enum import Enum
 from functools import wraps
-import json
+
 
 
 # def convert_to_js_dispatchEvent_str(enum_class):

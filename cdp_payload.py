@@ -1,6 +1,6 @@
 import websockets
 import json
-import plasticityCommand
+import plasticitycommand
 import base64
 
 
@@ -11,7 +11,7 @@ async def cdp_ws_injector(ws_url,payload):
     if not have value, return None
     """
     async with websockets.connect(ws_url) as websocket:
-        await websocket.send(json.dumps(payload).strip())
+        await websocket.send(json.dumps(payload))
         response =await websocket.recv()
         #print(response)
         # try:

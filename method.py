@@ -6,7 +6,7 @@ from getwebsocketInfo import get_plasticity_cdp_url
 def init_id():
 
     ws=get_plasticity_cdp_url()
-    
+    print(ws)
     first = ws[0]["url"]
     javscritpString = open("./plasticity_javascript_payloads/init.js","r",encoding="UTF-8").read()
     res = asyncio.run(cdp_ws_injector(first,cdp_runtime_evaluate_payload(f'''{javscritpString}''')))
@@ -27,3 +27,5 @@ def screenshot():
     with open("./test file/screen.jpg", "wb") as f:
             f.write(jpeg_data)
 
+def isolate_focus():
+    pass
