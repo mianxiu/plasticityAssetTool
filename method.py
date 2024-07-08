@@ -28,4 +28,9 @@ def screenshot():
             f.write(jpeg_data)
 
 def isolate_focus():
+    ws=get_plasticity_cdp_url()
     pass
+
+def get_document_tree():
+    pass
+
