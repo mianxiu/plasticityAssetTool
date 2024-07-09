@@ -16,19 +16,38 @@ function App() {
   //     </header>
   //   </div>
   // );
+
+  // 创建 WebSocket 连接
+  const socket = new WebSocket("ws://127.0.0.1:15151");
+
+  // 连接建立时的处理
+  socket.addEventListener("open", () => {
+    console.log("Connected to WebSocket server");
+    // 发送消息到服务器
+  });
+
+  // 接收到消息时的处理
+  socket.addEventListener("message", event => {
+    console.log("Received message from server:", event.data);
+  });
+
+  // 连接关闭时的处理
+  socket.addEventListener("close", () => {
+    console.log("WebSocket connection closed");
+  });
+
   // 监听按键事件
   document.addEventListener("keydown", function (event) {
-    // 按下 "z" 键（键码为 90）
     if (event.code == "Backquote") {
-      // 阻止 "z" 键的默认行为，即不显示任何内容
-
       console.log("init key event done");
-      // 向父页面发送消息，通知隐藏内容
       window.parent.postMessage("hideContent", "*");
     }
   });
   const [count, setCount] = createSignal(2);
-  const increment = () => setCount(prev => prev + 1);
+  const increment = () => {
+    setCount(prev => prev + 1);
+    socket.send("Hello, server! from plasiticy" + `is solidjs ${count()}`);
+  };
 
   const decrement = () => setCount(prev => prev - 1);
 

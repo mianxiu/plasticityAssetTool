@@ -1,3 +1,5 @@
 {
-    "http_port":15150
+    "http_port":15150,
+    "websocket_port":15151
+
 }

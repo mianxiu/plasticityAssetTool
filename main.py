@@ -1,12 +1,15 @@
 
 import webview
 
+class Api():
+      def log(self, value):
+            print(value)
 
 def custom_logic(window):
     #window.toggle_fullscreen()
     window.evaluate_js('alert("Nice one brother")')
 
-window = webview.create_window('Woah dude!', "plasticity-asset-tool-app/dist/index.html")
+window = webview.create_window('Woah dude!', "plasticity-asset-tool-app/dist/index.html",js_api=Api())
 webview.start(custom_logic, window,http_port="15150")
 # anything below this line will be executed after program is finished executing
 pass
