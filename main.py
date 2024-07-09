@@ -1,27 +1,13 @@
 
-import webview
+from bottle import route, run, static_file
 
-class Api():
-      def log(self, value):
-            print(value)
+@route('/')
+def serve_index():
+    return static_file('index.html', root='plasticity-asset-tool-app/dist')
 
-def custom_logic(window):
-    #window.toggle_fullscreen()
-    window.evaluate_js('alert("Nice one brother")')
+@route('/<filepath:path>')
+def serve_static(filepath):
+    return static_file(filepath, root='plasticity-asset-tool-app/dist')
 
-window = webview.create_window('Woah dude!', "plasticity-asset-tool-app/dist/index.html",js_api=Api())
-webview.start(custom_logic, window,http_port="15150")
-# anything below this line will be executed after program is finished executing
-pass
-
-
-# from bottle import Bottle, run, static_file
-
-# app = Bottle()
-
-# @app.route('/')
-# def index():
-#     return static_file('index.html', root='dist/')
-
-# if __name__ == '__main__':
-#     run(app, host='localhost', port=8000)
+if __name__ == '__main__':
+    run(host='localhost', port=15150)
