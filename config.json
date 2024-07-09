@@ -1,5 +1,6 @@
 {
     "http_port":15150,
-    "websocket_port":15151
+    "websocket_port":15151,
+    "show_panel_event_key_code":"Backquote"
 
 }

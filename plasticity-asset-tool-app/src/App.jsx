@@ -43,7 +43,10 @@ function App() {
       window.parent.postMessage("hideContent", "*");
     }
   });
+
+  //
   const [count, setCount] = createSignal(2);
+  const [double, setDouble] = createSignal(0);
   const increment = () => {
     setCount(prev => prev + 1);
     socket.send("Hello, server! from plasiticy" + `is solidjs ${count()}`);
@@ -53,11 +56,13 @@ function App() {
 
   createEffect(() => {
     document.querySelector("#c").textContent = count();
+    setDouble(count() * 2);
   });
 
   return (
     <div>
-      <span>Count:{count()}</span>{" "}
+      <span>Double:{double()}</span>
+      <span>Count:{count()}</span>
       <button type="button" onClick={increment}>
         add one
       </button>
