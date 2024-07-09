@@ -31,6 +31,9 @@ def isolate_focus():
     ws=get_plasticity_cdp_url()
     pass
 
+def focus_plasticity_asset_file_window():
+    pass
+
 def get_document_tree():
     pass
 

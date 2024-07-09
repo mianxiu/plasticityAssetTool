@@ -82,21 +82,3 @@ screenshot_payload={
 }
 
 
-input_EnterKey_payload = {
-
-    'id': 1,
-    'method': 'Input.dispatchKeyEvent',
-    'params': {
-        'type': 'keyDown',
-        'key': 'Enter',
-        'code': 'Enter',
-        'text': '\r',
-        'unmodifiedText': '\r',
-        'nativeVirtualKeyCode': 13,
-        'windowsVirtualKeyCode': 13
-    }
-}
-# n = plasticityCommand.Command.ALTERNATIVE_DUPLICATE._selector(selector="#viewport > plasticity-viewport > canvas")
-# p = plasticityCommand.PointerEvent.POINTER_UP._selector(selector="#viewport > plasticity-viewport > canvas")
-# print(n)
-# print(p)
