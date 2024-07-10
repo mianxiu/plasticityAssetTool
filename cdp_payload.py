@@ -36,7 +36,7 @@ def cdp_runtime_evaluate_payload(*javascript_str:str):
                 'method':'Runtime.evaluate',
                 'params':{'expression':f"""{_expression_str}"""}
             }
-        print(_return_json)
+        #print(_return_json)
         return json.loads(json.dumps(_return_json).replace('\n',''))
         
 

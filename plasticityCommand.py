@@ -276,10 +276,33 @@ class Edit(Enum):
     UNDO="undo"
     
     
+class Viewport(Enum):
+    _JS_EVENT_TYPE = Javscript_Event_Type.EVENT.value
     
-# n = Command.ALTERNATIVE_DUPLICATE._selector(selector="#viewport > plasticity-viewport > canvas")
-# p = PointerEvent.POINTER_UP._selector(selector="#viewport > plasticity-viewport > canvas")
-# print(n)
-# print(p)
-#print(Command.ABORT)
-#print(Command.ABORT.value)
+    @_convert_javascript_event_str(event_type=_JS_EVENT_TYPE)
+    def _selector(self,selector:str):
+            pass
+        
+    CPLANE_RESET="cplane:reset"
+    CPLANE_SELECTION="cplane:selection"
+    FOCUS="focus"
+    GRID_DECR="grid:decr"
+    GRID_INCR="grid:incr"
+    NAVIGATE_BACK="navigate:back"
+    NAVIGATE_BOTTOM="navigate:bottom"
+    NAVIGATE_FRONT="navigate:front"
+    NAVIGATE_LEFT="navigate:left"
+    NAVIGATE_RIGHT="navigate:right"
+    NAVIGATE_SELECTION="navigate:selection"
+    NAVIGATE_TOP="navigate:top"
+    SET_AND_CENTER_FOCUS_POINT="set-and-center-focus-point"
+    SET_FOCUS_POINT="set-focus-point"
+    TOGGLE_EDGES="toggle-edges"
+    TOGGLE_FACES="toggle-faces"
+    TOGGLE_ORTHOGRAPHIC="toggle-orthographic"
+    TOGGLE_OVERLAYS="toggle-overlays"
+    TOGGLE_RENDER_MODE="toggle-render-mode"
+    TOGGLE_X_RAY="toggle-x-ray"
+        
+        
+    
