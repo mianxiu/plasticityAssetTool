@@ -4,9 +4,6 @@ from getwebsocketInfo import get_plasticity_cdp_url
 
 
 
-websocket_info=get_plasticity_cdp_url()
-print(websocket_info)
-first = websocket_info[0]["url"]
 
 def init_id(websocket_url:str):
     
@@ -58,22 +55,32 @@ def get_document_tree(websocket_url:str):
 
 
 ws = get_plasticity_cdp_url()
-f = ws[1]["url"]
+f = ws[0]["url"]
 
 def plasticity_window_activate(websocket_url:str):
     import re
     tab_id = re.sub(r"(ws.*page\/)(.*)",r"\2",websocket_url)
-    print(tab_id)
-    _payload = {
+
+    # _payload ={
+    # "id": 1,
+    # "method": "Page.bringToFront",
+    # "params": {
+    #     "sessionId": tab_id
+    #     }
+    # }
+    _payload ={
     "id": 1,
-    "method": "Page.bringToFront",
+    "method": "Browser.getWindowForTarget",
     "params": {
-        "sessionId": tab_id
+        "targetId": tab_id
+        }
     }
-    }
-    import json
-    res = asyncio.run(cdp_ws_injector(websocket_url,json.dumps(_payload)))
     
+    
+    
+    print(_payload)
+    res = asyncio.run(cdp_ws_injector(websocket_url,_payload))
+    print(res)
     import win32gui,win32con
     # 最大化指定窗口
     async def  maximize_window(window_title):
@@ -81,10 +88,28 @@ def plasticity_window_activate(websocket_url:str):
         hwnd = win32gui.FindWindow(None, window_title)
         if hwnd != 0:
             # 最大化窗口
-            win32gui.ShowWindow(hwnd, win32con.SW_MAXIMIZE)
+
+            win32gui.ShowWindow(hwnd, win32con.SW_NORMAL)
+            #win32gui.SetForegroundWindow(hwnd)
+
         else:
             print("未找到窗口:", window_title)
 
     asyncio.run(maximize_window("Plasticity"))
 
-plasticity_window_activate(f)
+#plasticity_window_activate(f)
+# import time
+# time.sleep(2)
+# screenshot(f)
+import win32gui
+
+def winEnumHandler( hwnd, ctx ):
+    if win32gui.IsWindowVisible( hwnd ):
+        print ( hwnd, hex( hwnd ), win32gui.GetWindowText( hwnd ) )
+
+win32gui.EnumWindows( winEnumHandler, None )
+#6820320 , 20843792
+import win32con
+hwnd =6820320 
+win32gui.ShowWindow(hwnd, win32con.SW_NORMAL)
+win32gui.SetForegroundWindow(hwnd)

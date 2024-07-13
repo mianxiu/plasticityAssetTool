@@ -4,7 +4,7 @@ import json
 
 
 
-async def cdp_ws_injector(ws_url,payload):
+async def cdp_ws_injector(ws_url,payload:dict):
     """
     asyncio.run(injector_js(ws_url,payload))
     if not have value, return None
