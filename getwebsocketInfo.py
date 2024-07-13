@@ -57,12 +57,12 @@ def get_plasticity_cdp_url():
             
             for ws_json in json_data:
                 _ws_url = ws_json["webSocketDebuggerUrl"]
-                
+                _id = ws_json["id"] 
                 _res =  json.loads(asyncio.run(cdp_ws_injector(_ws_url,getFileNamePayload)))
                 #print(_res)
                 try:
                     filename =_res["result"]["result"]["value"]
-                    ws_url_info.append({'name':filename, "url":ws_json["webSocketDebuggerUrl"]})
+                    ws_url_info.append({'name':filename, "url":_ws_url,"id":_id})
                     #print(ws_json["title"])
                     #print(ws_url_info)
                 except:
@@ -72,3 +72,5 @@ def get_plasticity_cdp_url():
     return ws_url_info
 
           
+
+

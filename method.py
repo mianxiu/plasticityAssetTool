@@ -40,8 +40,15 @@ def isolate_focus(websocket_url:str):
     res = asyncio.run(cdp_ws_injector(websocket_url,_payload))
     print (_payload)
     pass
-isolate_focus(first)
 
+
+
+def select_obj_isolate_focus(websocket_url:str,selector:str):
+    from plasticitycommand import PointerEvent
+    
+    _p =PointerEvent.POINTER_UP._selector(selector=selector)
+    # _payload = cdp_runtime_evaluate_payload(_p)
+    isolate_focus(websocket_url=websocket_url)
 
 def focus_plasticity_asset_file_window(websocket_url:str):
     pass
@@ -49,3 +56,35 @@ def focus_plasticity_asset_file_window(websocket_url:str):
 def get_document_tree(websocket_url:str):
     pass
 
+
+ws = get_plasticity_cdp_url()
+f = ws[1]["url"]
+
+def plasticity_window_activate(websocket_url:str):
+    import re
+    tab_id = re.sub(r"(ws.*page\/)(.*)",r"\2",websocket_url)
+    print(tab_id)
+    _payload = {
+    "id": 1,
+    "method": "Page.bringToFront",
+    "params": {
+        "sessionId": tab_id
+    }
+    }
+    import json
+    res = asyncio.run(cdp_ws_injector(websocket_url,json.dumps(_payload)))
+    
+    import win32gui,win32con
+    # 最大化指定窗口
+    async def  maximize_window(window_title):
+        # 查找窗口句柄
+        hwnd = win32gui.FindWindow(None, window_title)
+        if hwnd != 0:
+            # 最大化窗口
+            win32gui.ShowWindow(hwnd, win32con.SW_MAXIMIZE)
+        else:
+            print("未找到窗口:", window_title)
+
+    asyncio.run(maximize_window("Plasticity"))
+
+plasticity_window_activate(f)

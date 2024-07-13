@@ -81,4 +81,10 @@ screenshot_payload={
     }
 }
 
-
+command = {
+            "id": 1,
+            "method": "Page.bringToFront",
+            "params": {
+                "sessionId": "tab_id"
+            }
+}
