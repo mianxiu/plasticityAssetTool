@@ -54,62 +54,38 @@ def get_document_tree(websocket_url:str):
     pass
 
 
-ws = get_plasticity_cdp_url()
-f = ws[0]["url"]
+# ws = get_plasticity_cdp_url()
+# f = ws[0]["url"]
 
 def plasticity_window_activate(websocket_url:str):
-    import re
-    tab_id = re.sub(r"(ws.*page\/)(.*)",r"\2",websocket_url)
-
-    # _payload ={
-    # "id": 1,
-    # "method": "Page.bringToFront",
-    # "params": {
-    #     "sessionId": tab_id
-    #     }
-    # }
-    _payload ={
-    "id": 1,
-    "method": "Browser.getWindowForTarget",
-    "params": {
-        "targetId": tab_id
-        }
-    }
-    
-    
-    
-    print(_payload)
-    res = asyncio.run(cdp_ws_injector(websocket_url,_payload))
-    print(res)
-    import win32gui,win32con
-    # 最大化指定窗口
-    async def  maximize_window(window_title):
-        # 查找窗口句柄
-        hwnd = win32gui.FindWindow(None, window_title)
-        if hwnd != 0:
-            # 最大化窗口
-
-            win32gui.ShowWindow(hwnd, win32con.SW_NORMAL)
-            #win32gui.SetForegroundWindow(hwnd)
-
-        else:
-            print("未找到窗口:", window_title)
-
-    asyncio.run(maximize_window("Plasticity"))
+    pass
 
 #plasticity_window_activate(f)
 # import time
 # time.sleep(2)
-# screenshot(f)
-import win32gui
 
-def winEnumHandler( hwnd, ctx ):
-    if win32gui.IsWindowVisible( hwnd ):
-        print ( hwnd, hex( hwnd ), win32gui.GetWindowText( hwnd ) )
+#screenshot(f)
 
-win32gui.EnumWindows( winEnumHandler, None )
-#6820320 , 20843792
-import win32con
-hwnd =6820320 
-win32gui.ShowWindow(hwnd, win32con.SW_NORMAL)
-win32gui.SetForegroundWindow(hwnd)
+# import win32gui,win32event
+
+# def get_associated_program_hwnd(file_path):
+#     # 创建进程并打开文件
+
+#     pid = win32process.CreateProcess(
+#         None,  # 应用程序路径（如果为空，则使用系统关联）
+#         f'''cmd.exe /c "{file_path}"''',  # 命令行参数（使用文件路径作为参数）
+#         None,
+#         None,
+#         0,
+#         win32process.CREATE_NO_WINDOW,
+#         None,
+#         None,
+#         win32process.STARTUPINFO()
+#     )
+#     # win32event.WaitForInputIdle(pid[0],3000)
+#     print(pid[0])
+
+# # 获取关联程序的窗口句柄
+# hwnd = get_associated_program_hwnd(file_path)
+
+# print(f"关联程序的窗口句柄：{hwnd}")
