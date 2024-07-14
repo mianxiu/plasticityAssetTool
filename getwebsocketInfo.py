@@ -53,10 +53,11 @@ def reflash_plasticity_cdp_json_response():
         # don't use proxy
     session = requests.Session()
     session.trust_env = False
-    response = session.get(_CDP_JSON_URL,proxies={})
-    if response.status_code == 200:
-        content = response.text
-        return content
+    if _CDP_JSON_URL != "":
+        response = session.get(_CDP_JSON_URL,proxies={})
+        if response.status_code == 200:
+            content = response.text
+            return content
                 
                 
                 
@@ -206,7 +207,7 @@ def open_new_file_asset(file_path,sleep_time=0):
     shell_process = subprocess.Popen(f'''cmd.exe /c "{file_path}"''',stdout=subprocess.PIPE) 
     import time
     time.sleep(sleep_time)
-    _cdp_content = reflash_plasticity_cdp_json_response()
+    _cdp_content = reflash_plasticity_cdp_json_response() if _CDP_JSON_URL != "" else find_init_plasticity_cdp_json_url_response()
     Plasticity_Window.reflash_new_plasticity_window()
     # print("EXIST-----")
     # print(_EXIST_PLASTICITY_HWND)
@@ -221,7 +222,9 @@ def open_new_file_asset(file_path,sleep_time=0):
         ISOPEN_PLASTICITY_ASSET_FILE_INFO.append({
             "title":_NEW_PLASTICITY_HWND[0]["title"],
             "hwnd":_NEW_PLASTICITY_HWND[0]["hwnd"],
-            "url":_NEW_PLASTICITY_WEBSOCKET_JSON[0]["url"]
+            "url":_NEW_PLASTICITY_WEBSOCKET_JSON[0]["url"],
+            "file_name":"",
+            "file_path":file_path
         })
 
 if __name__ == '__main__':

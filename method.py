@@ -16,16 +16,13 @@ def init_panel(websocket_url:str):
     '%show_panel_event_key_code%':config["keymap"]["show_panel_event_key_code"]
     # 添加更多的替换规则
     }
-    print(replacements)
     for key,value in replacements.items():
         javscritpString =  javscritpString.replace(f"`{key}`",str(value))
         
     res = asyncio.run(cdp_ws_injector(websocket_url,cdp_runtime_evaluate_payload(f'''{javscritpString}''')))
-    print(res)
-    print(javscritpString)
-    
-init_panel("ws://localhost:9223/devtools/page/81ADACCCAC27E7651F62A0933A311762")
-
+    # print(res)
+    # print(javscritpString)
+init_panel("ws://127.0.0.1:9223/devtools/page/5E1B5B0A279D6E9A62DD1E11F953983A")
 
 def screenshot(websocket_url:str):
     """
@@ -52,7 +49,6 @@ def isolate_focus(websocket_url:str):
     pass
 
 
-
 def select_obj_isolate_focus(websocket_url:str,selector:str):
     from plasticitycommand import PointerEvent
     
@@ -63,13 +59,22 @@ def select_obj_isolate_focus(websocket_url:str,selector:str):
 def focus_plasticity_asset_file_window(websocket_url:str):
     pass
 
+def get_filename_from_ws_url(websocket_url:str):
+    return
+
 def get_document_tree(websocket_url:str):
     pass
 
 
+
 # ws = get_plasticity_cdp_url()
 # f = ws[0]["url"]
-
+import win32gui,win32con
 def plasticity_window_activate(websocket_url:str):
     pass
+
+def plasticity_winddow_minimize(hwnd):
+    win32gui.ShowWindow(hwnd,win32con.SW_MINIMIZE)
+    
+plasticity_winddow_minimize(1443174)
 
