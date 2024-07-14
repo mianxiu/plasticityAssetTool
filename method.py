@@ -1,17 +1,30 @@
 import asyncio
 from cdp_payload import cdp_ws_injector,cdp_runtime_evaluate_payload,screenshot_payload
-from getwebsocketInfo import get_plasticity_cdp_url
 
 
 
 
-def init_id(websocket_url:str):
-    
-    javscritpString = open("./plasticity_javascript_payloads/init.js","r",encoding="UTF-8").read()
+
+def init_panel(websocket_url:str):
+    import json
+
+    javscritpString = open("./plasticity-javascript-payloads/init.js","r",encoding="UTF-8").read()
+    config = json.loads(open("./config.json","r").read())
+    replacements = {
+    '%websocket_port%': config["server"]["websocket_port"],
+    '%http_port%': config["server"]["http_port"],
+    '%show_panel_event_key_code%':config["keymap"]["show_panel_event_key_code"]
+    # 添加更多的替换规则
+    }
+    print(replacements)
+    for key,value in replacements.items():
+        javscritpString =  javscritpString.replace(f"`{key}`",str(value))
+        
     res = asyncio.run(cdp_ws_injector(websocket_url,cdp_runtime_evaluate_payload(f'''{javscritpString}''')))
     print(res)
+    print(javscritpString)
     
-#init_id()
+init_panel("ws://localhost:9223/devtools/page/81ADACCCAC27E7651F62A0933A311762")
 
 
 def screenshot(websocket_url:str):
@@ -60,32 +73,3 @@ def get_document_tree(websocket_url:str):
 def plasticity_window_activate(websocket_url:str):
     pass
 
-#plasticity_window_activate(f)
-# import time
-# time.sleep(2)
-
-#screenshot(f)
-
-# import win32gui,win32event
-
-# def get_associated_program_hwnd(file_path):
-#     # 创建进程并打开文件
-
-#     pid = win32process.CreateProcess(
-#         None,  # 应用程序路径（如果为空，则使用系统关联）
-#         f'''cmd.exe /c "{file_path}"''',  # 命令行参数（使用文件路径作为参数）
-#         None,
-#         None,
-#         0,
-#         win32process.CREATE_NO_WINDOW,
-#         None,
-#         None,
-#         win32process.STARTUPINFO()
-#     )
-#     # win32event.WaitForInputIdle(pid[0],3000)
-#     print(pid[0])
-
-# # 获取关联程序的窗口句柄
-# hwnd = get_associated_program_hwnd(file_path)
-
-# print(f"关联程序的窗口句柄：{hwnd}")

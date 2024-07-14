@@ -1,6 +1,7 @@
 // in plasiticity 3d
 // object node is list node, and has event
 // input node is list name node
+
 var objectNodes = document.querySelectorAll("#left-sidebar .mr-1");
 var inputNodes = document.querySelectorAll("#left-sidebar .mr-1 input");
 
@@ -20,13 +21,17 @@ console.log(`PlasticityAssetTool:init node id`);
 let node = document.createElement("iframe");
 node.id = "plasticity_asset_tool_panel";
 node.src = "http://127.0.0.1:15150/index.html";
+// python to replace `%in python config%`
+node.setAttribute("websocket_port", `%websocket_port%`);
+node.setAttribute("http_port", `%http_port%`);
+node.setAttribute("show_panel_event_key_code", "`%show_panel_event_key_code%`");
 node.style = "display:block;width:500px;height:500px;position:fixed;background-color: antiquewhite;border-radius: 10px;top:100px;left:100px;z-index:300;";
 document.querySelector("body").appendChild(node);
 // 获取要监听的元素
 
 // 监听按键事件
 document.addEventListener("keydown", async function (event) {
-  if (event.code == "Backquote") {
+  if (event.code == "`%show_panel_event_key_code%`") {
     // 按下 "z" 键时切换元素的显示状态
     let el = document.querySelector("#plasticity_asset_tool_panel");
     el.style.display = el.style.display === "none" ? "block" : "none";
@@ -44,4 +49,4 @@ window.addEventListener("message", function (event) {
     el.style.display = "none";
   }
 });
-console.log("init");
+console.log("plasticity asset tool panel init");
