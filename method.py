@@ -70,7 +70,7 @@ def get_document_tree(websocket_url:str):
 # ws = get_plasticity_cdp_url()
 # f = ws[0]["url"]
 import win32gui,win32con
-def plasticity_window_activate(websocket_url:str):
+def plasticity_window_activate(hwnd:int):
     pass
 
 def plasticity_winddow_minimize(hwnd):

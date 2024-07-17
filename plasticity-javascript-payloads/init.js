@@ -25,6 +25,7 @@ node.src = "http://127.0.0.1:15150/index.html";
 node.setAttribute("websocket_port", `%websocket_port%`);
 node.setAttribute("http_port", `%http_port%`);
 node.setAttribute("show_panel_event_key_code", "`%show_panel_event_key_code%`");
+node.setAttribute("hwnd", `%hwnd%`);
 node.style = "display:block;width:500px;height:500px;position:fixed;background-color: antiquewhite;border-radius: 10px;top:100px;left:100px;z-index:300;";
 document.querySelector("body").appendChild(node);
 // 获取要监听的元素
