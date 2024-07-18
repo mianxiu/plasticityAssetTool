@@ -1,5 +1,36 @@
 import json
 import re
+from enum import Enum
+
+class Plasticity_Object_Type(Enum):
+    GROUP = "group",
+    ITEM = "item",
+    NAME = "name"
+    pass
+
+def get_node_tree(file_json_str:json):
+    _file_json = json.loads(file_json_str)
+    _nodes = _file_json["nodes"]
+    _groups = _file_json["groups"]
+    _groups_root = _groups[0]["children"]
+    
+    
+    for root_index in _groups_root:
+        _node = _nodes[root_index]
+        _node_type = list(_node.keys())[0]
+        
+        match _node_type:
+            case Plasticity_Object_Type.GROUP.value:
+                pass
+
+        
+        print(_node_type)
+        pass
+
+    
+    print("\n_______________\n",_nodes)
+    print(_groups_root)
+
 with open('test file\worker.plasticity', 'rb') as file:
     # start_sequence = b'4A534F4E7B'
     # end_sequence = b'F858000042'
@@ -28,10 +59,11 @@ with open('test file\worker.plasticity', 'rb') as file:
         data += chunk  # 将读取的数据添加到存储区
         
     d = data.decode("utf-8",errors="ignore")
-    e = re.findall("JSON(.*)X\x00\x00BIN\x00PS\x00\x00\x003: ",d)
+    e = re.findall("JSON(.*}]}).+PS",d)
     # 使用正则表达式替换提取 JSON 数据
 
-    print(e[0])
+    #print(e[0])
+    get_node_tree(file_json_str=e[0])
     
     with open('test file/output.json','w') as j:
         j.write(e[0])
