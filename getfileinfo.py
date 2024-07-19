@@ -17,6 +17,7 @@ def get_node_tree(file_json_str:json):
     _groups = _file_json["groups"]
     
     global _index, _deep
+    
     _index = 0
     _deep = 0
     
@@ -28,32 +29,21 @@ def get_node_tree(file_json_str:json):
         for root_index in _groups_root:
 
             _node = _nodes[root_index]
-
             _node_type = list(_node.keys())[0]
 
             match _node_type:
                 case "group":
                     print(_deep,_node)
-                    _deep += 1
                     
-                    
+                    _deep += 1          
                     _index += 1
                     _loop_tree(_index)
                     
                 case "item":
- 
                     print(_deep,_node)
-                    # _deep -= 1
+       
         _deep -=1      
-                # case Plasticity_Object_Type.NAME.value:
-                #     pass
 
-        
-            # print(_node_type)
-            # pass
-
-        
-            # print("\n_______________\n",_nodes)
 
     _loop_tree(_index)
 
