@@ -8,28 +8,54 @@ class Plasticity_Object_Type(Enum):
     NAME = "name"
     pass
 
+
 def get_node_tree(file_json_str:json):
+
+
     _file_json = json.loads(file_json_str)
     _nodes = _file_json["nodes"]
     _groups = _file_json["groups"]
-    _groups_root = _groups[0]["children"]
     
+    global _index, _deep
+    _index = 0
+    _deep = 0
     
-    for root_index in _groups_root:
-        _node = _nodes[root_index]
-        _node_type = list(_node.keys())[0]
+    def _loop_tree(index:int):
+        global _index,_deep
         
-        match _node_type:
-            case Plasticity_Object_Type.GROUP.value:
-                pass
+        _groups_root = _groups[index]["children"]
+        
+        for root_index in _groups_root:
+
+            _node = _nodes[root_index]
+
+            _node_type = list(_node.keys())[0]
+
+            match _node_type:
+                case "group":
+                    print(_deep,_node)
+                    _deep += 1
+                    
+                    
+                    _index += 1
+                    _loop_tree(_index)
+                    
+                case "item":
+ 
+                    print(_deep,_node)
+                    # _deep -= 1
+        _deep -=1      
+                # case Plasticity_Object_Type.NAME.value:
+                #     pass
 
         
-        print(_node_type)
-        pass
+            # print(_node_type)
+            # pass
 
-    
-    print("\n_______________\n",_nodes)
-    print(_groups_root)
+        
+            # print("\n_______________\n",_nodes)
+
+    _loop_tree(_index)
 
 with open('test file\worker.plasticity', 'rb') as file:
     # start_sequence = b'4A534F4E7B'
