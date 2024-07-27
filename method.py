@@ -22,7 +22,7 @@ def init_panel(websocket_url:str):
     res = asyncio.run(cdp_ws_injector(websocket_url,cdp_runtime_evaluate_payload(f'''{javscritpString}''')))
     # print(res)
     # print(javscritpString)
-init_panel("ws://127.0.0.1:9223/devtools/page/5E1B5B0A279D6E9A62DD1E11F953983A")
+# init_panel("ws://127.0.0.1:9223/devtools/page/5E1B5B0A279D6E9A62DD1E11F953983A")
 
 def screenshot(websocket_url:str):
     """
@@ -73,8 +73,67 @@ import win32gui,win32con
 def plasticity_window_activate(hwnd:int):
     pass
 
-def plasticity_winddow_minimize(hwnd):
-    win32gui.ShowWindow(hwnd,win32con.SW_MINIMIZE)
+def plasticity_window_title_change(hwnd,title):
+    #win32gui.ShowWindow(hwnd,win32con.SWP_HIDEWINDOW)
+    win32gui.SetWindowText(hwnd,title)
+
+title_ico_path_ = r"G:\Github\plasticityAssetTool\test file\ico.ico"
+
+def plasticity_window_icon_change(hwnd,ico_path):
+    icon_flags = win32con.LR_LOADFROMFILE
+    hicon = win32gui.LoadImage(0, ico_path, win32con.IMAGE_ICON, 0, 0, icon_flags)
     
-plasticity_winddow_minimize(1443174)
+    # 设置窗口图标
+    #win32gui.SendMessage(hwnd, win32con.WM_SETICON, win32con.ICON_BIG, hicon)
+    win32gui.SendMessage(hwnd, win32con.WM_SETICON, win32con.ICON_SMALL, hicon)
+    
+
+def plasticity_window_setoverlay(hwnd,ico_path):
+    import ctypes
+    from ctypes import wintypes
+
+    # # 定义常量
+    # WM_SETICON = 0x0080
+    # ICON_SMALL = 0
+    # ICON_BIG = 1
+
+    # 加载 user32.dll
+    user32 = ctypes.WinDLL('user32')
+
+    # 定义 ICONINFO 结构体
+    class ICONINFO(ctypes.Structure):
+        _fields_ = [
+            ('fIcon', wintypes.BOOL),
+            ('xHotspot', wintypes.DWORD),
+            ('yHotspot', wintypes.DWORD),
+            ('hbmMask', wintypes.HBITMAP),
+            ('hbmColor', wintypes.HBITMAP)
+        ]
+
+    icon_flags = win32con.LR_LOADFROMFILE
+    hicon = win32gui.LoadImage(0, ico_path, win32con.IMAGE_ICON, 0, 0, icon_flags)
+
+    # 创建 ICONINFO 结构体
+    icon_info = ICONINFO()
+    user32.GetIconInfo(hicon, ctypes.byref(icon_info))
+
+    # 设置叠加图标
+
+    win32gui.SendMessage(hwnd, win32con.WM_SETICON, win32con.ICON_SMALL, hicon)
+    # user32.SendMessageW(hwnd, WM_SETICON, ICON_SMALL, icon_info.hbmMask)
+    # user32.SendMessageW(hwnd, WM_SETICON, ICON_BIG, icon_info.hbmColor)
+
+    # 释放资源
+    # user32.DeleteObject(icon_info.hbmMask)
+    # user32.DeleteObject(icon_info.hbmColor)
+    # user32.DestroyIcon(hicon)
+
+    #win32gui.UpdateWindow(hwnd)    
+_hwnd = 2367588
+#plasticity_window_setoverlay(_hwnd,ico_path=title_ico_path_)
+#plasticity_window_icon_change(_hwnd,ico_path=title_ico_path_)
+plasticity_window_title_change(_hwnd,"📘(asset) test 22222")
+
+
+
 

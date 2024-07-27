@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+
 from enum import Enum
 
 class Websocket_Handle_Message(Enum):
@@ -7,12 +7,15 @@ class Websocket_Handle_Message(Enum):
     
     PRINT_MESSAGE = "PRINT_MESSAGE",
     SW_HIDE="SW_HIDE",
+    SW_SHOW = "SW_SHOW"
     SW_SHOWNORMAL="SW_SHOWNORMAL",
     SW_SHOWMINIMIZED="SW_SHOWMINIMIZED",
     SW_SHOWMAXIMIZED="SW_SHOWMAXIMIZED",
     SW_MAXIMIZE="SW_MAXIMIZE",
     SW_MINIMIZE="SW_MINIMIZE",
-    SW_RESTORE = "SW_RESTORE"
+    SW_RESTORE = "SW_RESTORE",
+    
+    
 
 
 
