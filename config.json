@@ -1,7 +1,7 @@
 {
   "server": {
     "http_port": 15150,
-    "websocket_port": 15151
+    "websocket_url": "/webscoket"
   },
   "keymap": {
     "show_panel_event_key_code": "Backquote"

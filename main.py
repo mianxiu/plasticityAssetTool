@@ -1,6 +1,6 @@
 
 import asyncio
-
+import threading
 import tornado.websocket
 
 from webui import webui
@@ -70,9 +70,9 @@ def make_app():
         (r"/websocket", WSHandler),
          (r"/(.*)", tornado.web.StaticFileHandler, {"path": html_root, "default_filename": r"./index.html"}),
         
-    ],debug=True,**settings)
+    ],**settings)
 
-async def run_http_server():
+async def run_http_websocket_server():
     app = make_app()
     app.listen(HTTP_PORT)
     shutdown_event = asyncio.Event()
@@ -91,18 +91,25 @@ def run_webui():
     webui.wait()
     
     
-async def main():
-    pass
+def run_all_server():
+        asyncio.run(run_http_websocket_server())
         # loop = asyncio.get_event_loop()
-        # task1 =loop.create_task(run_http_server())
-        # task2 = loop.create_task(run_all_server_with_websocket())
+        # task1 =loop.create_task(run_http_websocket_server())
+        # task2 = loop.create_task(run_webui())
         
         # await task1
         # await task2
+        pass
 
 if __name__ == "__main__":
+    _thread_http_websocket = threading.Thread(target=run_all_server)
+    _thread_http_websocket.daemon = True
+    _thread_http_websocket.start()
+    _thread_ui = threading.Thread(target=run_webui)
+    _thread_ui.start()
     
-    asyncio.run(run_http_server())
+    
+    
 
     
 
