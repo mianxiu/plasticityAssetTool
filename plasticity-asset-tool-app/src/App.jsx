@@ -18,7 +18,7 @@ function App() {
   // );
 
   // 创建 WebSocket 连接
-  const socket = new WebSocket("ws://127.0.0.1:15151");
+  const socket = new WebSocket("ws://127.0.0.1:15150/websocket");
 
   // 连接建立时的处理
   socket.addEventListener("open", () => {
