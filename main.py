@@ -11,32 +11,6 @@ import tornado
 HTTP_PORT = 15150
 WEBSOCKET_PORT = 15151
 
-# async def handler(websocket):
-#     while True:
-#         try:
-#             message = await websocket.recv()
-#         except websockets.ConnectionClosedOK:
-#             break
-        
-#         print(message)
-        
-# async def websocket_server():
-#     print(f"websocket server run on port: ws://127.0.0.1:{WEBSOCKET_PORT}")
-#     async with websockets.serve(handler, "", WEBSOCKET_PORT):
-#         await asyncio.Future()  # run forever
-
-
-# # run gui serve
-# from bottle import route, run, static_file
-
-# @route('/')
-# def serve_index():
-#     return static_file('index.html', root='plasticity-asset-tool-app/dist')
-
-# @route('/<filepath:path>')
-# def serve_static(filepath):
-#     return static_file(filepath, root='plasticity-asset-tool-app/dist')
-
 class WSHandler(tornado.websocket.WebSocketHandler):
     def open(self):
         print("WebSocket opened")
@@ -72,6 +46,10 @@ def make_app():
         
     ],**settings)
 
+
+def end_handler(event):
+    event.set()  # 主线程结束时设置事件
+
 async def run_http_websocket_server():
     app = make_app()
     app.listen(HTTP_PORT)
@@ -85,6 +63,7 @@ async def run_http_websocket_server():
 #     await websocket_server()
  
 def run_webui():
+
     MyWindow = webui.window()
     MyWindow.set_size(800,640)
     MyWindow.show( rf"http://127.0.0.1:{HTTP_PORT}/")
@@ -93,20 +72,17 @@ def run_webui():
     
 def run_all_server():
         asyncio.run(run_http_websocket_server())
-        # loop = asyncio.get_event_loop()
-        # task1 =loop.create_task(run_http_websocket_server())
-        # task2 = loop.create_task(run_webui())
-        
-        # await task1
-        # await task2
         pass
 
 if __name__ == "__main__":
-    _thread_http_websocket = threading.Thread(target=run_all_server)
-    _thread_http_websocket.daemon = True
-    _thread_http_websocket.start()
+
+    # _thread_http_websocket = threading.Thread(target=run_all_server)
+    # _thread_http_websocket.daemon = False
+    # _thread_http_websocket.start()
     _thread_ui = threading.Thread(target=run_webui)
+    _thread_ui.daemon = True
     _thread_ui.start()
+    run_all_server()
     
     
     

@@ -59,14 +59,33 @@ function App() {
     setDouble(count() * 2);
   });
 
+  const MyComponent = () => {
+    const animal = { breed: "cat", name: "Midnight" };
+    return (
+      <div>
+        <p>
+          i have a {animal.breed} named {animal.name} !
+        </p>
+      </div>
+    );
+  };
+
   return (
     <div>
+      <MyComponent />
       <span>Double:{double()}</span>
       <span>Count:{count()}</span>
       <button type="button" onClick={increment}>
         add one
       </button>
-      <button type="button" onClick={decrement}>
+      <button
+        style={{
+          color: "blue",
+          background: "gray",
+        }}
+        type="button"
+        onClick={decrement}
+      >
         subtrace one
       </button>
       <span id="c"></span>
