@@ -18,7 +18,9 @@
   font-size: calc(10px + 2vmin);
   color: white;
 }
-
+.dark-mode {
+  --li-color: blue;
+}
 .link {
   color: #b318f0;
 }
@@ -30,4 +32,35 @@
   to {
     transform: rotate(360deg);
   }
+}
+
+.panel {
+  background-color: rgb(134, 147, 237);
+  min-height: "100%";
+  min-width: "100%";
+  grid-gap: 10px;
+  margin: 0 auto;
+  max-width: 2968px;
+  width: 100%;
+  display: grid;
+  /* grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); */
+  grid-template-columns: repeat(auto-fit, 100px);
+}
+
+.panel_obj {
+  background-color: green;
+  height: 100px;
+}
+
+.tab,
+.tab_ul {
+  display: flex;
+  padding: 0;
+}
+.tab_li {
+  list-style-type: none;
+  background-color: aliceblue;
+}
+.tab_li:hover {
+  background-color: var(--li-color);
 }

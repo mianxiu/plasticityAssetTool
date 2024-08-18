@@ -2,7 +2,7 @@
 import asyncio
 import threading
 import tornado.websocket
-
+import websockethandle
 from webui import webui
 
 
@@ -11,12 +11,14 @@ import tornado
 HTTP_PORT = 15150
 WEBSOCKET_PORT = 15151
 
+
 class WSHandler(tornado.websocket.WebSocketHandler):
     def open(self):
         print("WebSocket opened")
 
     def on_message(self, message):
-        print(f"from {message}")
+        websockethandle.websocket_handle(message=message)
+        #print(f"from {message}")
         self.write_message(f"Received message: {message}")
 
     def on_close(self):
@@ -47,15 +49,13 @@ def make_app():
     ],**settings)
 
 
-def end_handler(event):
-    event.set()  # 主线程结束时设置事件
-
 async def run_http_websocket_server():
     app = make_app()
     app.listen(HTTP_PORT)
     shutdown_event = asyncio.Event()
     print(f'http server running: http://localhost:{HTTP_PORT}')
-    print(f'websocket server running: ws://127.0.0.1:{HTTP_PORT}')
+    print(f'websocket server running: ws://127.0.0.1:{HTTP_PORT}/websocket')
+    print(f'Ctrl+C to exit')
     await shutdown_event.wait() 
 
     

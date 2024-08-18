@@ -1,8 +1,59 @@
 import logo from "./logo.svg";
 import styles from "./App.module.css";
-import { createEffect, createSignal } from "solid-js";
+import { createEffect, createSignal, mergeProps, Show } from "solid-js";
+import { Dynamic } from "solid-js/web";
 
-function App() {
+const RedDiv = () => (
+  <div
+    style={{
+      color: "red",
+    }}
+  ></div>
+);
+
+export function MyComponent(props) {
+  const [breed, setBreed] = createSignal("cat");
+  const animal = { breed: "cat", name: "Midnight" };
+
+  const [theme, setTheme] = createSignal("light");
+  const handler = (data, event) => {
+    setBreed(data);
+  };
+
+  const finalProps = mergeProps({ name: "default name" }, props);
+  return (
+    <div classList={{ border: theme() === "light", light: theme() === "light", dark: theme() === "dark" }}>
+      <p>
+        i have a {breed()} named {animal.name} !, props is {finalProps.name}
+      </p>
+      <button
+        onclick={() => {
+          setBreed("dog");
+        }}
+      >
+        dog
+      </button>
+      <button
+        onclick={() => {
+          setBreed("chicken");
+        }}
+      >
+        chicken
+      </button>
+      <button
+        onclick={() => {
+          theme() === "light" ? setTheme("dark") : setTheme("light");
+        }}
+      >
+        {theme()}
+      </button>
+
+      <button onclick={[handler, "fromButtonData"]}>handler</button>
+    </div>
+  );
+}
+
+export function App() {
   // return (
   //   <div class={styles.App}>
   //     <header class={styles.header}>
@@ -17,36 +68,9 @@ function App() {
   //   </div>
   // );
 
-  // 创建 WebSocket 连接
-  const socket = new WebSocket("ws://127.0.0.1:15150/websocket");
-
-  // 连接建立时的处理
-  socket.addEventListener("open", () => {
-    console.log("Connected to WebSocket server");
-    // 发送消息到服务器
-  });
-
-  // 接收到消息时的处理
-  socket.addEventListener("message", event => {
-    console.log("Received message from server:", event.data);
-  });
-
-  // 连接关闭时的处理
-  socket.addEventListener("close", () => {
-    console.log("WebSocket connection closed");
-  });
-
-  // 监听按键事件
-  document.addEventListener("keydown", function (event) {
-    if (event.code == "Backquote") {
-      console.log("init key event done");
-      window.parent.postMessage("hideContent", "*");
-    }
-  });
-
   //
   const [count, setCount] = createSignal(2);
-  const [double, setDouble] = createSignal(0);
+
   const increment = () => {
     setCount(prev => prev + 1);
     socket.send("Hello, server! from plasiticy" + `is solidjs ${count()}`);
@@ -59,38 +83,41 @@ function App() {
     setDouble(count() * 2);
   });
 
-  const MyComponent = () => {
-    const animal = { breed: "cat", name: "Midnight" };
-    return (
-      <div>
-        <p>
-          i have a {animal.breed} named {animal.name} !
-        </p>
-      </div>
-    );
-  };
-
   return (
     <div>
-      <MyComponent />
-      <span>Double:{double()}</span>
-      <span>Count:{count()}</span>
-      <button type="button" onClick={increment}>
-        add one
-      </button>
-      <button
-        style={{
-          color: "blue",
-          background: "gray",
-        }}
-        type="button"
-        onClick={decrement}
-      >
-        subtrace one
-      </button>
-      <span id="c"></span>
+      <Show when={data.loading}>
+        <div>loading</div>
+      </Show>
+      <span>File Manager</span>
+      <div class={styles.tab}>
+        <ul class={styles.tab_ul}>
+          <li class={styles.tab_li}>
+            <span>test file 1</span>
+            <button>x</button>
+          </li>
+          <li class={styles.tab_li}>
+            {" "}
+            <span>test file 2</span>
+            <button>x</button>
+          </li>
+        </ul>
+        <button>+</button>
+      </div>
+      <MyComponent name="props name" />
+      <div class={styles.panel}>
+        <div class={styles.panel_obj}>
+          <img></img>
+        </div>
+        <div class={styles.panel_obj}>
+          <img></img>
+        </div>
+        <div class={styles.panel_obj}>
+          <img></img>
+        </div>
+        <div class={styles.panel_obj}>
+          <img></img>
+        </div>
+      </div>
     </div>
   );
 }
-
-export default App;

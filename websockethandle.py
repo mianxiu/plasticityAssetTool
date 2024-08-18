@@ -3,7 +3,7 @@ from enum import Enum
 
 class Websocket_Handle_Message(Enum):
     def __str__(self) -> str:
-        return self.value    
+        return self.value 
     
     PRINT_MESSAGE = "PRINT_MESSAGE",
     SW_HIDE="SW_HIDE",
@@ -33,18 +33,31 @@ def websocket_handle(message:str):
    
    if len(_message) > 1 : pass
    else: 
-       return print("commit message need be like: [ SW_MINMIZE:hwnd number ]")
+       return print("commit message need be like: [Command:args] -> [ SW_MINMIZE:hwnd number ]")
 
    _command = _message[0]
    _args = _message[1]
    
    print("message: ",_command,_args)
-   
-   match message:
-       
-       case Websocket_Handle_Message.PRINT_MESSAGE:
-            pass
-       case Websocket_Handle_Message.SW_SHOWNORMAL:
-           print("show_normal") 
+    
+   match _command:
+            case "PRINT_MESSAGE":
+                pass
+            case"SW_HIDE":
+                pass
+            case "SW_SHOW":
+                pass
+            case"SW_SHOWNORMAL":
+                pass
+            case"SW_SHOWMINIMIZED":
+                pass
+            case"SW_SHOWMAXIMIZED":
+                pass
+            case"SW_MAXIMIZE":
+                pass
+            case"SW_MINIMIZE":
+                pass
+            case "SW_RESTORE":
+                pass
            
-websocket_handle("SW_MINMIZE:000000:222")
+# websocket_handle("SW_MINMIZE:000000:222")
