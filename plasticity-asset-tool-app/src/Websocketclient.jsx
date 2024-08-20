@@ -1,4 +1,4 @@
-export function Websocket_Client() {
+export function WebsocketClient() {
   // 创建 WebSocket 连接
   const socket = new WebSocket("ws://127.0.0.1:15150/websocket");
 

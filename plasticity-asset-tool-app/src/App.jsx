@@ -2,6 +2,7 @@ import logo from "./logo.svg";
 import styles from "./App.module.css";
 import { createEffect, createSignal, mergeProps, Show } from "solid-js";
 import { Dynamic } from "solid-js/web";
+import { WebsocketClient } from "./Websocketclient";
 
 const RedDiv = () => (
   <div
@@ -85,9 +86,6 @@ export function App() {
 
   return (
     <div>
-      <Show when={data.loading}>
-        <div>loading</div>
-      </Show>
       <span>File Manager</span>
       <div class={styles.tab}>
         <ul class={styles.tab_ul}>
@@ -105,15 +103,6 @@ export function App() {
       </div>
       <MyComponent name="props name" />
       <div class={styles.panel}>
-        <div class={styles.panel_obj}>
-          <img></img>
-        </div>
-        <div class={styles.panel_obj}>
-          <img></img>
-        </div>
-        <div class={styles.panel_obj}>
-          <img></img>
-        </div>
         <div class={styles.panel_obj}>
           <img></img>
         </div>

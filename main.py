@@ -4,26 +4,35 @@ import threading
 import tornado.websocket
 import websockethandle
 from webui import webui
-
+import uuid
 
 import tornado
 
 HTTP_PORT = 15150
 WEBSOCKET_PORT = 15151
 
+clients = {}
 
 class WSHandler(tornado.websocket.WebSocketHandler):
+ 
     def open(self):
-        print("WebSocket opened")
+        self.id = uuid.uuid4()
+        clients[self.id] = {'id':self.id}
+        print(f"WebSocket opened {self.id}")
 
     def on_message(self, message):
+        print(f"from {self.id}----")
         websockethandle.websocket_handle(message=message)
-        #print(f"from {message}")
         self.write_message(f"Received message: {message}")
 
     def on_close(self):
-        print("WebSocket closed")
-
+                # 清除客户端连接
+        for client_id, client in clients.items():
+            if client == self: 
+                del clients[client_id]
+        print(f"WebSocket closed for {client_id}")
+                
+                
     def check_origin(self, origin):
         return True
     
@@ -76,12 +85,12 @@ def run_all_server():
 
 if __name__ == "__main__":
 
-    # _thread_http_websocket = threading.Thread(target=run_all_server)
-    # _thread_http_websocket.daemon = False
-    # _thread_http_websocket.start()
-    _thread_ui = threading.Thread(target=run_webui)
-    _thread_ui.daemon = True
-    _thread_ui.start()
+    # # _thread_http_websocket = threading.Thread(target=run_all_server)
+    # # _thread_http_websocket.daemon = False
+    # # _thread_http_websocket.start()
+    # _thread_ui = threading.Thread(target=run_webui)
+    # _thread_ui.daemon = True
+    # _thread_ui.start()
     run_all_server()
     
     

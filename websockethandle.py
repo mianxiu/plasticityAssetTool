@@ -18,12 +18,55 @@ class Websocket_Handle_Message(Enum):
     SW_RESTORE = "SW_RESTORE",
     
     
+class Menu(Enum):
+    def select_plasticity_file():
+        import tkinter as tk
+        from tkinter import filedialog
 
+        # 创建主窗口
+        root = tk.Tk()
+        root.withdraw()  # 隐藏主窗口
+        root.iconbitmap("plasticity asset tool.ico")
+        
+        file_path = filedialog.askopenfilenames(title="Select file", filetypes=(
+            ("All files", "*.plasticity *.plasticityassettooldb") ,("Plasticity files", "*.plasticity"),("Plasticity Asset Tool DB", "*.plasticityassettooldb")))
 
+        if file_path:
+            print("选择的文件路径为:", file_path)
+            return file_path
+        else:
+            print("未选择任何文件")
 
+        # 关闭主窗口
+        root.destroy()
 
-def split_message_to_arg(message:str):
-    return message.split(":",1)
+class Window_Control(Enum):
+    def window_control(hwnd,sw_str):
+        match sw_str:
+            case "SW_HIDE":
+                win32gui.ShowWindow(hwnd,win32con.SW_HIDE)
+
+            case "SW_SHOW":
+                win32gui.ShowWindow(hwnd,win32con.SW_SHOW)
+
+            case "SW_SHOWNORMAL":
+                win32gui.ShowWindow(hwnd,win32con.SW_SHOWNORMAL)
+
+            case "SW_SHOWMINIMIZED":
+                win32gui.ShowWindow(hwnd,win32con.SW_SHOWMINIMIZED)
+
+            case "SW_SHOWMAXIMIZED":
+                win32gui.ShowWindow(hwnd,win32con.SW_SHOWMAXIMIZED)
+
+            case "SW_MAXIMIZE":
+                win32gui.ShowWindow(hwnd,win32con.SW_MAXIMIZE)
+
+            case "SW_MINIMIZE":
+                win32gui.ShowWindow(hwnd,win32con.SW_MINIMIZE)
+
+            case "SW_RESTORE":
+                win32gui.ShowWindow(hwnd,win32con.SW_RESTORE)
+
 
 
 def websocket_handle(message:str):
@@ -31,7 +74,7 @@ def websocket_handle(message:str):
         message is like plasticity listener: [command:args], example: SW_MINMIZE:hwnd number -> make window minmize
         """
 
-        _message = split_message_to_arg(message=message)
+        _message =  message.split(":",1)
 
         if len(_message) > 1 : pass
         else: 
@@ -42,35 +85,16 @@ def websocket_handle(message:str):
 
         print("message: ",_command,_args)
 
-        # if re.match('^SW_',_command) == True:
-        #         win32gui.ShowWindow(_args,win32con.SW_MAXIMIZE)
+        if bool(re.search(r'^SW_[A-Z]+',_command)) == True:
+            Window_Control.window_control(hwnd=_args,sw_str=_command) 
+        else:
+            print(f"not command:{_message}")
 
-        match _command:
-            case "PRINT_MESSAGE":
-                pass
-            case "SW_HIDE":
-                win32gui.ShowWindow(_args,win32con.SW_HIDE)
+        # match _command:
+        #     case "PRINT_MESSAGE":
+                
+        #         pass
 
-            case "SW_SHOW":
-                win32gui.ShowWindow(_args,win32con.SW_SHOW)
-
-            case "SW_SHOWNORMAL":
-                win32gui.ShowWindow(_args,win32con.SW_SHOWNORMAL)
-
-            case "SW_SHOWMINIMIZED":
-                win32gui.ShowWindow(_args,win32con.SW_SHOWMINIMIZED)
-
-            case "SW_SHOWMAXIMIZED":
-                win32gui.ShowWindow(_args,win32con.SW_SHOWMAXIMIZED)
-
-            case "SW_MAXIMIZE":
-                win32gui.ShowWindow(_args,win32con.SW_MAXIMIZE)
-
-            case "SW_MINIMIZE":
-                win32gui.ShowWindow(_args,win32con.SW_MINIMIZE)
-
-            case "SW_RESTORE":
-                win32gui.ShowWindow(_args,win32con.SW_RESTORE)
 
            
 # websocket_handle("SW_MINMIZE:000000:222")
