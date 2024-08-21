@@ -87,6 +87,8 @@ def websocket_handle(message:str):
 
         if bool(re.search(r'^SW_[A-Z]+',_command)) == True:
             Window_Control.window_control(hwnd=_args,sw_str=_command) 
+        elif _command == "Menu" and _args == "select_plasticity_file":
+           return  Menu.select_plasticity_file()
         else:
             print(f"not command:{_message}")
 

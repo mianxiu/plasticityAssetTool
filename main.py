@@ -21,9 +21,9 @@ class WSHandler(tornado.websocket.WebSocketHandler):
         print(f"WebSocket opened {self.id}")
 
     def on_message(self, message):
-        print(f"from {self.id}----")
-        websockethandle.websocket_handle(message=message)
-        self.write_message(f"Received message: {message}")
+        # print(f"from {self.id}----")
+        d =websockethandle.websocket_handle(message=message)
+        self.write_message(f"Received message: {d}")
 
     def on_close(self):
                 # 清除客户端连接

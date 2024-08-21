@@ -5,7 +5,7 @@ export function Home() {
   return (
     <div>
       <span>Home</span>
-      <button>reflesh</button>
+      <button>refleshdd</button>
     </div>
   );
 }
