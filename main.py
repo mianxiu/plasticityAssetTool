@@ -20,13 +20,12 @@ class WSHandler(tornado.websocket.WebSocketHandler):
         clients[self.id] = {'id':self.id}
         print(f"WebSocket opened {self.id}")
 
-    def on_message(self, message):
-        # print(f"from {self.id}----")
-        d =websockethandle.websocket_handle(message=message)
-        self.write_message(f"Received message: {d}")
-
+    async def on_message(self, message):
+        result = websockethandle.websocket_handle(message=message)
+        self.write_message(f"Received message: {result}")
+        
     def on_close(self):
-                # 清除客户端连接
+        # 清除客户端连接
         for client_id, client in clients.items():
             if client == self: 
                 del clients[client_id]
@@ -73,10 +72,27 @@ async def run_http_websocket_server():
  
 def run_webui():
 
-    MyWindow = webui.window()
-    MyWindow.set_size(800,640)
-    MyWindow.show( rf"http://127.0.0.1:{HTTP_PORT}/")
-    webui.wait()
+    # MyWindow = webui.window()
+    # MyWindow.set_size(800,640)
+    # MyWindow.show( rf"http://127.0.0.1:{HTTP_PORT}/")
+    # webui.wait()
+        import tkinter as tk
+        from tkinter import filedialog
+
+        # 创建主窗口
+        root = tk.Tk()
+        root.iconify()  
+        root.iconbitmap("plasticity asset tool.ico")
+        
+        
+        # 创建一个顶级窗口来容纳文件选择对话框
+        # top_level = tk.Toplevel(root)
+        # top_level.withdraw()
+
+        # button = tk.Button(top_level, text="Open File", command=open_file)
+        # button.pack()
+
+        root.mainloop()
     
     
 def run_all_server():
@@ -85,6 +101,7 @@ def run_all_server():
 
 if __name__ == "__main__":
 
+        
     # # _thread_http_websocket = threading.Thread(target=run_all_server)
     # # _thread_http_websocket.daemon = False
     # # _thread_http_websocket.start()

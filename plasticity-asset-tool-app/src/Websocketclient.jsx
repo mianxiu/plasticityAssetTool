@@ -19,10 +19,10 @@ export function WebsocketClient() {
   });
 
   // 监听按键事件
-  document.addEventListener("keydown", function (event) {
-    if (event.code == "Backquote") {
-      console.log("init key event done");
-      window.parent.postMessage("hideContent", "*");
-    }
-  });
+  // document.addEventListener("keydown", function (event) {
+  //   if (event.code == "Backquote") {
+  //     console.log("init key event done");
+  //     window.parent.postMessage("hideContent", "*");
+  //   }
+  // });
 }

@@ -2,6 +2,8 @@
 from enum import Enum
 import re
 import win32gui,win32con
+import tkinter as tk
+from tkinter import filedialog
 
 class Websocket_Handle_Message(Enum):
     def __str__(self) -> str:
@@ -20,25 +22,31 @@ class Websocket_Handle_Message(Enum):
     
 class Menu(Enum):
     def select_plasticity_file():
-        import tkinter as tk
-        from tkinter import filedialog
+
 
         # 创建主窗口
-        root = tk.Tk()
-        root.withdraw()  # 隐藏主窗口
+        root = tk.Tk()    
         root.iconbitmap("plasticity asset tool.ico")
         
+        # top_level = tk.Toplevel(root)
+        # top_level.withdraw()
+        root.geometry("300x0")
+        root.wm_title("plasticity asset tool")
+
         file_path = filedialog.askopenfilenames(title="Select file", filetypes=(
             ("All files", "*.plasticity *.plasticityassettooldb") ,("Plasticity files", "*.plasticity"),("Plasticity Asset Tool DB", "*.plasticityassettooldb")))
 
         if file_path:
             print("选择的文件路径为:", file_path)
+            root.withdraw()  # 隐藏主窗口
+            root.destroy()
             return file_path
         else:
             print("未选择任何文件")
-
-        # 关闭主窗口
+            
+        root.withdraw()  # 隐藏主窗口
         root.destroy()
+
 
 class Window_Control(Enum):
     def window_control(hwnd,sw_str):

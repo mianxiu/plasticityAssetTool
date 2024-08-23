@@ -2,7 +2,6 @@ import logo from "./logo.svg";
 import styles from "./App.module.css";
 import { createEffect, createSignal, mergeProps, Show } from "solid-js";
 import { Dynamic } from "solid-js/web";
-import { WebsocketClient } from "./Websocketclient";
 import { Home } from "./Home";
 
 export function MyComponent(props) {}
