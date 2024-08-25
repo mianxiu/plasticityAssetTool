@@ -4,6 +4,9 @@ import { WebsocketClient } from "./WebsocketClient";
 export function Home() {
   //   <WebsocketClient />;
   const socket = new WebSocket("ws://127.0.0.1:15150/websocket");
+  socket.addEventListener("message", event => {
+    console.log("Received message from server:", event.data);
+  });
   const c = () => {
     socket.send("Menu:select_plasticity_file");
   };

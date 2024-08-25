@@ -1,18 +1,41 @@
-import concurrent.futures
+import tornado.ioloop
+import tornado.web
+import tornado.websocket
+import tornado.process
+import os
 
-def square(n):
-    return n**2
+class WSHandler(tornado.websocket.WebSocketHandler):
+    def open(self):
+        client_id = len(self.server.clients) + 1
+        process = tornado.process.Subprocess(['python', 'test_1.py', str(os.getpid()), str(client_id)])
+        process.set_exit_callback(self.on_process_exit)
+        self.server.clients[client_id] = process
 
-# 创建线程池
-executor = concurrent.futures.ThreadPoolExecutor()
+    def on_message(self, message):
+        client_id = int(self.request.arguments["client_id"][0])
+        process = self.server.clients.get(client_id)
+        if process:
+            process.write_message(message)
 
-# 提交多个任务到线程池中
-futures = {executor.submit(square, i): i for i in range(10)}
+    def on_close(self):
+        client_id = int(self.request.arguments["client_id"][0])
+        process = self.server.clients.get(client_id)
+        if process:
+            process.kill()
+            del self.server.clients[client_id]
 
-# 等待每个任务完成并即时获取结果
-for future in concurrent.futures.as_completed(futures):
-    result = future.result()
-    print(f"Result for {futures[future]} : {result}")
+    def on_process_exit(self, status):
+        print("Process exited with status:", status)
 
-# 关闭线程池
-executor.shutdown()
+class Application(tornado.web.Application):
+    def __init__(self):
+        self.clients = {}
+        handlers = [
+            (r"/ws", WSHandler),
+        ]
+        super().__init__(handlers)
+
+if __name__ == "__main__":
+    app = Application()
+    app.listen(8888)
+    tornado.ioloop.IOLoop.current().start()

@@ -39,7 +39,7 @@ class Menu(Enum):
                 ("All files", "*.plasticity *.plasticityassettooldb") ,("Plasticity files", "*.plasticity"),("Plasticity Asset Tool DB", "*.plasticityassettooldb")))
 
             if file_path:
-                print("选择的文件路径为:", file_path)
+                # print("选择的文件路径为:", file_path)
                 FILE_PATH = file_path
             else:
                 print("未选择任何文件")

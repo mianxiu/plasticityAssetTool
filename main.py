@@ -9,38 +9,55 @@ from tornado import ioloop
 import crossfiledialog
 import concurrent.futures
 import threading
+from tornado import websocket
+import multiprocessing
+
+
 
 HTTP_PORT = 15150
 WEBSOCKET_PORT = 15151
 
+WEBSOCKET_URL =  f"ws://127.0.0.1:{HTTP_PORT}/websocket"
+
 clients = {}
 # 创建线程池
 executor = concurrent.futures.ThreadPoolExecutor()
-recent_path = []
+RECENT_PATH = []
 
 
 
 class WSHandler(tornado.websocket.WebSocketHandler):
  
-    def open(self):
+    async def open(self):
         self.id = uuid.uuid4()
         clients[self.id] = {'id':self.id}
         print(f"WebSocket opened {self.id}")
         
         
+    # @classmethod
+    # def on_m(self,msg):
+    #         self.write_message(f"Received message: { self.id} {msg}")
+            
 
     def on_message(self, message):
-        global recent_path
-        #提交多个任务到线程池中
-        
-        
+        global RECENT_PATH
+
+
         def oo():
+            global RECENT_PATH
             r = websockethandle.websocket_handle(message=message)
-            self.write_message(f"Received message: { self.id} {r}")
+            RECENT_PATH = r
+            #ioloop.IOLoop.current().spawn_callback(WSHandler.write_message,r)
+            
         
-        t = threading.Thread(target=oo)
+        t = threading.Thread(target=oo,name=self.id)
         t.setDaemon(True)
         t.start()
+        t.join()
+        
+        
+        self.write_message(f"{RECENT_PATH}")
+        RECENT_PATH = []
         
         # futures = {executor.submit(oo):self.id}
         # # 等待每个任务完成并即时获取结果
@@ -61,6 +78,10 @@ class WSHandler(tornado.websocket.WebSocketHandler):
         for client_id, client in clients.items():
             if client == self: 
                 del clients[client_id]
+                for thread in threading.enumerate():
+                    if thread.name == "MyThread":
+                        print(f"Closing thread {thread.name}")
+                        thread.join(timeout=0)
         print(f"WebSocket closed for {client_id}")
                 
                 
@@ -89,7 +110,7 @@ def make_app():
     ],**settings)
 
 
-async def run_http_websocket_server():
+async def run_http_websocket_server(HTTP_PORT):
     app = make_app()
     app.listen(HTTP_PORT)
     shutdown_event = asyncio.Event()
@@ -127,8 +148,8 @@ def run_webui():
        # root.mainloop()
     
     
-def run_all_server():
-        asyncio.run(run_http_websocket_server())
+def run_all_server(http_port):
+        asyncio.run(run_http_websocket_server(HTTP_PORT=http_port))
         pass
 
 if __name__ == "__main__":
@@ -140,7 +161,13 @@ if __name__ == "__main__":
     # _thread_ui = threading.Thread(target=run_webui)
     # _thread_ui.daemon = True
     # _thread_ui.start()
-    run_all_server()
+    
+    # run_all_server()
+    t1 = multiprocessing.Process(target=run_all_server,args=(15150,))
+    t2 = multiprocessing.Process(target=run_all_server,args=(15151,))
+    
+    t1.start()
+    t2.start()
     
     
     
