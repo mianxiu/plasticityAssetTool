@@ -4,6 +4,7 @@ import re
 import win32gui,win32con
 import tkinter as tk
 from tkinter import filedialog
+import crossfiledialog
 
 class Websocket_Handle_Message(Enum):
     def __str__(self) -> str:
@@ -18,34 +19,34 @@ class Websocket_Handle_Message(Enum):
     SW_MAXIMIZE="SW_MAXIMIZE",
     SW_MINIMIZE="SW_MINIMIZE",
     SW_RESTORE = "SW_RESTORE",
-    
-    
+
+
+
+FILE_PATH =[]
 class Menu(Enum):
     def select_plasticity_file():
+            global FILE_PATH
+            root = tk.Tk()    
+            root.iconbitmap("plasticity asset tool.ico")
+            root.withdraw()
 
+            t = tk.Toplevel(root)
+            t.iconbitmap("plasticity asset tool.ico")
+            t.geometry("300x0")
+            t.wm_title("plasticity asset tool")
 
-        # 创建主窗口
-        root = tk.Tk()    
-        root.iconbitmap("plasticity asset tool.ico")
-        
-        # top_level = tk.Toplevel(root)
-        # top_level.withdraw()
-        root.geometry("300x0")
-        root.wm_title("plasticity asset tool")
+            file_path = filedialog.askopenfilenames(title="Select file", parent=t, filetypes=(
+                ("All files", "*.plasticity *.plasticityassettooldb") ,("Plasticity files", "*.plasticity"),("Plasticity Asset Tool DB", "*.plasticityassettooldb")))
 
-        file_path = filedialog.askopenfilenames(title="Select file", filetypes=(
-            ("All files", "*.plasticity *.plasticityassettooldb") ,("Plasticity files", "*.plasticity"),("Plasticity Asset Tool DB", "*.plasticityassettooldb")))
-
-        if file_path:
-            print("选择的文件路径为:", file_path)
-            root.withdraw()  # 隐藏主窗口
+            if file_path:
+                print("选择的文件路径为:", file_path)
+                FILE_PATH = file_path
+            else:
+                print("未选择任何文件")
+                
             root.destroy()
-            return file_path
-        else:
-            print("未选择任何文件")
-            
-        root.withdraw()  # 隐藏主窗口
-        root.destroy()
+
+
 
 
 class Window_Control(Enum):
@@ -75,8 +76,7 @@ class Window_Control(Enum):
             case "SW_RESTORE":
                 win32gui.ShowWindow(hwnd,win32con.SW_RESTORE)
 
-
-
+import threading
 def websocket_handle(message:str):
         """
         message is like plasticity listener: [command:args], example: SW_MINMIZE:hwnd number -> make window minmize
@@ -96,14 +96,19 @@ def websocket_handle(message:str):
         if bool(re.search(r'^SW_[A-Z]+',_command)) == True:
             Window_Control.window_control(hwnd=_args,sw_str=_command) 
         elif _command == "Menu" and _args == "select_plasticity_file":
-           return  Menu.select_plasticity_file()
+            # FILE_PATH = []
+            # t = threading.Thread(target=Menu.select_plasticity_file)
+            # t.setDaemon(True)
+            # t.start()
+            # print(FILE_PATH)
+            Menu.select_plasticity_file()
         else:
             print(f"not command:{_message}")
 
         # match _command:
         #     case "PRINT_MESSAGE":
                 
-        #         pass
+        return FILE_PATH
 
 
            

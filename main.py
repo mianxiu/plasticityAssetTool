@@ -1,17 +1,24 @@
 
 import asyncio
-import threading
 import tornado.websocket
 import websockethandle
 from webui import webui
 import uuid
-
 import tornado
+from tornado import ioloop
+import crossfiledialog
+import concurrent.futures
+import threading
 
 HTTP_PORT = 15150
 WEBSOCKET_PORT = 15151
 
 clients = {}
+# 创建线程池
+executor = concurrent.futures.ThreadPoolExecutor()
+recent_path = []
+
+
 
 class WSHandler(tornado.websocket.WebSocketHandler):
  
@@ -19,11 +26,36 @@ class WSHandler(tornado.websocket.WebSocketHandler):
         self.id = uuid.uuid4()
         clients[self.id] = {'id':self.id}
         print(f"WebSocket opened {self.id}")
-
-    async def on_message(self, message):
-        result = websockethandle.websocket_handle(message=message)
-        self.write_message(f"Received message: {result}")
         
+        
+
+    def on_message(self, message):
+        global recent_path
+        #提交多个任务到线程池中
+        
+        
+        def oo():
+            r = websockethandle.websocket_handle(message=message)
+            self.write_message(f"Received message: { self.id} {r}")
+        
+        t = threading.Thread(target=oo)
+        t.setDaemon(True)
+        t.start()
+        
+        # futures = {executor.submit(oo):self.id}
+        # # 等待每个任务完成并即时获取结果
+        # for future in concurrent.futures.as_completed(futures):
+        #     result = future.result()
+        #     print(f"Result for {futures[future]} : {result}")   
+
+        # await self.write_message(f"Received message: { self.id} holding select file... ")
+        # await threading.Thread(target=futures.result).start()
+
+        # threads.append(threading.Thread)
+        
+       
+            #await ioloop.IOLoop.current().run_in_executor(None,oo)
+
     def on_close(self):
         # 清除客户端连接
         for client_id, client in clients.items():
@@ -92,7 +124,7 @@ def run_webui():
         # button = tk.Button(top_level, text="Open File", command=open_file)
         # button.pack()
 
-        root.mainloop()
+       # root.mainloop()
     
     
 def run_all_server():
