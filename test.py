@@ -1,41 +1,18 @@
-import tornado.ioloop
-import tornado.web
-import tornado.websocket
-import tornado.process
-import os
+import concurrent.futures
+import time
 
-class WSHandler(tornado.websocket.WebSocketHandler):
-    def open(self):
-        client_id = len(self.server.clients) + 1
-        process = tornado.process.Subprocess(['python', 'test_1.py', str(os.getpid()), str(client_id)])
-        process.set_exit_callback(self.on_process_exit)
-        self.server.clients[client_id] = process
-
-    def on_message(self, message):
-        client_id = int(self.request.arguments["client_id"][0])
-        process = self.server.clients.get(client_id)
-        if process:
-            process.write_message(message)
-
-    def on_close(self):
-        client_id = int(self.request.arguments["client_id"][0])
-        process = self.server.clients.get(client_id)
-        if process:
-            process.kill()
-            del self.server.clients[client_id]
-
-    def on_process_exit(self, status):
-        print("Process exited with status:", status)
-
-class Application(tornado.web.Application):
-    def __init__(self):
-        self.clients = {}
-        handlers = [
-            (r"/ws", WSHandler),
-        ]
-        super().__init__(handlers)
+def worker(seconds):
+    time.sleep(seconds)
+    return f"Task completed in {seconds} seconds"
 
 if __name__ == "__main__":
-    app = Application()
-    app.listen(8888)
-    tornado.ioloop.IOLoop.current().start()
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        # 提交多个任务给线程池
+        tasks = [executor.submit(worker, i) for i in range(1, 6)]
+
+        # 使用as_completed迭代已完成的任务结果
+        for future in concurrent.futures.as_completed(tasks):
+            result = future.result()
+            print(result)
+
+    print("All tasks completed")
