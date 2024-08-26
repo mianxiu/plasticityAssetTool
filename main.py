@@ -6,12 +6,6 @@ from webui import webui
 import uuid
 import tornado
 from tornado import ioloop
-import crossfiledialog
-import concurrent.futures
-import threading
-from tornado import websocket,gen
-import multiprocessing
-
 
 
 HTTP_PORT = 15150
@@ -84,33 +78,15 @@ async def run_http_websocket_server(HTTP_PORT):
     print(f'Ctrl+C to exit')
     await shutdown_event.wait() 
 
-    
-# async def run_all_server_with_websocket():
-#     await websocket_server()
+
  
 def run_webui():
 
-    # MyWindow = webui.window()
-    # MyWindow.set_size(800,640)
-    # MyWindow.show( rf"http://127.0.0.1:{HTTP_PORT}/")
-    # webui.wait()
-        import tkinter as tk
-        from tkinter import filedialog
+    MyWindow = webui.window()
+    MyWindow.set_size(800,640)
+    MyWindow.show( rf"http://127.0.0.1:{HTTP_PORT}/")
+    webui.wait()
 
-        # 创建主窗口
-        root = tk.Tk()
-        root.iconify()  
-        root.iconbitmap("plasticity asset tool.ico")
-        
-        
-        # 创建一个顶级窗口来容纳文件选择对话框
-        # top_level = tk.Toplevel(root)
-        # top_level.withdraw()
-
-        # button = tk.Button(top_level, text="Open File", command=open_file)
-        # button.pack()
-
-       # root.mainloop()
     
     
 def run_all_server(http_port):

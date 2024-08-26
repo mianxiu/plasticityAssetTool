@@ -4,7 +4,6 @@ import re
 import win32gui,win32con
 import tkinter as tk
 from tkinter import filedialog
-import crossfiledialog
 
 class Websocket_Handle_Message(Enum):
     def __str__(self) -> str:
@@ -96,18 +95,10 @@ def websocket_handle(message:str):
         if bool(re.search(r'^SW_[A-Z]+',_command)) == True:
             Window_Control.window_control(hwnd=_args,sw_str=_command) 
         elif _command == "Menu" and _args == "select_plasticity_file":
-            # FILE_PATH = []
-            # t = threading.Thread(target=Menu.select_plasticity_file)
-            # t.setDaemon(True)
-            # t.start()
-            # print(FILE_PATH)
+
             Menu.select_plasticity_file()
         else:
             print(f"not command:{_message}")
-
-        # match _command:
-        #     case "PRINT_MESSAGE":
-                
         return FILE_PATH
 
 
