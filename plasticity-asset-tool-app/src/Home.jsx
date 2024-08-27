@@ -3,12 +3,15 @@ import { WebsocketClient } from "./WebsocketClient";
 
 export function Home() {
   //   <WebsocketClient />;
+  const [filePath, setFilePath] = createSignal("");
+
   const socket = new WebSocket("ws://127.0.0.1:15150/websocket");
   socket.addEventListener("message", event => {
     console.log("Received message from server:", event.data);
+    setFilePath(event.data);
   });
   const c = () => {
-    socket.send("Menu:select_plasticity_file");
+    socket.send("File:select_plasticity_file");
   };
   return (
     <div>
@@ -22,6 +25,11 @@ export function Home() {
       >
         openfile
       </button>
+      <ul>
+        <li>
+          <span>{filePath()}</span>
+        </li>
+      </ul>
     </div>
   );
 }
