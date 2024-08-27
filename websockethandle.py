@@ -21,10 +21,14 @@ class Websocket_Handle_Message(Enum):
 
 
 
-FILE_PATH =[]
-class Menu(Enum):
+
+class File(Enum):
+    def run_command(command):
+        match command:
+            case "select_plasticity_file":
+                return File.select_plasticity_file()
+                
     def select_plasticity_file():
-            global FILE_PATH
             root = tk.Tk()    
             root.iconbitmap("plasticity asset tool.ico")
             root.withdraw()
@@ -36,16 +40,13 @@ class Menu(Enum):
             t.wm_attributes('-topmost', True) 
             t.wm_attributes('-topmost', False) 
             
-
             file_path = filedialog.askopenfilenames(title="Select file", parent=t, filetypes=(
                 ("All files", "*.plasticity *.plasticityassettooldb") ,("Plasticity files", "*.plasticity"),("Plasticity Asset Tool DB", "*.plasticityassettooldb")))
 
             if file_path:
-                # print("选择的文件路径为:", file_path)
-                FILE_PATH = file_path
-            else:
-                print("未选择任何文件")
-                
+                root.destroy()
+                return file_path
+            
             root.destroy()
 
 
@@ -78,7 +79,7 @@ class Window_Control(Enum):
             case "SW_RESTORE":
                 win32gui.ShowWindow(hwnd,win32con.SW_RESTORE)
 
-import threading
+
 def websocket_handle(message:str):
         """
         message is like plasticity listener: [command:args], example: SW_MINMIZE:hwnd number -> make window minmize
@@ -90,20 +91,19 @@ def websocket_handle(message:str):
         else: 
             return print("commit message need be like: [Command:args] -> [ SW_MINMIZE:hwnd number ]")
 
-        _command = _message[0]
-        _args = _message[1]
+        _menu = _message[0]
+        _command = _message[1]
 
-        print("message: ",_command,_args)
+        print("message: ",_menu,_command)
 
-        if bool(re.search(r'^SW_[A-Z]+',_command)) == True:
-            Window_Control.window_control(hwnd=_args,sw_str=_command) 
-        elif _command == "Menu" and _args == "select_plasticity_file":
-
-            Menu.select_plasticity_file()
+        if bool(re.search(r'^SW_[A-Z]+',_menu)) == True:
+          return  Window_Control.window_control(hwnd=_command,sw_str=_menu) 
+        elif bool(re.search(r'^File',_menu)) == True:
+          return  File.run_command(_command)
+            
         else:
             print(f"not command:{_message}")
 
-        return FILE_PATH
 
 
            
