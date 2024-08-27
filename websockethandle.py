@@ -33,7 +33,9 @@ class Menu(Enum):
             t.iconbitmap("plasticity asset tool.ico")
             t.geometry("300x0")
             t.wm_title("plasticity asset tool")
-            t.wm_attributes('-topmost', 1) 
+            t.wm_attributes('-topmost', True) 
+            t.wm_attributes('-topmost', False) 
+            
 
             file_path = filedialog.askopenfilenames(title="Select file", parent=t, filetypes=(
                 ("All files", "*.plasticity *.plasticityassettooldb") ,("Plasticity files", "*.plasticity"),("Plasticity Asset Tool DB", "*.plasticityassettooldb")))
