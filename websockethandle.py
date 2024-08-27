@@ -33,6 +33,7 @@ class Menu(Enum):
             t.iconbitmap("plasticity asset tool.ico")
             t.geometry("300x0")
             t.wm_title("plasticity asset tool")
+            t.wm_attributes('-topmost', 1) 
 
             file_path = filedialog.askopenfilenames(title="Select file", parent=t, filetypes=(
                 ("All files", "*.plasticity *.plasticityassettooldb") ,("Plasticity files", "*.plasticity"),("Plasticity Asset Tool DB", "*.plasticityassettooldb")))
@@ -99,6 +100,7 @@ def websocket_handle(message:str):
             Menu.select_plasticity_file()
         else:
             print(f"not command:{_message}")
+
         return FILE_PATH
 
 

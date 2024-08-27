@@ -1,12 +1,11 @@
 
 import asyncio
-import tornado.websocket
 import websockethandle
 from webui import webui
 import uuid
 import tornado
-from tornado import ioloop
-
+from tornado import ioloop,websocket
+import threading
 
 HTTP_PORT = 15150
 WEBSOCKET_PORT = 15151
@@ -16,7 +15,7 @@ RECENT_PATH = []
 
 clients = {}
 
-class WSHandler(tornado.websocket.WebSocketHandler):
+class WSHandler(websocket.WebSocketHandler):
  
     async def open(self):
         self.id = uuid.uuid4()
@@ -88,6 +87,8 @@ def run_webui():
     webui.wait()
 
     
+def run_webui_tk():
+    pass
     
 def run_all_server(http_port):
         asyncio.run(run_http_websocket_server(HTTP_PORT=http_port))
