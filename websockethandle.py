@@ -4,6 +4,11 @@ import re
 import win32gui,win32con
 import tkinter as tk
 from tkinter import filedialog
+import sqlite3
+from peewee import *
+import time
+
+RECENT_PATH_DB = 'recent_path.db'
 
 class Websocket_Handle_Message(Enum):
     def __str__(self) -> str:
@@ -43,13 +48,52 @@ class File(Enum):
             file_path = filedialog.askopenfilenames(title="Select file", parent=t, filetypes=(
                 ("All files", "*.plasticity *.plasticityassettooldb") ,("Plasticity files", "*.plasticity"),("Plasticity Asset Tool DB", "*.plasticityassettooldb")))
 
-            if file_path:
+            if file_path and len(file_path) > 0:
                 root.destroy()
+                File.write_recent_db_file(file_path)
                 return file_path
             
             root.destroy()
 
+    def open_plasticity_file():
+        pass
+    def write_recent_db_file(file_path:list):
+                    # 定义 SQLite 数据库文件路径
+                    db = SqliteDatabase(f'{RECENT_PATH_DB}')
 
+                    # 完成数据库连接
+                    db.connect()
+
+                    # 定义 Peewee 模型
+                    class FilePath(Model):
+                        name = CharField()
+                        path = CharField()
+                        # last_read_date=TimeField()
+                        # has_db=BooleanField()
+                        
+
+                        class Meta:
+                            database = db
+
+
+                    db.create_tables([FilePath])
+
+                    # # 示例文件路径
+                    # file_path = '/path/to/your/file.txt'
+
+                    # 插入文件路径数据
+                    for file in file_path:
+                        FilePath.create(name="work.plasticity",path = file)
+
+                    # 读取并打印存储的文件路径数据
+                    for file_path in FilePath.select():
+                        print(file_path.path)
+
+                    # 关闭数据库连接
+                    db.close()
+                    pass
+    def read_recent_db_file():
+        pass
 
 
 class Window_Control(Enum):
