@@ -4,9 +4,10 @@ import re
 import win32gui,win32con
 import tkinter as tk
 from tkinter import filedialog
-import sqlite3
 from peewee import *
 import time
+import datetime
+import os
 
 RECENT_PATH_DB = 'recent_path.db'
 
@@ -58,37 +59,31 @@ class File(Enum):
     def open_plasticity_file():
         pass
     def write_recent_db_file(file_path:list):
-                    # 定义 SQLite 数据库文件路径
-                    db = SqliteDatabase(f'{RECENT_PATH_DB}')
 
-                    # 完成数据库连接
+                    db = SqliteDatabase(f'{RECENT_PATH_DB}')
                     db.connect()
 
-                    # 定义 Peewee 模型
                     class FilePath(Model):
                         name = CharField()
                         path = CharField()
-                        # last_read_date=TimeField()
-                        # has_db=BooleanField()
+                        last_read_date=TimeField()
+                        has_db=BooleanField()
                         
-
                         class Meta:
                             database = db
 
-
                     db.create_tables([FilePath])
-
-                    # # 示例文件路径
-                    # file_path = '/path/to/your/file.txt'
 
                     # 插入文件路径数据
                     for file in file_path:
-                        FilePath.create(name="work.plasticity",path = file)
+                        filename = os.path.basename(file)
+                        l = time.time()
+                        s = FilePath.create(name=f"{filename}",path = file,last_read_date=l,has_db=False)
+                        s.has_db = True
+                        s.save()
 
-                    # 读取并打印存储的文件路径数据
                     for file_path in FilePath.select():
                         print(file_path.path)
-
                     # 关闭数据库连接
                     db.close()
                     pass
