@@ -6,11 +6,15 @@ import tkinter as tk
 from tkinter import filedialog
 from peewee import *
 import time
-import datetime
 import os
+import win32clipboard
+import ctypes
+import io
+
 
 RECENT_PATH_DB = "recent_path.db"
-
+        # 指定要保存到的文件路径
+file_path = "./test file/clipboard_binary_data.bin"
 
 class Websocket_Handle_Message(Enum):
     def __str__(self) -> str:
@@ -29,6 +33,74 @@ class Websocket_Handle_Message(Enum):
 
 class AssetDatabase(Enum):
     pass
+
+class Clipboard(Enum):
+        PLASTICITY_CUSTOM_FORMAT_NAME = "application/vnd.plasticity.items"
+
+
+        
+        @staticmethod
+        def get_plasticity_format_id():
+                RegisterClipboardFormat = ctypes.windll.user32.RegisterClipboardFormatA
+                format_id = RegisterClipboardFormat(Clipboard.PLASTICITY_CUSTOM_FORMAT_NAME.encode("utf-8"))
+                # print(f"Registered custom clipboard format '{PLASTICITY_CUSTOM_FORMAT_NAME}' with ID: {format_id}")
+                return format_id
+                
+
+        @staticmethod
+        def check_plasticity_clipboard_data_is_has():
+            format_id = Clipboard.get_plasticity_format_id()
+
+            win32clipboard.OpenClipboard()
+            i = win32clipboard.IsClipboardFormatAvailable(format_id)
+            win32clipboard.CloseClipboard()
+            if i == 1:
+                return True
+            else:
+                return False
+            
+        print(check_plasticity_clipboard_data_is_has())
+
+        @staticmethod
+        def get_plasticity_clipboard_data(path:str):
+            
+            format_id = Clipboard.get_plasticity_format_id()
+            win32clipboard.OpenClipboard()
+            try:
+                # 尝试获取剪贴板数据
+                clipboard_data = win32clipboard.GetClipboardData(format_id)
+
+                with open(path, 'wb') as file:
+                    file.write(clipboard_data)
+                    
+                print(f"剪贴板数据已保存为二进制文件: {path}")
+            except Exception as e:
+                print("无法获取剪贴板数据或数据无法保存为二进制格式")
+
+            # 关闭剪贴板
+            win32clipboard.CloseClipboard()
+        
+        @staticmethod
+        def set_plasticity_clipboard_data(path:str):
+            format_id = Clipboard.get_plasticity_format_id()
+            # 打开剪贴板
+            win32clipboard.OpenClipboard()
+            win32clipboard.EmptyClipboard()
+            
+            try:
+                with open(path, 'rb') as f:
+                    clipboard_data = f.read()
+                
+                buffer = io.BytesIO()
+                buffer.write(clipboard_data)
+                win32clipboard.SetClipboardData(format_id,buffer.getvalue())
+            except Exception as e:
+                print("无法设置剪贴板内容")
+
+            # 关闭剪贴板
+            win32clipboard.CloseClipboard()
+
+
 
 
 class File(Enum):

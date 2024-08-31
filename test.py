@@ -9,13 +9,28 @@ PLASTICITY_CUSTOM_FORMAT_NAME = "application/vnd.plasticity.items"
 # 指定要保存到的文件路径
 file_path = "./test file/clipboard_binary_data.bin"
 
+def get_plasticity_format_id():
+        RegisterClipboardFormat = ctypes.windll.user32.RegisterClipboardFormatA
+        format_id = RegisterClipboardFormat(PLASTICITY_CUSTOM_FORMAT_NAME.encode("utf-8"))
+        # print(f"Registered custom clipboard format '{PLASTICITY_CUSTOM_FORMAT_NAME}' with ID: {format_id}")
+        return format_id
+    
+def check_plasticity_clipboard_data_is_has():
+    format_id = get_plasticity_format_id()
+
+    win32clipboard.OpenClipboard()
+    i = win32clipboard.IsClipboardFormatAvailable(format_id)
+    win32clipboard.CloseClipboard()
+    if i == 1:
+        return True
+    else:
+        return False
+    
+print(check_plasticity_clipboard_data_is_has())
+
 def get_plasticity_clipboard_data(path:str):
     
-    RegisterClipboardFormat = ctypes.windll.user32.RegisterClipboardFormatA
-    format_id = RegisterClipboardFormat(PLASTICITY_CUSTOM_FORMAT_NAME.encode("utf-8"))
-
-    print(f"Registered custom clipboard format '{PLASTICITY_CUSTOM_FORMAT_NAME}' with ID: {format_id}")
-
+    format_id = get_plasticity_format_id()
     win32clipboard.OpenClipboard()
     try:
         # 尝试获取剪贴板数据
@@ -31,15 +46,8 @@ def get_plasticity_clipboard_data(path:str):
     # 关闭剪贴板
     win32clipboard.CloseClipboard()
     
-
-
 def set_plasticity_clipboard_data(path:str):
-    
-    RegisterClipboardFormat = ctypes.windll.user32.RegisterClipboardFormatA
-    format_id = RegisterClipboardFormat(PLASTICITY_CUSTOM_FORMAT_NAME.encode("utf-8"))
-
-    print(f"Registered custom clipboard format '{PLASTICITY_CUSTOM_FORMAT_NAME}' with ID: {format_id}")
-
+    format_id = get_plasticity_format_id()
     # 打开剪贴板
     win32clipboard.OpenClipboard()
     win32clipboard.EmptyClipboard()
@@ -57,5 +65,5 @@ def set_plasticity_clipboard_data(path:str):
     # 关闭剪贴板
     win32clipboard.CloseClipboard()
 
-    
-set_plasticity_clipboard_data(file_path)
+
+
