@@ -74,7 +74,7 @@ async def run_http_websocket_server(HTTP_PORT):
     shutdown_event = asyncio.Event()
     print(f'http server running: http://localhost:{HTTP_PORT}')
     print(f'websocket server running: ws://127.0.0.1:{HTTP_PORT}/websocket')
-    print(f'Ctrl+C to exit')
+    print('Ctrl+C to exit')
     await shutdown_event.wait() 
 
 
