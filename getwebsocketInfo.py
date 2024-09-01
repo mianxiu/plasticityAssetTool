@@ -218,7 +218,7 @@ def open_new_file_asset(file_path,sleep_time=0):
     
     print("Exist Plasticity websocket json: \n",_EXIST_PLASTICITY_WEBSOCKET_JSON)
     
-    if check_value_in_dict_array(_NEW_PLASTICITY_HWND[0]["hwnd"],ISOPEN_PLASTICITY_ASSET_FILE_INFO)==False:
+    if not check_value_in_dict_array(_NEW_PLASTICITY_HWND[0]["hwnd"],ISOPEN_PLASTICITY_ASSET_FILE_INFO):
         ISOPEN_PLASTICITY_ASSET_FILE_INFO.append({
             "title":_NEW_PLASTICITY_HWND[0]["title"],
             "hwnd":_NEW_PLASTICITY_HWND[0]["hwnd"],
@@ -232,8 +232,8 @@ if __name__ == '__main__':
     file_path = r'G:\Github\plasticityAssetTool\test file\test 1.plasticity'
     file_path2 =r'G:\Github\plasticityAssetTool\test file\test 2.plasticity'
 
-    open_new_file_asset(file_path=file_path,sleep_time=3)
+    # open_new_file_asset(file_path=file_path,sleep_time=3)
     #open_new_file_asset(file_path=file_path2,sleep_time=3)
     print(ISOPEN_PLASTICITY_ASSET_FILE_INFO)
-
+    print(find_init_plasticity_cdp_json_url_response())
 

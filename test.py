@@ -1,7 +1,5 @@
 import win32clipboard
-import win32con
 import ctypes
-import pickle
 import io
 
 PLASTICITY_CUSTOM_FORMAT_NAME = "application/vnd.plasticity.items"

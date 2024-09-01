@@ -35,15 +35,13 @@ class AssetDatabase(Enum):
     pass
 
 class Clipboard(Enum):
-        PLASTICITY_CUSTOM_FORMAT_NAME = "application/vnd.plasticity.items"
-
-
         
+        PLASTICITY_CUSTOM_FORMAT_NAME = "application/vnd.plasticity.items".encode("utf-8")
+
         @staticmethod
         def get_plasticity_format_id():
                 RegisterClipboardFormat = ctypes.windll.user32.RegisterClipboardFormatA
-                format_id = RegisterClipboardFormat(Clipboard.PLASTICITY_CUSTOM_FORMAT_NAME.encode("utf-8"))
-                # print(f"Registered custom clipboard format '{PLASTICITY_CUSTOM_FORMAT_NAME}' with ID: {format_id}")
+                format_id = RegisterClipboardFormat(Clipboard.PLASTICITY_CUSTOM_FORMAT_NAME.value)
                 return format_id
                 
 
@@ -59,8 +57,7 @@ class Clipboard(Enum):
             else:
                 return False
             
-        print(check_plasticity_clipboard_data_is_has())
-
+        
         @staticmethod
         def get_plasticity_clipboard_data(path:str):
             
@@ -82,6 +79,11 @@ class Clipboard(Enum):
         
         @staticmethod
         def set_plasticity_clipboard_data(path:str):
+            
+            if not os.path.exists(path):
+                print("没有文件")
+                return
+            
             format_id = Clipboard.get_plasticity_format_id()
             # 打开剪贴板
             win32clipboard.OpenClipboard()
@@ -100,7 +102,7 @@ class Clipboard(Enum):
             # 关闭剪贴板
             win32clipboard.CloseClipboard()
 
-
+# print(Clipboard.set_plasticity_clipboard_data(file_path))
 
 
 class File(Enum):
