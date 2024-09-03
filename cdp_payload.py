@@ -4,7 +4,7 @@ import json
 
 
 
-async def cdp_ws_injector(ws_url,payload:dict):
+async def cdp_ws_injector(ws_url:str,payload:dict):
     """
     asyncio.run(injector_js(ws_url,payload))
     if not have value, return None
@@ -12,15 +12,7 @@ async def cdp_ws_injector(ws_url,payload:dict):
     async with websockets.connect(ws_url) as websocket:
         await websocket.send(json.dumps(payload))
         response =await websocket.recv()
-        #print(response)
-        # try:
-        #     return json.loads(response)['result']['result']['value']
-        # except:
-        #     try:
-        #         return json.load(response)['result']['data']
-        #     except:
-        #         return None
-        
+
         return response
 
 def cdp_runtime_evaluate_payload(*javascript_str:str):

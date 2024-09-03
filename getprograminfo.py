@@ -3,6 +3,8 @@ import psutil
 import win32process
 import win32gui
 import json
+import cdp_payload
+import asyncio
 
 _PROCESS_NAME = "Plasticity.exe"
 _PROCESS_WINDOW_TITLE = "Plasticity"
@@ -89,15 +91,25 @@ def get_program_info():
     cdp_content = cdp_info["content"]
     hwnd_lists = get_plastcity_hwnd_lists(_PROCESS_NAME)
     
-    for cdp_json,hwnd in zip(cdp_content,hwnd_lists):
-        info_lists.append({
-            "ws_url": cdp_json["webSocketDebuggerUrl"],
-            "hwnd":hwnd
-        })
+    for cdp_json,hwnd in zip(cdp_content,reversed(hwnd_lists)):
+        ws_url = cdp_json["webSocketDebuggerUrl"]
+        filename = json.loads(asyncio.run(
+            cdp_payload.cdp_ws_injector(
+                ws_url=ws_url,payload=cdp_payload.getFileNamePayload)))["result"]["result"]["value"]
         
+        info_lists.append({
+            "ws_url": ws_url,
+            "hwnd":hwnd,
+            "filename":filename
+        })
+        win32gui.SetWindowText(hwnd,filename)
     return info_lists
 
 print(get_program_info())
         
         
 
+import win32con
+
+
+# win32gui.SetWindowText()
