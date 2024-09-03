@@ -1,8 +1,11 @@
 import psutil
 import asyncio
 from cdp_payload import cdp_ws_injector,getFileNamePayload
-import requests,json
-
+import requests
+import json
+import win32gui
+import win32process
+import subprocess
 
 
 #ws = "ws://127.0.0.1:9223/devtools/page/D1F330B6426643C50C7912FBC0ABAAC7"
@@ -71,7 +74,8 @@ def reflash_exist_websocket_json(dev_json_content):
     }
     """
     global _EXIST_PLASTICITY_WEBSOCKET_JSON,_NEW_PLASTICITY_WEBSOCKET_JSON
-    if dev_json_content is None : return
+    if dev_json_content is None : 
+        return
     #print(dev_json_content)
     _EXIST_PLASTICITY_WEBSOCKET_JSON.clear()
     
@@ -82,7 +86,7 @@ def reflash_exist_websocket_json(dev_json_content):
         _id = ws_json["id"] 
         _title = ws_json["title"]
         
-        if _title == _PROCESS_WINDOW_TITLE and check_value_in_dict_array(_ws_url,_EXIST_PLASTICITY_WEBSOCKET_JSON)==False:
+        if _title == _PROCESS_WINDOW_TITLE and not check_value_in_dict_array(_ws_url,_EXIST_PLASTICITY_WEBSOCKET_JSON):
             # _res =  json.loads(asyncio.run(cdp_ws_injector(_ws_url,getFileNamePayload)))
 
             # filename =_res["result"]["result"]["value"]
@@ -131,14 +135,14 @@ def reflash_new_websocket_json(dev_json_content):
 _EXIST_PLASTICITY_HWND =[]
 _NEW_PLASTICITY_HWND =[]
 
-import win32gui,win32process
+
 class Plasticity_Window:
 
     @staticmethod
     def __ExistEnumWindowHandle(hwnd, ctx ):
         if win32gui.IsWindowVisible( hwnd ):
             name =win32gui.GetWindowText( hwnd )
-            if name == _PROCESS_WINDOW_TITLE and check_value_in_dict_array(hwnd,_EXIST_PLASTICITY_HWND) == False:
+            if name == _PROCESS_WINDOW_TITLE and not check_value_in_dict_array(hwnd,_EXIST_PLASTICITY_HWND):
                 _EXIST_PLASTICITY_HWND.append({
                         "title":_PROCESS_WINDOW_TITLE,
                         "hwnd":hwnd,
@@ -150,7 +154,7 @@ class Plasticity_Window:
     def __NewEnumWindowHandle(hwnd, ctx ):
         if win32gui.IsWindowVisible( hwnd ):
             name =win32gui.GetWindowText( hwnd )
-            if name == _PROCESS_WINDOW_TITLE and check_value_in_dict_array(hwnd,_EXIST_PLASTICITY_HWND) == False and check_value_in_dict_array(hwnd,_NEW_PLASTICITY_HWND) == False:
+            if name == _PROCESS_WINDOW_TITLE and not check_value_in_dict_array(hwnd,_EXIST_PLASTICITY_HWND) and not check_value_in_dict_array(hwnd,_NEW_PLASTICITY_HWND):
                 _NEW_PLASTICITY_HWND.clear()
                 _NEW_PLASTICITY_HWND.append({
                         "title":_PROCESS_WINDOW_TITLE,
@@ -198,17 +202,19 @@ def open_new_file_asset(file_path,sleep_time=0):
     """
     has reflash websocket json 
     """
-    import psutil,subprocess
+
     # before create process to reflash 
     _cdp_content = find_init_plasticity_cdp_json_url_response()
     Plasticity_Window.reflash_exist_plasticity_window()
     reflash_exist_websocket_json(dev_json_content=_cdp_content)
     print("Before Plasticity websocket json: \n",_EXIST_PLASTICITY_WEBSOCKET_JSON)
     shell_process = subprocess.Popen(f'''cmd.exe /c "{file_path}"''',stdout=subprocess.PIPE) 
+    
     import time
     time.sleep(sleep_time)
     _cdp_content = reflash_plasticity_cdp_json_response() if _CDP_JSON_URL != "" else find_init_plasticity_cdp_json_url_response()
     Plasticity_Window.reflash_new_plasticity_window()
+    
     # print("EXIST-----")
     # print(_EXIST_PLASTICITY_HWND)
     # print("NEW------")

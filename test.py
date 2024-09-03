@@ -1,67 +1,43 @@
-import win32clipboard
-import ctypes
-import io
+import win32gui
+import win32process
 
-PLASTICITY_CUSTOM_FORMAT_NAME = "application/vnd.plasticity.items"
 
-# 指定要保存到的文件路径
-file_path = "./test file/clipboard_binary_data.bin"
 
-def get_plasticity_format_id():
-        RegisterClipboardFormat = ctypes.windll.user32.RegisterClipboardFormatA
-        format_id = RegisterClipboardFormat(PLASTICITY_CUSTOM_FORMAT_NAME.encode("utf-8"))
-        # print(f"Registered custom clipboard format '{PLASTICITY_CUSTOM_FORMAT_NAME}' with ID: {format_id}")
-        return format_id
-    
-def check_plasticity_clipboard_data_is_has():
-    format_id = get_plasticity_format_id()
+def get_pid_from_hwnd(hwnd):
+    _, pid = win32process.GetWindowThreadProcessId(hwnd)
+    return pid
 
-    win32clipboard.OpenClipboard()
-    i = win32clipboard.IsClipboardFormatAvailable(format_id)
-    win32clipboard.CloseClipboard()
-    if i == 1:
+def get_process_name(pid):
+    import psutil
+    process = psutil.Process(pid)
+    return process.name()
+
+def get_hwnd_from_process_name(process_name):
+    hwnd_list = []
+
+    def callback(hwnd, hwnd_list):
+        if win32gui.IsWindowVisible(hwnd):
+            try:
+                pid = get_pid_from_hwnd(hwnd)
+                if get_process_name(pid) == process_name:
+                    hwnd_list.append((hwnd, pid))
+            except psutil.NoSuchProcess:
+                pass
         return True
-    else:
-        return False
+
+    win32gui.EnumWindows(callback, hwnd_list)
+
+    return hwnd_list
+
+# 要查找的进程名
+process_name = "Plasticity.exe"
+
+# 获取包含进程名的窗口句柄和进程ID列表
+hwnd_pid_list = get_hwnd_from_process_name(process_name)
+
+# 打印窗口句柄和进程ID
+for hwnd, pid in hwnd_pid_list:
+    print(f"进程名: {process_name}, 窗口句柄: {hwnd}, 进程ID: {pid}")
     
-print(check_plasticity_clipboard_data_is_has())
-
-def get_plasticity_clipboard_data(path:str):
-    
-    format_id = get_plasticity_format_id()
-    win32clipboard.OpenClipboard()
-    try:
-        # 尝试获取剪贴板数据
-        clipboard_data = win32clipboard.GetClipboardData(format_id)
-
-        with open(path, 'wb') as file:
-            file.write(clipboard_data)
-            
-        print(f"剪贴板数据已保存为二进制文件: {path}")
-    except Exception as e:
-        print("无法获取剪贴板数据或数据无法保存为二进制格式")
-
-    # 关闭剪贴板
-    win32clipboard.CloseClipboard()
-    
-def set_plasticity_clipboard_data(path:str):
-    format_id = get_plasticity_format_id()
-    # 打开剪贴板
-    win32clipboard.OpenClipboard()
-    win32clipboard.EmptyClipboard()
-    
-    try:
-        with open(path, 'rb') as f:
-            clipboard_data = f.read()
-        
-        buffer = io.BytesIO()
-        buffer.write(clipboard_data)
-        win32clipboard.SetClipboardData(format_id,buffer.getvalue())
-    except Exception as e:
-        print("无法设置剪贴板内容")
-
-    # 关闭剪贴板
-    win32clipboard.CloseClipboard()
-
-
-
+    win32gui.SetWindowText(hwnd, str(hwnd))
+    #ws url 倒序，和hwnd正序对应
