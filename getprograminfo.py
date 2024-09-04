@@ -79,6 +79,7 @@ def find_plasticity_cdp_json():
         response = session.get(url,proxies={})
         if response.status_code == 200:
             content = response.text
+            
             return {
                 "url":url,"content":json.loads(content)}
         
@@ -91,12 +92,14 @@ def get_program_info():
     cdp_content = cdp_info["content"]
     hwnd_lists = get_plastcity_hwnd_lists(_PROCESS_NAME)
     
-    for cdp_json,hwnd in zip(cdp_content,reversed(hwnd_lists)):
+    for cdp_json,hwnd in zip(cdp_content,hwnd_lists):
         ws_url = cdp_json["webSocketDebuggerUrl"]
-        filename = json.loads(asyncio.run(
-            cdp_payload.cdp_ws_injector(
-                ws_url=ws_url,payload=cdp_payload.getFileNamePayload)))["result"]["result"]["value"]
-        
+        try:
+            filename = json.loads(
+                cdp_payload.cdp_ws_injector_sync(
+                    ws_url=ws_url,payload=cdp_payload.getFileNamePayload))["result"]["result"]["value"]
+        except KeyError: 
+            pass
         info_lists.append({
             "ws_url": ws_url,
             "hwnd":hwnd,
@@ -109,7 +112,3 @@ print(get_program_info())
         
         
 
-import win32con
-
-
-# win32gui.SetWindowText()

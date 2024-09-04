@@ -1,10 +1,10 @@
 import websockets
 import json
+from websockets.sync.client import connect
 
 
 
-
-async def cdp_ws_injector(ws_url:str,payload:dict):
+async def cdp_ws_injector(ws_url,payload:dict):
     """
     asyncio.run(injector_js(ws_url,payload))
     if not have value, return None
@@ -12,9 +12,14 @@ async def cdp_ws_injector(ws_url:str,payload:dict):
     async with websockets.connect(ws_url) as websocket:
         await websocket.send(json.dumps(payload))
         response =await websocket.recv()
-
         return response
 
+def cdp_ws_injector_sync(ws_url:str,payload:dict):
+        with connect(ws_url) as websocket:
+            websocket.send(json.dumps(payload))
+            response =websocket.recv()
+        return response
+    
 def cdp_runtime_evaluate_payload(*javascript_str:str):
         """
         return Chrome DevTools Protocol json str
@@ -50,7 +55,7 @@ domPayload = {
 getFileNamePayload = {
     'id' : 3,
     'method':'Runtime.evaluate',
-    'params':{'expression':f'''document.querySelector('#left-sidebar > plasticity-filename > div > span').textContent'''}
+    'params':{'expression':f'''document.querySelector('#left-sidebar > plasticity-filename > div').textContent'''}
 }
 
 selectObjectPayload ={
