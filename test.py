@@ -1,14 +1,25 @@
-import psutil
+import wmi
+import threading
+import pythoncom
 
-# 定义要查找的进程名
-process_name = "Plasticity.exe"
 
-# 遍历当前所有进程
-for process in psutil.process_iter(['pid', 'name']):
-    if process.info['name'] == process_name:
-        # 获取进程的打开文件列表
-        open_files = process.open_files()
-        
-        print(f"Open files for process {process_name}:")
-        for file in open_files:
-            print(file.path)
+
+def process_creation_listener():
+    try:
+        print("----wmi listener----")
+        pythoncom.CoInitialize()
+        c = wmi.WMI()
+        process_watcher = c.Win32_Process.watch_for("creation",name="Plasticity.exe")
+        while True:
+            new_process = process_watcher()
+            print("进程创建：", new_process.Caption)
+    except KeyboardInterrupt:
+        print("捕捉到 Ctrl + C，退出监听循环")
+
+# process_creation_listener()
+
+t = threading.Thread(target=process_creation_listener)
+t.daemon = True
+t.start()
+while t.is_alive():
+    t.join(timeout=1)
