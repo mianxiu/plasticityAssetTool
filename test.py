@@ -1,25 +1,20 @@
-import wmi
-import threading
-import pythoncom
+import asyncio
+import random
 
+async def my_async_function(parameter):
+    print(f"正在处理参数 {parameter}...")
+    # 模拟异步操作随机等待时间
+    await asyncio.sleep(random.uniform(1, 10))
+    print(f"参数 {parameter} 处理完成")
 
+# 待处理的参数列表
+parameters = [1, 2, 3, 4, 5]
 
-def process_creation_listener():
-    try:
-        print("----wmi listener----")
-        pythoncom.CoInitialize()
-        c = wmi.WMI()
-        process_watcher = c.Win32_Process.watch_for("creation",name="Plasticity.exe")
-        while True:
-            new_process = process_watcher()
-            print("进程创建：", new_process.Caption)
-    except KeyboardInterrupt:
-        print("捕捉到 Ctrl + C，退出监听循环")
+async def main():
+    for param in parameters:
+        # 异步执行函数
+        await my_async_function(param)
+        print("等待下一次循环...")
 
-# process_creation_listener()
-
-t = threading.Thread(target=process_creation_listener)
-t.daemon = True
-t.start()
-while t.is_alive():
-    t.join(timeout=1)
+# 运行异步函数
+asyncio.run(main())
