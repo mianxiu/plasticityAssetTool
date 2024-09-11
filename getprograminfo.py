@@ -87,15 +87,19 @@ async def find_plasticity_cdp_json(ports):
     # print("目标进程", _PROCESS_NAME, "的端口列表:", ports)
         
     # don't use proxy
+    if(len(ports) > 0):
+        try:
+            for p in ports:
+                url = f"http://127.0.0.1:{p}/json"
+                response = session.get(url,proxies={},timeout=1)
 
-    for p in ports:
-        url = f"http://127.0.0.1:{p}/json"
-        response = session.get(url,proxies={})
-        if response.status_code == 200:
-            content = response.text
-            return {
-                "url":url,"content":json.loads(content)}
-            
+                if response.status_code == 200:
+                    content = response.text
+                    return {
+                        "url":url,"content":json.loads(content)}
+        except requests.exceptions.ConnectTimeout:
+            print("cccc")
+            return
 
 async def get_ws_info():
     """
