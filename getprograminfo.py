@@ -16,6 +16,8 @@ _PROCESS_WINDOW_TITLE = "Plasticity"
 
 _HWND_LISTS = []
 _CURRENT_WS_JSON = []
+_PORT = []
+_IS_CHECK_PORT = False
 
 
 def get_pid_from_hwnd(hwnd):
@@ -57,10 +59,10 @@ def get_ports_by_process_name(process_name:str):
                 if conn.status == 'LISTEN':
                     ports.append(conn.laddr.port)
     return ports
+    
 
-
-_PORT = get_ports_by_process_name(_PROCESS_NAME)
-
+session = requests.Session()
+session.trust_env = False
 async def find_plasticity_cdp_json(ports):
 
     """
@@ -85,8 +87,6 @@ async def find_plasticity_cdp_json(ports):
     # print("目标进程", _PROCESS_NAME, "的端口列表:", ports)
         
     # don't use proxy
-    session = requests.Session()
-    session.trust_env = False
 
     for p in ports:
         url = f"http://127.0.0.1:{p}/json"
@@ -95,6 +95,7 @@ async def find_plasticity_cdp_json(ports):
             content = response.text
             return {
                 "url":url,"content":json.loads(content)}
+            
 
 async def get_ws_info():
     """
@@ -104,20 +105,44 @@ async def get_ws_info():
             "filename":filename
         }
     """
+    global _IS_CHECK_PORT,_PORT
+    
     ws_info_lists = []
-    try:
-        cdp_info =await find_plasticity_cdp_json(ports=_PORT)
-        
-        cdp_url = cdp_info["url"]
-        cdp_content = cdp_info["content"]
-        
-    except TypeError:
+
+    # try:
+    # print(_IS_CHECK_PORT)
+    # print(_PORT)
+    # print(len(_PORT))
+    if len(_PORT) == 0:      
+        _PORT = get_ports_by_process_name(_PROCESS_NAME)
         return
+        
+    # elif (_IS_CHECK_PORT is False) and (len(_PORT) > 0) :
+    #         _IS_CHECK_PORT = True
+    #         print(_PORT)      
+    # else:
+    #     return
+    
+    # else:
+    #     return
+    # except TypeError:
+    #     _IS_CHECK_PORT = False
+    #     print("Not Port Or Not Plasticity Runing")
+    #     return
+    # if _IS_CHECK_PORT is False:
+    #     return
+    # try:
+    cdp_info =await find_plasticity_cdp_json(ports=_PORT)
+    cdp_url = cdp_info["url"]
+    cdp_content = cdp_info["content"]
+    
+    # except TypeError:
+    #     return
     
     for cdp_json in cdp_content:
         ws_url = cdp_json["webSocketDebuggerUrl"]
-        try:
-            if ws_url not in _CURRENT_WS_JSON:
+        
+        if ws_url not in _CURRENT_WS_JSON:
                     _CURRENT_WS_JSON.append(ws_url)
                     print("new",ws_url)
                     await check_new_hwnd()
@@ -125,9 +150,6 @@ async def get_ws_info():
             # filename = json.loads(
             #     cdp_payload.cdp_ws_injector_sync(
             #         ws_url=ws_url,payload=cdp_payload.getFileNamePayload))["result"]["result"]["value"]
-            pass
-        except KeyError: 
-            pass
 
     # return ws_info_lists
 
@@ -141,10 +163,10 @@ def get_program_info():
     info_list = {}
     
     ws_info = get_ws_info()
-    try:
-        hwnd_lists = get_plastcity_hwnd_lists(_PROCESS_NAME)
-    except TypeError:
-        return
+    # try:
+    hwnd_lists = get_plastcity_hwnd_lists(_PROCESS_NAME)
+    # except TypeError:
+    #     return
     
     for ws,hwnd in zip(ws_info,hwnd_lists):
         filename = ws["filename"]
@@ -179,15 +201,18 @@ async def check_old_hwnd():
 
     
 async def run_process_listener():
-    
     try:
         print("start listener...")
         while True:
-                time.sleep(0.3)
+                # time.sleep(0.3)
+                await asyncio.sleep(0.5)
                 await get_ws_info()
                 # print(get_ws_info())
     except KeyboardInterrupt:
         print("stop listener")
-        
+
+# if __name__ == "__main":
 # check_new_hwnd()
+
+
 asyncio.run(run_process_listener())
