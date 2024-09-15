@@ -99,7 +99,7 @@ async def find_plasticity_cdp_json(ports):
                         "url":url,"content":json.loads(content)}
         except requests.exceptions.ConnectTimeout:
             print("cccc")
-            return
+            return 
 
 async def get_ws_info():
     """
@@ -117,6 +117,7 @@ async def get_ws_info():
     # print(_IS_CHECK_PORT)
     # print(_PORT)
     # print(len(_PORT))
+    
     if len(_PORT) == 0:      
         _PORT = get_ports_by_process_name(_PROCESS_NAME)
         return
@@ -137,6 +138,13 @@ async def get_ws_info():
     #     return
     # try:
     cdp_info =await find_plasticity_cdp_json(ports=_PORT)
+    
+    if cdp_info is None:
+        _PORT.clear()
+        _HWND_LISTS.clear()
+        print("None Plasticity Runing")
+        return
+    
     cdp_url = cdp_info["url"]
     cdp_content = cdp_info["content"]
     
@@ -150,6 +158,7 @@ async def get_ws_info():
                     _CURRENT_WS_JSON.append(ws_url)
                     print("new",ws_url)
                     await check_new_hwnd()
+                    print(_HWND_LISTS)
               
             # filename = json.loads(
             #     cdp_payload.cdp_ws_injector_sync(
