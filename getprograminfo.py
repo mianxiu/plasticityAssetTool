@@ -155,11 +155,13 @@ async def get_ws_info():
         ws_url = cdp_json["webSocketDebuggerUrl"]
         
         if ws_url not in _CURRENT_WS_JSON:
+
                     _CURRENT_WS_JSON.append(ws_url)
                     print("new",ws_url)
-                    await check_new_hwnd()
-                    print(_HWND_LISTS)
-              
+                    if len(_HWND_LISTS) != len(_CURRENT_WS_JSON):
+                        await check_new_hwnd()
+                        print(_HWND_LISTS)
+                
             # filename = json.loads(
             #     cdp_payload.cdp_ws_injector_sync(
             #         ws_url=ws_url,payload=cdp_payload.getFileNamePayload))["result"]["result"]["value"]
@@ -197,7 +199,7 @@ def get_program_info():
     #     win32gui.SetWindowText(p["hwnd"],p["filename"])
 
 async def check_new_hwnd():
-    print("check hwnd")
+    print("checking hwnd")
     current_hwnd = get_plastcity_hwnd_lists(_PROCESS_NAME)
     for n in current_hwnd:
         if n not in _HWND_LISTS:
