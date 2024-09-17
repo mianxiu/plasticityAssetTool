@@ -147,21 +147,27 @@ async def get_ws_info():
     
     cdp_url = cdp_info["url"]
     cdp_content = cdp_info["content"]
+    ws_url_array = [d["webSocketDebuggerUrl"] for d in cdp_content]
+    
+    ws_url_length = len(ws_url_array)
+    _current_ws_json_length = len(_CURRENT_WS_JSON)
+    
+    print(ws_url_length,_current_ws_json_length)
+    
     
     # except TypeError:
     #     return
-    
-    for cdp_json in cdp_content:
-        ws_url = cdp_json["webSocketDebuggerUrl"]
+    if ws_url_length > _current_ws_json_length:
+        await check_new_ws_url(ws_url_array=ws_url_array)
         
-        if ws_url not in _CURRENT_WS_JSON:
+        if len(_HWND_LISTS) != len(_CURRENT_WS_JSON):
+            await check_new_hwnd()
+            print(_HWND_LISTS)
+            
+    elif ws_url_length < _current_ws_json_length:
+        await check_old_ws_url(ws_url_array=ws_url_array)
+        await check_old_hwnd()
 
-                    _CURRENT_WS_JSON.append(ws_url)
-                    print("new",ws_url)
-                    if len(_HWND_LISTS) != len(_CURRENT_WS_JSON):
-                        await check_new_hwnd()
-                        print(_HWND_LISTS)
-                
             # filename = json.loads(
             #     cdp_payload.cdp_ws_injector_sync(
             #         ws_url=ws_url,payload=cdp_payload.getFileNamePayload))["result"]["result"]["value"]
@@ -198,8 +204,29 @@ def get_program_info():
     # for p in program_info:
     #     win32gui.SetWindowText(p["hwnd"],p["filename"])
 
+async def check_new_ws_url(ws_url_array):
+        for url in ws_url_array:
+            if url not in _CURRENT_WS_JSON:
+                        _CURRENT_WS_JSON.append(url)
+                        print("new",url)
+
+async def check_old_ws_url(ws_url_array):
+        global _CURRENT_WS_JSON
+        
+        # cdp_content_set = set(ws_url_array)
+        for url in _CURRENT_WS_JSON:
+
+            if url not in ws_url_array:
+                        _CURRENT_WS_JSON.remove(url)
+                        print("remove",url)
+        # result = [x for x in _CURRENT_WS_JSON if x in cdp_content_set]
+        
+        # _CURRENT_WS_JSON = result
+
+
+
+
 async def check_new_hwnd():
-    print("checking hwnd")
     current_hwnd = get_plastcity_hwnd_lists(_PROCESS_NAME)
     for n in current_hwnd:
         if n not in _HWND_LISTS:
@@ -211,7 +238,7 @@ async def check_old_hwnd():
     for n in _HWND_LISTS:
         if n not in current_hwnd:
             _HWND_LISTS.remove(n)
-            print("old",n)
+            print("remove",n)
 
 
     
@@ -229,5 +256,7 @@ async def run_process_listener():
 # if __name__ == "__main":
 # check_new_hwnd()
 
-
-asyncio.run(run_process_listener())
+try:
+    asyncio.run(run_process_listener())
+except KeyboardInterrupt:
+    print("exit listener")
