@@ -99,7 +99,7 @@ async def find_plasticity_cdp_json(ports):
                         "url":url,"content":json.loads(content)}
                     
         except requests.exceptions.ConnectTimeout:
-            print("cccc")
+            print(f"CDP Server Close")
             return 
 
 async def get_ws_info():
