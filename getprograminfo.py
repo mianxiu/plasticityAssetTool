@@ -27,21 +27,21 @@ def get_pid_from_hwnd(hwnd):
 def get_process_name(pid):
     return psutil.Process(pid).name()
 
-def get_plastcity_hwnd_lists(process_name:str):
+async def get_plastcity_hwnd_lists(process_name:str):
     hwnd_list = []
     time_list = []
 
     def callback(hwnd, hwnd_list):
         if win32gui.IsWindowVisible(hwnd):
-            try:
+            # try:
                 pid = get_pid_from_hwnd(hwnd)
                 if get_process_name(pid) == process_name:
 
                     t = psutil.Process(pid).create_time()
                     hwnd_list.append(hwnd)
                     time_list.append(t)
-            except psutil.NoSuchProcess:
-                pass
+            # except psutil.NoSuchProcess:
+            #     pass
         return True
     
 
@@ -97,6 +97,7 @@ async def find_plasticity_cdp_json(ports):
                     content = response.text
                     return {
                         "url":url,"content":json.loads(content)}
+                    
         except requests.exceptions.ConnectTimeout:
             print("cccc")
             return 
@@ -152,18 +153,16 @@ async def get_ws_info():
     ws_url_length = len(ws_url_array)
     _current_ws_json_length = len(_CURRENT_WS_JSON)
     
-    print(ws_url_length,_current_ws_json_length)
+    # print(ws_url_length,_current_ws_json_length)
     
     
     # except TypeError:
     #     return
     if ws_url_length > _current_ws_json_length:
         await check_new_ws_url(ws_url_array=ws_url_array)
+        await check_new_hwnd()
+        # print(_HWND_LISTS)
         
-        if len(_HWND_LISTS) != len(_CURRENT_WS_JSON):
-            await check_new_hwnd()
-            print(_HWND_LISTS)
-            
     elif ws_url_length < _current_ws_json_length:
         await check_old_ws_url(ws_url_array=ws_url_array)
         await check_old_hwnd()
@@ -227,14 +226,14 @@ async def check_old_ws_url(ws_url_array):
 
 
 async def check_new_hwnd():
-    current_hwnd = get_plastcity_hwnd_lists(_PROCESS_NAME)
+    current_hwnd =await get_plastcity_hwnd_lists(_PROCESS_NAME)
     for n in current_hwnd:
         if n not in _HWND_LISTS:
             _HWND_LISTS.append(n)
             print("new",n)
 
 async def check_old_hwnd():
-    current_hwnd = get_plastcity_hwnd_lists(_PROCESS_NAME)
+    current_hwnd =await get_plastcity_hwnd_lists(_PROCESS_NAME)
     for n in _HWND_LISTS:
         if n not in current_hwnd:
             _HWND_LISTS.remove(n)
@@ -253,10 +252,8 @@ async def run_process_listener():
     except KeyboardInterrupt:
         print("stop listener")
 
-# if __name__ == "__main":
-# check_new_hwnd()
-
-try:
-    asyncio.run(run_process_listener())
-except KeyboardInterrupt:
-    print("exit listener")
+if __name__ == "__main__":
+    try:
+        asyncio.run(run_process_listener())
+    except KeyboardInterrupt:
+        print("Exit listener")
