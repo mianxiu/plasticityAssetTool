@@ -47,7 +47,7 @@ async def get_plastcity_hwnd_lists(process_name:str):
 
     win32gui.EnumWindows(callback, hwnd_list)
         
-    print(hwnd_list)
+    # print(hwnd_list)
     return hwnd_list
 
 def get_ports_by_process_name(process_name:str):
@@ -143,6 +143,7 @@ async def get_ws_info():
     if cdp_info is None:
         _PORT.clear()
         _HWND_LISTS.clear()
+        _CURRENT_WS_JSON.clear()
         print("None Plasticity Runing")
         return
     
@@ -153,7 +154,7 @@ async def get_ws_info():
     ws_url_length = len(ws_url_array)
     _current_ws_json_length = len(_CURRENT_WS_JSON)
     
-    # print(ws_url_length,_current_ws_json_length)
+    print(ws_url_length,_current_ws_json_length)
     
     
     # except TypeError:
@@ -198,7 +199,7 @@ def get_program_info():
             
         # info["hwnd"] = hwnd
 
-    print(info_list)
+    # print(info_list)
     
     # for p in program_info:
     #     win32gui.SetWindowText(p["hwnd"],p["filename"])
