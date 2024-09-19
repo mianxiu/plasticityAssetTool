@@ -244,14 +244,14 @@ async def check_old_hwnd():
     
 async def run_process_listener():
     try:
-        print("start listener...")
+        print("Start Listener...\n------")
         while True:
                 # time.sleep(0.3)
                 await asyncio.sleep(0.5)
                 await get_ws_info()
                 # print(get_ws_info())
     except KeyboardInterrupt:
-        print("stop listener")
+        print("Stop Listener")
 
 if __name__ == "__main__":
     try:
