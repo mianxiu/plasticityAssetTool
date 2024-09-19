@@ -144,7 +144,7 @@ async def get_ws_info():
         _PORT.clear()
         _HWND_LISTS.clear()
         _CURRENT_WS_JSON.clear()
-        print("None Plasticity Runing")
+        print("None Plasticity.exe Runing")
         return
     
     cdp_url = cdp_info["url"]
