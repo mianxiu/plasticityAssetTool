@@ -154,7 +154,7 @@ async def get_ws_info():
     ws_url_length = len(ws_url_array)
     _current_ws_json_length = len(_CURRENT_WS_JSON)
     
-    print(ws_url_length,_current_ws_json_length)
+    # print(ws_url_length,_current_ws_json_length)
     
     
     # except TypeError:
