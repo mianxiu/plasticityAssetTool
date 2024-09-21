@@ -27,14 +27,14 @@ def get_pid_from_hwnd(hwnd):
 def get_process_name(pid):
     return psutil.Process(pid).name()
 
-async def get_plastcity_hwnd_lists(process_name:str):
+def get_plastcity_hwnd_lists(process_name:str):
     hwnd_list = []
     time_list = []
 
     def callback(hwnd, hwnd_list):
         if win32gui.IsWindowVisible(hwnd):
             # try:
-                pid = get_pid_from_hwnd(hwnd)
+                pid =get_pid_from_hwnd(hwnd)
                 if get_process_name(pid) == process_name:
 
                     t = psutil.Process(pid).create_time()
@@ -50,7 +50,7 @@ async def get_plastcity_hwnd_lists(process_name:str):
     # print(hwnd_list)
     return hwnd_list
 
-def get_ports_by_process_name(process_name:str):
+async def get_ports_by_process_name(process_name:str):
     ports = []
     for proc in psutil.process_iter(['pid', 'name']):
         if proc.info['name'] == process_name:
@@ -99,7 +99,7 @@ async def find_plasticity_cdp_json(ports):
                         "url":url,"content":json.loads(content)}
                     
         except requests.exceptions.ConnectTimeout:
-            print(f"CDP Server Close")
+            print("CDP Server Close")
             return 
 
 async def get_ws_info():
@@ -120,7 +120,7 @@ async def get_ws_info():
     # print(len(_PORT))
     
     if len(_PORT) == 0:      
-        _PORT = get_ports_by_process_name(_PROCESS_NAME)
+        _PORT =await get_ports_by_process_name(_PROCESS_NAME)
         return
         
     # elif (_IS_CHECK_PORT is False) and (len(_PORT) > 0) :
@@ -174,35 +174,35 @@ async def get_ws_info():
 
     # return ws_info_lists
 
-def get_program_info():
-    """
-    [
-        {hwnd:ws_info}
-    ]
-    """
+# def get_program_info():
+#     """
+#     [
+#         {hwnd:ws_info}
+#     ]
+#     """
     
-    info_list = {}
+#     info_list = {}
     
-    ws_info = get_ws_info()
-    # try:
-    hwnd_lists = get_plastcity_hwnd_lists(_PROCESS_NAME)
-    # except TypeError:
-    #     return
+#     ws_info = get_ws_info()
+#     # try:
+#     hwnd_lists = get_plastcity_hwnd_lists(_PROCESS_NAME)
+#     # except TypeError:
+#     #     return
     
-    for ws,hwnd in zip(ws_info,hwnd_lists):
-        filename = ws["filename"]
-        # for hwnd in hwnd_lists:
-        win32gui.SetWindowText(hwnd,filename)
-        info_list[hwnd] = ws
+#     for ws,hwnd in zip(ws_info,hwnd_lists):
+#         filename = ws["filename"]
+#         # for hwnd in hwnd_lists:
+#         win32gui.SetWindowText(hwnd,filename)
+#         info_list[hwnd] = ws
         
-        pass
+#         pass
             
-        # info["hwnd"] = hwnd
+#         # info["hwnd"] = hwnd
 
-    # print(info_list)
+#     # print(info_list)
     
-    # for p in program_info:
-    #     win32gui.SetWindowText(p["hwnd"],p["filename"])
+#     # for p in program_info:
+#     #     win32gui.SetWindowText(p["hwnd"],p["filename"])
 
 async def check_new_ws_url(ws_url_array):
         for url in ws_url_array:
@@ -227,14 +227,16 @@ async def check_old_ws_url(ws_url_array):
 
 
 async def check_new_hwnd():
-    current_hwnd =await get_plastcity_hwnd_lists(_PROCESS_NAME)
+    loop = asyncio.get_event_loop()
+    current_hwnd =await loop.run_in_executor(None,get_plastcity_hwnd_lists,_PROCESS_NAME)
     for n in current_hwnd:
         if n not in _HWND_LISTS:
             _HWND_LISTS.append(n)
             print("new",n)
 
 async def check_old_hwnd():
-    current_hwnd =await get_plastcity_hwnd_lists(_PROCESS_NAME)
+    loop = asyncio.get_event_loop()
+    current_hwnd =await loop.run_in_executor(None,get_plastcity_hwnd_lists,_PROCESS_NAME)
     for n in _HWND_LISTS:
         if n not in current_hwnd:
             _HWND_LISTS.remove(n)
