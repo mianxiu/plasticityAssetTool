@@ -15,19 +15,25 @@ _PROCESS_WINDOW_TITLE = "Plasticity"
 
 
 _HWND_LISTS = []
-_CURRENT_WS_JSON = []
+_CURRENT_WS_JSON_LISTS = []
 _PORT = []
 _IS_CHECK_PORT = False
 
+PLASTICITY_INSTANCE_INFO = []
+_CALLBACK = ''
 
-def get_pid_from_hwnd(hwnd):
-    _, pid= win32process.GetWindowThreadProcessId(hwnd)
-    return pid
-    
-def get_process_name(pid):
-    return psutil.Process(pid).name()
 
 def get_plastcity_hwnd_lists(process_name:str):
+    
+    def get_pid_from_hwnd(hwnd):
+        _, pid= win32process.GetWindowThreadProcessId(hwnd)
+        return pid
+    
+
+    def get_process_name(pid):
+        return psutil.Process(pid).name()
+
+    
     hwnd_list = []
     time_list = []
 
@@ -99,8 +105,10 @@ async def find_plasticity_cdp_json(ports):
                         "url":url,"content":json.loads(content)}
                     
         except requests.exceptions.ConnectTimeout:
-            print("CDP Server Close")
-            return 
+            print("CDP Server Timeout")
+            return
+        except requests.exceptions.ConnectionError:
+            print("CDP Server Error")
 
 async def get_ws_info():
     """
@@ -114,36 +122,19 @@ async def get_ws_info():
     
     ws_info_lists = []
 
-    # try:
-    # print(_IS_CHECK_PORT)
-    # print(_PORT)
-    # print(len(_PORT))
+
     
     if len(_PORT) == 0:      
         _PORT =await get_ports_by_process_name(_PROCESS_NAME)
         return
-        
-    # elif (_IS_CHECK_PORT is False) and (len(_PORT) > 0) :
-    #         _IS_CHECK_PORT = True
-    #         print(_PORT)      
-    # else:
-    #     return
-    
-    # else:
-    #     return
-    # except TypeError:
-    #     _IS_CHECK_PORT = False
-    #     print("Not Port Or Not Plasticity Runing")
-    #     return
-    # if _IS_CHECK_PORT is False:
-    #     return
-    # try:
+
     cdp_info =await find_plasticity_cdp_json(ports=_PORT)
     
     if cdp_info is None:
         _PORT.clear()
         _HWND_LISTS.clear()
-        _CURRENT_WS_JSON.clear()
+        _CURRENT_WS_JSON_LISTS.clear()
+        await change_plasticity_instance_info()
         print("None Plasticity.exe Runing")
         return
     
@@ -151,80 +142,45 @@ async def get_ws_info():
     cdp_content = cdp_info["content"]
     ws_url_array = [d["webSocketDebuggerUrl"] for d in cdp_content]
     
-    ws_url_length = len(ws_url_array)
-    _current_ws_json_length = len(_CURRENT_WS_JSON)
+    _new_ws_url_length = len(ws_url_array)
+    _current_ws_json_length = len(_CURRENT_WS_JSON_LISTS)
     
-    # print(ws_url_length,_current_ws_json_length)
+    # print(_new_ws_url_length,_current_ws_json_length)
     
     
     # except TypeError:
     #     return
-    if ws_url_length > _current_ws_json_length:
+    if _new_ws_url_length > _current_ws_json_length:
         await check_new_ws_url(ws_url_array=ws_url_array)
         await check_new_hwnd()
+        # await change_plasticity_instance_info()
+        
+
+        
         # print(_HWND_LISTS)
         
-    elif ws_url_length < _current_ws_json_length:
+    elif _new_ws_url_length < _current_ws_json_length:
         await check_old_ws_url(ws_url_array=ws_url_array)
         await check_old_hwnd()
+        # await change_plasticity_instance_info()
 
-            # filename = json.loads(
-            #     cdp_payload.cdp_ws_injector_sync(
-            #         ws_url=ws_url,payload=cdp_payload.getFileNamePayload))["result"]["result"]["value"]
+    elif _new_ws_url_length == _current_ws_json_length:
+        await change_plasticity_instance_info()
 
-    # return ws_info_lists
-
-# def get_program_info():
-#     """
-#     [
-#         {hwnd:ws_info}
-#     ]
-#     """
-    
-#     info_list = {}
-    
-#     ws_info = get_ws_info()
-#     # try:
-#     hwnd_lists = get_plastcity_hwnd_lists(_PROCESS_NAME)
-#     # except TypeError:
-#     #     return
-    
-#     for ws,hwnd in zip(ws_info,hwnd_lists):
-#         filename = ws["filename"]
-#         # for hwnd in hwnd_lists:
-#         win32gui.SetWindowText(hwnd,filename)
-#         info_list[hwnd] = ws
-        
-#         pass
-            
-#         # info["hwnd"] = hwnd
-
-#     # print(info_list)
-    
-#     # for p in program_info:
-#     #     win32gui.SetWindowText(p["hwnd"],p["filename"])
 
 async def check_new_ws_url(ws_url_array):
         for url in ws_url_array:
-            if url not in _CURRENT_WS_JSON:
-                        _CURRENT_WS_JSON.append(url)
+            if url not in _CURRENT_WS_JSON_LISTS:
+                        _CURRENT_WS_JSON_LISTS.append(url)
                         print("new",url)
 
 async def check_old_ws_url(ws_url_array):
-        global _CURRENT_WS_JSON
+        global _CURRENT_WS_JSON_LISTS
         
-        # cdp_content_set = set(ws_url_array)
-        for url in _CURRENT_WS_JSON:
-
+        for url in _CURRENT_WS_JSON_LISTS:
             if url not in ws_url_array:
-                        _CURRENT_WS_JSON.remove(url)
+                        _CURRENT_WS_JSON_LISTS.remove(url)
                         print("remove",url)
-        # result = [x for x in _CURRENT_WS_JSON if x in cdp_content_set]
-        
-        # _CURRENT_WS_JSON = result
-
-
-
 
 async def check_new_hwnd():
     loop = asyncio.get_event_loop()
@@ -243,20 +199,40 @@ async def check_old_hwnd():
             print("remove",n)
 
 
-    
-async def run_process_listener():
-    try:
-        print("Start Listener...\n------")
-        while True:
-                # time.sleep(0.3)
-                await asyncio.sleep(0.5)
-                await get_ws_info()
-                # print(get_ws_info())
-    except KeyboardInterrupt:
-        print("Stop Listener")
+async def change_plasticity_instance_info():
+    def update():
+        global PLASTICITY_INSTANCE_INFO
+        PLASTICITY_INSTANCE_INFO.clear()
+        PLASTICITY_INSTANCE_INFO = [{"ws_url": x, "hwnd": y} for x, y in zip(_CURRENT_WS_JSON_LISTS, _HWND_LISTS)]
+        # print(PLASTICITY_INSTANCE_INFO)
+        """ callback """
+        _CALLBACK()
+        
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None,update)
 
-if __name__ == "__main__":
+def process_listener_callback(callback):
+     global _CALLBACK
+     _CALLBACK = callback
+    
+def run_process_listener(interval=0.5):
+    async def loop():
+        try:
+            print("Start Listener...\n------")
+            while True:
+                    # time.sleep(0.3)
+                    await asyncio.sleep(interval)
+                    await get_ws_info()
+                    # print(get_ws_info())
+        except KeyboardInterrupt:
+            print("Stop Listener")
+            
     try:
-        asyncio.run(run_process_listener())
+        asyncio.run(loop())
     except KeyboardInterrupt:
         print("Exit listener")
+        
+
+
+if __name__ == "__main__":
+    run_process_listener()
