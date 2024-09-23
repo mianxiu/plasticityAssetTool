@@ -20,7 +20,7 @@ _PORT = []
 _IS_CHECK_PORT = False
 
 PLASTICITY_INSTANCE_INFO = []
-_CALLBACK = ''
+_CALLBACK = None
 
 
 def get_plastcity_hwnd_lists(process_name:str):
@@ -144,13 +144,14 @@ async def get_ws_info():
     
     _new_ws_url_length = len(ws_url_array)
     _current_ws_json_length = len(_CURRENT_WS_JSON_LISTS)
+    _current_hwnd_list_length = len(_HWND_LISTS)
     
     # print(_new_ws_url_length,_current_ws_json_length)
     
     
     # except TypeError:
     #     return
-    if _new_ws_url_length > _current_ws_json_length:
+    if _new_ws_url_length > _current_hwnd_list_length:
         await check_new_ws_url(ws_url_array=ws_url_array)
         await check_new_hwnd()
         # await change_plasticity_instance_info()
@@ -159,13 +160,16 @@ async def get_ws_info():
         
         # print(_HWND_LISTS)
         
-    elif _new_ws_url_length < _current_ws_json_length:
+    elif _new_ws_url_length <_current_hwnd_list_length:
         await check_old_ws_url(ws_url_array=ws_url_array)
         await check_old_hwnd()
         # await change_plasticity_instance_info()
 
-    elif _new_ws_url_length == _current_ws_json_length:
+    elif _new_ws_url_length == _current_hwnd_list_length:
         await change_plasticity_instance_info()
+        
+    # elif _current_ws_json_length != _current_hwnd_list_length:
+        
 
 
 async def check_new_ws_url(ws_url_array):
@@ -206,7 +210,11 @@ async def change_plasticity_instance_info():
         PLASTICITY_INSTANCE_INFO = [{"ws_url": x, "hwnd": y} for x, y in zip(_CURRENT_WS_JSON_LISTS, _HWND_LISTS)]
         # print(PLASTICITY_INSTANCE_INFO)
         """ callback """
-        _CALLBACK()
+        if callable(_CALLBACK):
+            _CALLBACK()
+        else:
+            # print("callback no callable")
+            pass
         
     loop = asyncio.get_event_loop()
     await loop.run_in_executor(None,update)
@@ -215,13 +223,13 @@ def process_listener_callback(callback):
      global _CALLBACK
      _CALLBACK = callback
     
-def run_process_listener(interval=0.5):
+def run_process_listener(intervalTimeSec=0.5):
     async def loop():
         try:
             print("Start Listener...\n------")
             while True:
                     # time.sleep(0.3)
-                    await asyncio.sleep(interval)
+                    await asyncio.sleep(intervalTimeSec)
                     await get_ws_info()
                     # print(get_ws_info())
         except KeyboardInterrupt:
