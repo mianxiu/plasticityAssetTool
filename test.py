@@ -37,7 +37,7 @@ if __name__ == "__main__":
             # t.start()
 
             print("------wait-------")
-            getprograminfo.process_listener_callback(callback=cc)
+            getprograminfo.process_listener_callback(has_new_callback=cc)
             getprograminfo.run_process_listener()
         
             # for _ in range(100):
