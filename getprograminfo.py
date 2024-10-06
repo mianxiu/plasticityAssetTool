@@ -21,6 +21,7 @@ _IS_CHECK_PORT = False
 
 PLASTICITY_INSTANCE_INFO = []
 _CALLBACK = None
+_UPDATE_CALLBACK = None
 
 
 def get_plastcity_hwnd_lists(process_name:str):
@@ -134,7 +135,7 @@ async def get_ws_info():
         _PORT.clear()
         _HWND_LISTS.clear()
         _CURRENT_WS_JSON_LISTS.clear()
-        await change_plasticity_instance_info()
+        await check_new_hwnd_callback()
         print("None Plasticity.exe Runing")
         return
     
@@ -154,7 +155,7 @@ async def get_ws_info():
     if _new_ws_url_length > _current_hwnd_list_length:
         await check_new_ws_url(ws_url_array=ws_url_array)
         await check_new_hwnd()
-        # await change_plasticity_instance_info()
+        await check_new_hwnd_callback()
         
 
         
@@ -163,11 +164,11 @@ async def get_ws_info():
     elif _new_ws_url_length <_current_hwnd_list_length:
         await check_old_ws_url(ws_url_array=ws_url_array)
         await check_old_hwnd()
-        # await change_plasticity_instance_info()
+
 
     elif _new_ws_url_length == _current_hwnd_list_length:
-        await change_plasticity_instance_info()
-        
+        # await check_new_hwnd_callback()
+        pass
     # elif _current_ws_json_length != _current_hwnd_list_length:
         
 
@@ -193,6 +194,7 @@ async def check_new_hwnd():
         if n not in _HWND_LISTS:
             _HWND_LISTS.append(n)
             print("new",n)
+            # await check_new_hwnd_callback()
 
 async def check_old_hwnd():
     loop = asyncio.get_event_loop()
@@ -203,7 +205,7 @@ async def check_old_hwnd():
             print("remove",n)
 
 
-async def change_plasticity_instance_info():
+async def check_new_hwnd_callback():
     def update():
         global PLASTICITY_INSTANCE_INFO
         PLASTICITY_INSTANCE_INFO.clear()
@@ -222,6 +224,8 @@ async def change_plasticity_instance_info():
 def process_listener_callback(callback):
      global _CALLBACK
      _CALLBACK = callback
+     
+
     
 def run_process_listener(intervalTimeSec=0.5):
     async def loop():

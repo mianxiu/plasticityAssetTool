@@ -23,7 +23,10 @@ import getprograminfo
 import threading
 import time
 
-
+def cc():
+    print("in other py")
+    print(getprograminfo.PLASTICITY_INSTANCE_INFO)
+                
 
 if __name__ == "__main__":
 
@@ -32,9 +35,7 @@ if __name__ == "__main__":
             # t = threading.Thread(target=getprograminfo.run_process_listener)
             # # t.daemon = True
             # t.start()
-            def cc():
-                print("in other py")
-                print(getprograminfo.PLASTICITY_INSTANCE_INFO)
+
             print("------wait-------")
             getprograminfo.process_listener_callback(callback=cc)
             getprograminfo.run_process_listener()
