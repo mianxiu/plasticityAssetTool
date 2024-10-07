@@ -24,9 +24,12 @@ import threading
 import time
 
 def cc():
-    print("in other py")
+    print("in other py-update")
     print(getprograminfo.PLASTICITY_INSTANCE_INFO)
                 
+def dd():
+    print("in other py-remove")
+    print(getprograminfo.PLASTICITY_INSTANCE_INFO)
 
 if __name__ == "__main__":
 
@@ -37,7 +40,7 @@ if __name__ == "__main__":
             # t.start()
 
             print("------wait-------")
-            getprograminfo.process_listener_callback(has_new_callback=cc)
+            getprograminfo.process_listener_callback(has_new_callback=cc,has_remove_callback=dd)
             getprograminfo.run_process_listener()
         
             # for _ in range(100):

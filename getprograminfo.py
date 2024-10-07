@@ -135,7 +135,8 @@ async def get_ws_info():
         _PORT.clear()
         _HWND_LISTS.clear()
         _CURRENT_WS_JSON_LISTS.clear()
-        await has_new_hwnd_callback()
+        await Hwnd_Callback.has_remove_hwnd_callback()
+        # await has_new_hwnd_callback()
         print("None Plasticity.exe Runing")
         return
     
@@ -155,7 +156,7 @@ async def get_ws_info():
     if _new_ws_url_length > _current_hwnd_list_length:
         await check_new_ws_url(ws_url_array=ws_url_array)
         await check_new_hwnd()
-        await has_new_hwnd_callback()
+        await Hwnd_Callback.has_new_hwnd_callback()
         
 
         
@@ -164,6 +165,7 @@ async def get_ws_info():
     elif _new_ws_url_length <_current_hwnd_list_length:
         await check_old_ws_url(ws_url_array=ws_url_array)
         await check_old_hwnd()
+        await Hwnd_Callback.has_remove_hwnd_callback()
 
 
     elif _new_ws_url_length == _current_hwnd_list_length:
@@ -204,22 +206,38 @@ async def check_old_hwnd():
             _HWND_LISTS.remove(n)
             print("remove",n)
 
-
-async def has_new_hwnd_callback():
-    def update():
-        global PLASTICITY_INSTANCE_INFO
-        PLASTICITY_INSTANCE_INFO.clear()
-        PLASTICITY_INSTANCE_INFO = [{"ws_url": x, "hwnd": y} for x, y in zip(_CURRENT_WS_JSON_LISTS, _HWND_LISTS)]
-        # print(PLASTICITY_INSTANCE_INFO)
-        """ callback """
-        if callable(_HAS_NEW_CALLBACK):
-            _HAS_NEW_CALLBACK()
-        else:
-            # print("callback no callable")
-            pass
+class Hwnd_Callback:
+    @staticmethod
+    def clear():
+            global PLASTICITY_INSTANCE_INFO
+            PLASTICITY_INSTANCE_INFO.clear()
+            PLASTICITY_INSTANCE_INFO = [{"ws_url": x, "hwnd": y} for x, y in zip(_CURRENT_WS_JSON_LISTS, _HWND_LISTS)]
+            # print(PLASTICITY_INSTANCE_INFO)
+    @staticmethod
+    async def has_new_hwnd_callback():
+        def update():
+            Hwnd_Callback.clear()
+            """ callback """
+            if callable(_HAS_NEW_CALLBACK):
+                _HAS_NEW_CALLBACK()
+            else:
+                # print("callback no callable")
+                pass 
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(None,update)
         
-    loop = asyncio.get_event_loop()
-    await loop.run_in_executor(None,update)
+    @staticmethod
+    async def has_remove_hwnd_callback():
+        def update():
+            Hwnd_Callback.clear()
+            """ callback """
+            if callable(_HAS_REMOVE_CALLBACK):
+                _HAS_REMOVE_CALLBACK()
+            else:
+                # print("callback no callable")
+                pass 
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(None,update)
 
 def process_listener_callback(has_new_callback=None,has_remove_callback=None):
      global _HAS_NEW_CALLBACK,_HAS_REMOVE_CALLBACK
@@ -229,6 +247,11 @@ def process_listener_callback(has_new_callback=None,has_remove_callback=None):
 
     
 def run_process_listener(intervalTimeSec=0.5):
+    """
+    first time PLASTICITY_INSTANCE_INFO maybe is empty
+    after has new hwnd: callback new
+    after remove hwnd: callback (even is empty when afte remove)
+    """
     async def loop():
         try:
             print("Start Listener...\n------")
