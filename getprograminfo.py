@@ -256,10 +256,10 @@ def run_process_listener(intervalTimeSec=0.5):
         try:
             print("Start Listener...\n------")
             while True:
-                    # time.sleep(0.3)
+    
                     await asyncio.sleep(intervalTimeSec)
                     await get_ws_info()
-                    # print(get_ws_info())
+           
         except KeyboardInterrupt:
             print("Stop Listener")
             

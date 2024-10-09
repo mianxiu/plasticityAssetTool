@@ -20,12 +20,20 @@
 # asyncio.run(main())
 
 import getprograminfo
+import method
 import threading
 import time
 
 def cc():
-    print("in other py-update")
-    print(getprograminfo.PLASTICITY_INSTANCE_INFO)
+    p = getprograminfo.PLASTICITY_INSTANCE_INFO
+    if p :
+        print("in other py-update")
+        print(p)
+        for _ in p:
+            _ws_url = _["ws_url"]
+            _hwnd = _["hwnd"]
+            
+            method.get_filename_from_ws_url(_ws_url)
                 
 def dd():
     print("in other py-remove")

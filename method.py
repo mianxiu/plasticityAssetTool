@@ -1,6 +1,9 @@
 import asyncio
 from cdp_payload import cdp_ws_injector,cdp_runtime_evaluate_payload,screenshot_payload
-
+import win32gui
+import win32con
+import json,base64
+import time
 
 
 
@@ -29,7 +32,7 @@ def screenshot(websocket_url:str):
     窗口不激活无法截图
     """
     jpeg_response =asyncio.run(cdp_ws_injector(websocket_url,screenshot_payload))
-    import json,base64
+   
     jpeg_data = base64.b64decode(json.loads(jpeg_response)["result"]["data"])
     print(jpeg_response)
     with open("./test file/screen.jpg", "wb") as f:
@@ -60,7 +63,22 @@ def focus_plasticity_asset_file_window(websocket_url:str):
     pass
 
 def get_filename_from_ws_url(websocket_url:str):
-    return
+    time.sleep(1)
+    msg = {
+        'id':1,
+        'method':'Runtime.enable',
+    }
+    getFileNamePayload = {
+    'id' : 3,
+    'method':'Runtime.evaluate',
+    'params':{'expression':'''document.querySelector('#left-sidebar > plasticity-filename > div').textContent'''}
+    }
+    
+    res1 = asyncio.run(cdp_ws_injector(websocket_url,msg))
+    res = asyncio.run(cdp_ws_injector(websocket_url,getFileNamePayload))
+    result1=json.loads(res1)
+    result = json.loads(res)
+    print(result)
 
 def get_document_tree(websocket_url:str):
     pass
@@ -69,8 +87,7 @@ def get_document_tree(websocket_url:str):
 
 # ws = get_plasticity_cdp_url()
 # f = ws[0]["url"]
-import win32gui
-import win32con
+
 def plasticity_window_activate(hwnd:int):
     pass
 
