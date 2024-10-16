@@ -77,8 +77,9 @@ def get_filename_from_ws_url(websocket_url:str):
     res1 = asyncio.run(cdp_ws_injector(websocket_url,msg))
     res = asyncio.run(cdp_ws_injector(websocket_url,getFileNamePayload))
     result1=json.loads(res1)
-    result = json.loads(res)
-    print(result)
+    result = json.loads(res)['result']['result']['value']
+    # print(result)
+    return result
 
 def get_document_tree(websocket_url:str):
     pass

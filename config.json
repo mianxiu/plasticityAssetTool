@@ -5,5 +5,9 @@
   },
   "keymap": {
     "show_panel_event_key_code": "Backquote"
+  },
+  "plasticity": {
+    "listener_reflash_time": 0.5,
+    "wait_loading_time": 1
   }
 }

@@ -23,17 +23,44 @@ import getprograminfo
 import method
 import threading
 import time
+import win32gui
+import json
 
 def cc():
     p = getprograminfo.PLASTICITY_INSTANCE_INFO
     if p :
         print("in other py-update")
-        print(p)
+        
         for _ in p:
-            _ws_url = _["ws_url"]
-            _hwnd = _["hwnd"]
+            _ws_url = _.ws_url
+            _hwnd = _.hwnd
             
-            method.get_filename_from_ws_url(_ws_url)
+            res =method.get_filename_from_ws_url(_ws_url)
+            if res is not None:
+                print(f"ws:{_ws_url},hwnd:{_hwnd},res:{res}")
+                # print(res)
+                
+                win32gui.SetWindowText(_hwnd,res)
+                pass
+            
+        # for __ in p:
+        #     _ws_url = __["ws_url"]
+        #     _hwnd = __["hwnd"]
+            
+        #     res =method.get_filename_from_ws_url(_ws_url)
+            
+        #     if res is not None:
+        #         # print(_hwnd)
+        #         print(res)
+        #         # f =json.loads(res)
+                
+        #         # win32gui.SetWindowText(_hwnd,res)
+        #         f = win32gui.GetWindowText(_hwnd)
+        #         print(f)
+                
+            
+            
+            
                 
 def dd():
     print("in other py-remove")

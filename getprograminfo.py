@@ -9,7 +9,16 @@ import pythoncom
 import time
 import asyncio
 
+class Plasticity_Instance_Info:
+    """
+    ws_url
+    hwnd
+    """
+    def __init__(self,ws_url,hwnd):
+        self.ws_url = ws_url
+        self.hwnd = hwnd
 
+     
 _PROCESS_NAME = "Plasticity.exe"
 _PROCESS_WINDOW_TITLE = "Plasticity"
 
@@ -121,7 +130,6 @@ async def get_ws_info():
     """
     global _IS_CHECK_PORT,_PORT
     
-    ws_info_lists = []
 
 
     
@@ -211,7 +219,8 @@ class Hwnd_Callback:
     def clear():
             global PLASTICITY_INSTANCE_INFO
             PLASTICITY_INSTANCE_INFO.clear()
-            PLASTICITY_INSTANCE_INFO = [{"ws_url": x, "hwnd": y} for x, y in zip(_CURRENT_WS_JSON_LISTS, _HWND_LISTS)]
+
+            PLASTICITY_INSTANCE_INFO = [Plasticity_Instance_Info(x,y) for x, y in zip(_CURRENT_WS_JSON_LISTS, _HWND_LISTS)]
             # print(PLASTICITY_INSTANCE_INFO)
     @staticmethod
     async def has_new_hwnd_callback():
