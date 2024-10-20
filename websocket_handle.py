@@ -4,7 +4,7 @@ import win32gui
 import win32con
 import tkinter as tk
 from tkinter import filedialog
-from peewee import *
+from peewee import SqliteDatabase,CharField,TimeField,BooleanField,Model
 import time
 import os
 import win32clipboard
