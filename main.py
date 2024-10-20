@@ -25,6 +25,7 @@ class WSHandler(websocket.WebSocketHandler):
 
     async def on_message(self, message):
         global RECENT_PATH
+        
         def websocket_hander_call_back():  
             global RECENT_PATH
             RECENT_PATH = websockethandle.websocket_handle(message=message)

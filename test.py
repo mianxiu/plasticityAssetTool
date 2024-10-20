@@ -19,52 +19,35 @@
 # # 运行异步函数
 # asyncio.run(main())
 
-import getprograminfo
+import program_info
 import method
 import threading
 import time
 import win32gui
 import json
 
-def cc():
-    p = getprograminfo.PLASTICITY_INSTANCE_INFO
+def update_program_info_cache():
+    p = program_info.PLASTICITY_INSTANCE_INFO
     if p :
         print("in other py-update")
         
         for _ in p:
             _ws_url = _.ws_url
-            _hwnd = _.hwnd
-            
+            # _hwnd = _.hwnd   
             res =method.get_filename_from_ws_url(_ws_url)
             if res is not None:
-                print(f"ws:{_ws_url},hwnd:{_hwnd},res:{res}")
+                print(_.toDict())
                 # print(res)
                 
-                win32gui.SetWindowText(_hwnd,res)
+                # win32gui.SetWindowText(_hwnd,res)
                 pass
             
-        # for __ in p:
-        #     _ws_url = __["ws_url"]
-        #     _hwnd = __["hwnd"]
-            
-        #     res =method.get_filename_from_ws_url(_ws_url)
-            
-        #     if res is not None:
-        #         # print(_hwnd)
-        #         print(res)
-        #         # f =json.loads(res)
-                
-        #         # win32gui.SetWindowText(_hwnd,res)
-        #         f = win32gui.GetWindowText(_hwnd)
-        #         print(f)
-                
-            
-            
+
             
                 
-def dd():
+def remove_program_info_cache():
     print("in other py-remove")
-    print(getprograminfo.PLASTICITY_INSTANCE_INFO)
+    print(program_info.PLASTICITY_INSTANCE_INFO)
 
 if __name__ == "__main__":
 
@@ -75,8 +58,8 @@ if __name__ == "__main__":
             # t.start()
 
             print("------wait-------")
-            getprograminfo.process_listener_callback(has_new_callback=cc,has_remove_callback=dd)
-            getprograminfo.run_process_listener()
+            program_info.process_listener_callback(has_new_callback=update_program_info_cache,has_remove_callback=remove_program_info_cache)
+            program_info.run_process_listener()
         
             # for _ in range(100):
             #     time.sleep(0.2)

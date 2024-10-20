@@ -17,7 +17,13 @@ class Plasticity_Instance_Info:
     def __init__(self,ws_url,hwnd):
         self.ws_url = ws_url
         self.hwnd = hwnd
-
+    
+    # @staticmethod
+    def toDict(self):
+        return {
+            "ws_url":self.ws_url,
+            "hwnd":self.hwnd
+        }
      
 _PROCESS_NAME = "Plasticity.exe"
 _PROCESS_WINDOW_TITLE = "Plasticity"
