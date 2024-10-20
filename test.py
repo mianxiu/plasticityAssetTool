@@ -20,7 +20,7 @@
 # asyncio.run(main())
 
 import program_info
-import method
+import cdp_method
 import threading
 import time
 import win32gui
@@ -34,7 +34,7 @@ def update_program_info_cache():
         for _ in p:
             _ws_url = _.ws_url
             # _hwnd = _.hwnd   
-            res =method.get_filename_from_ws_url(_ws_url)
+            res =cdp_method.get_filename_from_ws_url(_ws_url)
             if res is not None:
                 print(_.toDict())
                 # print(res)

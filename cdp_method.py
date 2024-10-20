@@ -40,7 +40,7 @@ def screenshot(websocket_url:str):
 
 
 def isolate_focus(websocket_url:str):
-    from plasticitycommand import Viewport,Command
+    from plasticity_command import Viewport,Command
     
     _selector ="#viewport > plasticity-viewport > canvas"
     _f = Viewport.FOCUS._selector(selector=_selector)
@@ -53,7 +53,7 @@ def isolate_focus(websocket_url:str):
 
 
 def select_obj_isolate_focus(websocket_url:str,selector:str):
-    from plasticitycommand import PointerEvent
+    from plasticity_command import PointerEvent
     
     _p =PointerEvent.POINTER_UP._selector(selector=selector)
     # _payload = cdp_runtime_evaluate_payload(_p)

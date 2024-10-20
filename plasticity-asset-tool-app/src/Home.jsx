@@ -21,11 +21,14 @@ export function Home() {
       <button
         onClick={file_select_plasticity_file}
         style={{
-          color: "blue",
+          color: "gray",
         }}
       >
         Open As Asset
       </button>
+      <div>
+        <span>websocket stauts</span>
+      </div>
       <ul>
         <li>
           <div>

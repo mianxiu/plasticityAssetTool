@@ -2,9 +2,11 @@ from peewee import SqliteDatabase,CharField,TimeField,BooleanField,Model
 from enum import Enum
 import tkinter as tk
 from tkinter import filedialog
-
+import time
+import os
 
 RECENT_PATH_DB = "recent_path.db"
+PROGRAM_INFO_CACHE = "program_info_cache.tmp"
 
 class File(Enum):
     def run_command(command):
@@ -79,4 +81,10 @@ class File(Enum):
         pass
 
     def read_recent_db_file(file_paths: list):
+        pass
+
+    def write_program_info_cache():
+        db =SqliteDatabase(f"{PROGRAM_INFO_CACHE}")
+        db.connect()
+        
         pass
