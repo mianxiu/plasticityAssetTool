@@ -25,6 +25,8 @@ import threading
 import time
 import win32gui
 import json
+from My_Modules import file_handle
+
 
 def update_program_info_cache():
     p = program_info.PLASTICITY_INSTANCE_INFO
@@ -32,6 +34,7 @@ def update_program_info_cache():
         print("in other py-update")
         
         for _ in p:
+            file_handle.File.write_program_info_cache(p)
             _ws_url = _.ws_url
             # _hwnd = _.hwnd   
             res =cdp_method.get_filename_from_ws_url(_ws_url)

@@ -5,6 +5,9 @@ from tkinter import filedialog
 import time
 import os
 
+import My_Modules.my_modules as my_modules
+
+
 RECENT_PATH_DB = "recent_path.db"
 PROGRAM_INFO_CACHE = "program_info_cache.tmp"
 
@@ -83,8 +86,26 @@ class File(Enum):
     def read_recent_db_file(file_paths: list):
         pass
 
-    def write_program_info_cache():
+    def write_program_info_cache(new_infos:list[my_modules.Plasticity_Instance_Info]):
         db =SqliteDatabase(f"{PROGRAM_INFO_CACHE}")
         db.connect()
         
+        class ProgramInfo(Model):
+            ws_url=CharField()
+            hwnd = CharField()
+        
+            class Meta:
+                database = db
+                
+        db.create_tables([ProgramInfo])
+        
+        for _ in new_infos:
+            d = ProgramInfo.create(ws_url = f"{_.ws_url}",hwnd=f"{_.hwnd}")
+            
+        d.has_db = True
+        d.save()
+        db.close()
+        
         pass
+    
+    
