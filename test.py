@@ -34,7 +34,7 @@ def update_program_info_cache():
         print("in other py-update")
         
         for _ in p:
-            file_handle.File.write_program_info_cache(p)
+            file_handle.File.write_program_info_cache(new_infos=p)
             _ws_url = _.ws_url
             # _hwnd = _.hwnd   
             res =cdp_method.get_filename_from_ws_url(_ws_url)
@@ -50,7 +50,9 @@ def update_program_info_cache():
                 
 def remove_program_info_cache():
     print("in other py-remove")
-    print(program_info.PLASTICITY_INSTANCE_INFO)
+    p = program_info.PLASTICITY_INSTANCE_INFO
+    
+    file_handle.File.remove_program_info_cache(p)
 
 if __name__ == "__main__":
 
