@@ -33,8 +33,9 @@ def update_program_info_cache():
     if p :
         print("in other py-update")
         
+
+        file_handle.File.write_program_info_cache(new_infos=p)
         for _ in p:
-            file_handle.File.write_program_info_cache(new_infos=p)
             _ws_url = _.ws_url
             # _hwnd = _.hwnd   
             res =cdp_method.get_filename_from_ws_url(_ws_url)

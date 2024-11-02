@@ -103,8 +103,11 @@ class File(Enum):
         db.connect()
         db.create_tables([ProgramInfo])
         
+
+        cache_ws_url = [d.ws_url for d in new_infos]
         for _ in new_infos:
-            d = ProgramInfo.create(ws_url = f"{_.ws_url}",hwnd=f"{_.hwnd}")
+            if not ProgramInfo.select().where(ProgramInfo.ws_url == _.ws_url).exists():
+                d = ProgramInfo.create(ws_url = f"{_.ws_url}",hwnd=f"{_.hwnd}")
             
             
         d.has_db = True
