@@ -10,7 +10,7 @@ import My_Modules.my_modules as my_modules
 
 RECENT_PATH_DB = "recent_path.db"
 PROGRAM_INFO_CACHE = "program_info_cache.tmp"
-db =SqliteDatabase(f"{PROGRAM_INFO_CACHE}")
+program_info_cache_db =SqliteDatabase(f"{PROGRAM_INFO_CACHE}")
 
 
 class ProgramInfo(Model):
@@ -18,7 +18,7 @@ class ProgramInfo(Model):
     hwnd = CharField()
 
     class Meta:
-        database = db
+        database = program_info_cache_db
         
 class File(Enum):
     def run_command(command):
@@ -100,26 +100,24 @@ class File(Enum):
 
     def write_program_info_cache(new_infos:list[my_modules.Plasticity_Instance_Info]):
 
-        db.connect()
-        db.create_tables([ProgramInfo])
+        program_info_cache_db.connect()
+        program_info_cache_db.create_tables([ProgramInfo])
         
 
-        cache_ws_url = [d.ws_url for d in new_infos]
         for _ in new_infos:
             if not ProgramInfo.select().where(ProgramInfo.ws_url == _.ws_url).exists():
                 d = ProgramInfo.create(ws_url = f"{_.ws_url}",hwnd=f"{_.hwnd}")
-            
-            
+             
         d.has_db = True
         d.save()
-        db.close()
+        program_info_cache_db.close()
         
         pass
     
     def remove_program_info_cache(new_infos:list[my_modules.Plasticity_Instance_Info]):
     
         # db =SqliteDatabase(f"{PROGRAM_INFO_CACHE}")
-        db.connect()
+        program_info_cache_db.connect()
         
         cache_ws_url = [d.ws_url for d in new_infos]
         print(cache_ws_url)
@@ -129,4 +127,13 @@ class File(Enum):
         delete_query = ProgramInfo.delete().where(~(ProgramInfo.ws_url << cache_ws_url))
         delete_query.execute()
         
-        db.close()
+        program_info_cache_db.close()
+        
+        #todo open program read cache
+    def read_program_info_cache(program_info_cache_tmp_path:str):
+            # db = SqliteDatabase(f"{PROGRAM_INFO_CACHE}")
+            program_info_cache_db.connect()
+            pass
+        
+if __name__ == "__main__":
+            pass
