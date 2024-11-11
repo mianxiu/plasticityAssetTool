@@ -59,17 +59,13 @@ if __name__ == "__main__":
 
         try:  
             
-            # t = threading.Thread(target=getprograminfo.run_process_listener)
-            # # t.daemon = True
-            # t.start()
-
             print("------wait-------")
-            program_info.process_listener_callback(has_new_callback=update_program_info_cache,has_remove_callback=remove_program_info_cache)
-            program_info.run_process_listener()
+            # program_info.process_listener_callback(has_new_callback=update_program_info_cache,has_remove_callback=remove_program_info_cache)
+            # program_info.run_process_listener()
+            
+            file_handle.File.read_program_info_cache()
         
-            # for _ in range(100):
-            #     time.sleep(0.2)
-            #     print(getprograminfo._PLASTICITY_INSTANCE_INFO)
+  
             pass
         except KeyboardInterrupt:
             print("exit")

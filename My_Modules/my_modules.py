@@ -6,7 +6,11 @@ class Plasticity_Instance_Info:
     def __init__(self,ws_url,hwnd):
         self.ws_url = ws_url
         self.hwnd = hwnd
-    
+    def __str__(self) -> str:
+        return f"ws_url:{self.ws_url},hwnd:{self.hwnd}"
+    def __repr__(self) -> str:
+        return f"ws_url:{self.ws_url},hwnd:{self.hwnd}"
+
     # @staticmethod
     def toDict(self):
         return {

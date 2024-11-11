@@ -130,9 +130,12 @@ class File(Enum):
         program_info_cache_db.close()
         
         #todo open program read cache
-    def read_program_info_cache(program_info_cache_tmp_path:str):
+    def read_program_info_cache():
             # db = SqliteDatabase(f"{PROGRAM_INFO_CACHE}")
             program_info_cache_db.connect()
+            cache_ = [my_modules.Plasticity_Instance_Info(_.ws_url,_.hwnd) for _ in ProgramInfo.select()]
+            
+            print(cache_)
             pass
         
 if __name__ == "__main__":
