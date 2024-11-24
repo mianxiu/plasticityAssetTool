@@ -27,14 +27,16 @@ import win32gui
 import json
 from My_Modules import file_handle
 
+# def load_program_info_tmp():
 
 def update_program_info_cache():
-    p = program_info.PLASTICITY_INSTANCE_INFO
+    
     if p :
         print("in other py-update")
         
 
         file_handle.File.write_program_info_cache(new_infos=p)
+        
         for _ in p:
             _ws_url = _.ws_url
             # _hwnd = _.hwnd   
@@ -51,17 +53,21 @@ def update_program_info_cache():
                 
 def remove_program_info_cache():
     print("in other py-remove")
-    p = program_info.PLASTICITY_INSTANCE_INFO
+    # p = program_info.PLASTICITY_INSTANCE_INFO
     
     file_handle.File.remove_program_info_cache(p)
+    
+    
 
 if __name__ == "__main__":
-
+        p = program_info.PLASTICITY_INSTANCE_INFO
         try:  
+            print("------load_cache------")
             
             print("------wait-------")
-            # program_info.process_listener_callback(has_new_callback=update_program_info_cache,has_remove_callback=remove_program_info_cache)
-            # program_info.run_process_listener()
+            
+            program_info.process_listener_callback(has_new_callback=update_program_info_cache,has_remove_callback=remove_program_info_cache)
+            program_info.run_process_listener()
             
             file_handle.File.read_program_info_cache()
         

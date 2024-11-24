@@ -130,12 +130,15 @@ class File(Enum):
         program_info_cache_db.close()
         
         #todo open program read cache
+        # 不需要tmp，可能偶数正序，寄数倒序 hwnd和ws对应
     def read_program_info_cache():
             # db = SqliteDatabase(f"{PROGRAM_INFO_CACHE}")
             program_info_cache_db.connect()
             cache_ = [my_modules.Plasticity_Instance_Info(_.ws_url,_.hwnd) for _ in ProgramInfo.select()]
             
-            print(cache_)
+            if cache_:
+                print(cache_[0])
+                return cache_
             pass
         
 if __name__ == "__main__":
