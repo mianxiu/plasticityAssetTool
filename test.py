@@ -28,24 +28,26 @@ import json
 from My_Modules import file_handle
 
 # def load_program_info_tmp():
-
+#todo 开始是hwnd倒序，4为第4个正确，前面倒序 会重复3次
 def update_program_info_cache():
-    
+    p = program_info.PLASTICITY_INSTANCE_INFO 
     if p :
         print("in other py-update")
         
 
-        file_handle.File.write_program_info_cache(new_infos=p)
-        
+        # file_handle.File.write_program_info_cache(new_infos=p)
+        print(p)
         for _ in p:
+            print(_)
             _ws_url = _.ws_url
-            # _hwnd = _.hwnd   
+            _hwnd = _.hwnd   
             res =cdp_method.get_filename_from_ws_url(_ws_url)
+            # print(res)
             if res is not None:
-                print(_.toDict())
+                # print(_.toDict())
                 # print(res)
                 
-                # win32gui.SetWindowText(_hwnd,res)
+                win32gui.SetWindowText(_hwnd,res)
                 pass
             
 
@@ -55,12 +57,13 @@ def remove_program_info_cache():
     print("in other py-remove")
     # p = program_info.PLASTICITY_INSTANCE_INFO
     
-    file_handle.File.remove_program_info_cache(p)
+    # file_handle.File.remove_program_info_cache(p)
     
     
 
+
 if __name__ == "__main__":
-        p = program_info.PLASTICITY_INSTANCE_INFO
+        
         try:  
             print("------load_cache------")
             
@@ -68,8 +71,7 @@ if __name__ == "__main__":
             
             program_info.process_listener_callback(has_new_callback=update_program_info_cache,has_remove_callback=remove_program_info_cache)
             program_info.run_process_listener()
-            
-            file_handle.File.read_program_info_cache()
+            # file_handle.File.read_program_info_cache()
         
   
             pass

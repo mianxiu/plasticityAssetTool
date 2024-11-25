@@ -35,7 +35,7 @@ _CURRENT_WS_JSON_LISTS = []
 _PORT = []
 _IS_CHECK_PORT = False
 
-PLASTICITY_INSTANCE_INFO = [Plasticity_Instance_Info]
+PLASTICITY_INSTANCE_INFO = []
 _HAS_NEW_CALLBACK = None
 _HAS_REMOVE_CALLBACK = None
 
@@ -208,10 +208,11 @@ async def check_new_hwnd():
     loop = asyncio.get_event_loop()
     current_hwnd =await loop.run_in_executor(None,get_plastcity_hwnd_lists,_PROCESS_NAME)
 
-    is_odd = lambda num:False if num %2==0 else True
+    # is_odd = lambda num:False if num %2==0 else True
     
-    if len(current_hwnd) > 1 and is_odd(len(current_hwnd)) == True:
-        current_hwnd = list(reversed(current_hwnd))
+    # if len(current_hwnd) > 1 and is_odd(len(current_hwnd)) == True:
+    #     current_hwnd = list(reversed(current_hwnd))
+    
     for n in current_hwnd:
         if n not in _HWND_LISTS:
             _HWND_LISTS.append(n)
@@ -233,9 +234,10 @@ class Hwnd_Callback:
             PLASTICITY_INSTANCE_INFO.clear()
 
             PLASTICITY_INSTANCE_INFO = [Plasticity_Instance_Info(x,y) for x, y in zip(_CURRENT_WS_JSON_LISTS, _HWND_LISTS)]
-            print(PLASTICITY_INSTANCE_INFO)
+            # print(PLASTICITY_INSTANCE_INFO)
+            
     @staticmethod
-    async def has_new_hwnd_callback():
+    async def has_new_hwnd_callback(): 
         def update():
             Hwnd_Callback.clear()
             """ callback """
@@ -288,6 +290,7 @@ def run_process_listener(intervalTimeSec=0.5):
         asyncio.run(loop())
     except KeyboardInterrupt:
         print("Exit listener")
+        
         
 
 
