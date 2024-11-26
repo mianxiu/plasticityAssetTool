@@ -18,7 +18,8 @@
 
 # # 运行异步函数
 # asyncio.run(main())
-
+from tornado import websocket
+import asyncio
 import program_info
 import cdp_method
 import threading
@@ -34,11 +35,11 @@ def update_program_info_cache():
     if p :
         print("in other py-update")
         
-
+        #当成一个客户端，向服务器发送指有新info,服务器再推送全部
         # file_handle.File.write_program_info_cache(new_infos=p)
+
         print(p)
         for _ in p:
-            print(_)
             _ws_url = _.ws_url
             _hwnd = _.hwnd   
             res =cdp_method.get_filename_from_ws_url(_ws_url)
@@ -61,7 +62,7 @@ def remove_program_info_cache():
     
     
 
-
+from main import websocket
 if __name__ == "__main__":
         
         try:  
@@ -71,9 +72,7 @@ if __name__ == "__main__":
             
             program_info.process_listener_callback(has_new_callback=update_program_info_cache,has_remove_callback=remove_program_info_cache)
             program_info.run_process_listener()
-            # file_handle.File.read_program_info_cache()
-        
-  
+
             pass
         except KeyboardInterrupt:
             print("exit")

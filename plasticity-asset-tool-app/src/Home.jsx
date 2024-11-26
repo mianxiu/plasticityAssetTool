@@ -4,8 +4,10 @@ import { WebsocketClient } from "./WebsocketClient";
 export function Home() {
   //   <WebsocketClient />;
   const [filePath, setFilePath] = createSignal("");
+  const [plasticityInfo, setPlasticityInfo] = createSignal("");
 
   const socket = new WebSocket("ws://127.0.0.1:15150/websocket");
+
   socket.addEventListener("message", event => {
     console.log("Received message from server:", event.data);
     setFilePath(event.data);

@@ -8,7 +8,7 @@ import os
 import win32clipboard
 import ctypes
 import io
-from Modules.file_handle import File
+from My_Modules.file_handle import File
 
 
         # 指定要保存到的文件路径
@@ -102,7 +102,11 @@ class Clipboard(Enum):
 
 # print(Clipboard.set_plasticity_clipboard_data(file_path))
 
-
+class PlasticityInfo(Enum):
+    @staticmethod
+    def send_plasticity_program_info():
+        return "plasticity_program_info_str"
+    
 
 
 class Window_Control(Enum):
@@ -156,6 +160,9 @@ def websocket_handle(message: str):
         return Window_Control.window_control(hwnd=_command, sw_str=_menu)
     elif bool(re.search(r"^File", _menu)):
         return File.run_command(_command)
+    elif bool(re.search(r"Info",_menu)):
+        return PlasticityInfo.send_plasticity_program_info()
+        pass
 
     else:
         print(f"not command:{_message}")

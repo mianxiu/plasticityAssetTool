@@ -1,6 +1,6 @@
 
 import asyncio
-import Modules.websocket_handle as websocket_handle
+import My_Modules.websocket_handle as websocket_handle
 from webui import webui
 import uuid
 import tornado
@@ -43,7 +43,7 @@ class WSHandler(websocket.WebSocketHandler):
                 del clients[client_id]
                 
         print(f"WebSocket closed for {client_id}")
-                
+    
                 
     def check_origin(self, origin):
         return True
@@ -105,8 +105,11 @@ if __name__ == "__main__":
     # _thread_ui = threading.Thread(target=run_webui)
     # _thread_ui.daemon = True
     # _thread_ui.start()
-    
-    run_all_server(HTTP_PORT)
+    try:
+        run_all_server(HTTP_PORT)
+    except KeyboardInterrupt:
+        print("Stop Server")
+             
 
 
 
