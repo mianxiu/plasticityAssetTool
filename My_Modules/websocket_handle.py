@@ -113,7 +113,7 @@ class PlasticityInfo(Enum):
     @staticmethod
     def send_plasticity_program_info_to_client(p:str):
         print("plasticity_program_info_str")
-        return p
+        return f"FOR_ALL:{p}"
 
 
 class Window_Control(Enum):

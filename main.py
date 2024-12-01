@@ -1,4 +1,4 @@
-
+import re
 import asyncio
 import My_Modules.websocket_handle as websocket_handle
 from webui import webui
@@ -34,9 +34,12 @@ class WSHandler(websocket.WebSocketHandler):
             RECENT_PATH = websocket_handle.websocket_handle(message=message)
 
         await ioloop.IOLoop.current().run_in_executor(None,websocket_hander_call_back)
-        for client in clients:
-                await client.write_message(f"{RECENT_PATH}")
-        await self.write_message(f"{RECENT_PATH}")
+        
+        if bool(re.search(r"^FOR_ALL:",str(RECENT_PATH))):
+            for client in clients:
+                    await client.write_message(f"{RECENT_PATH}")
+        else:
+            await self.write_message(f"{RECENT_PATH}")
         
 
     def on_close(self):
