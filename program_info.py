@@ -232,8 +232,18 @@ class Hwnd_Callback:
     def clear():
             global PLASTICITY_INSTANCE_INFO
             PLASTICITY_INSTANCE_INFO.clear()
-
-            PLASTICITY_INSTANCE_INFO = [Plasticity_Instance_Info(x,y) for x, y in zip(_CURRENT_WS_JSON_LISTS, _HWND_LISTS)]
+            _HWND_LISTS_LEN = len(_HWND_LISTS) 
+            print(f"_HWND_LIST_LEN:{_HWND_LISTS_LEN}")
+              
+            if _HWND_LISTS_LEN == 3:
+                # _HWND_LISTS_FINAL = [_HWND_LISTS[-1]] + _HWND_LISTS[:-1]
+                _HWND_LISTS_FINAL = _HWND_LISTS
+                pass
+            elif (_HWND_LISTS_LEN > 4 or _HWND_LISTS_LEN == 2):
+                _HWND_LISTS_FINAL =  reversed(_HWND_LISTS)
+            else:
+                _HWND_LISTS_FINAL = _HWND_LISTS
+            PLASTICITY_INSTANCE_INFO = [Plasticity_Instance_Info(x,y) for x, y in zip(_CURRENT_WS_JSON_LISTS, _HWND_LISTS_FINAL)]
             # print(PLASTICITY_INSTANCE_INFO)
             
     @staticmethod

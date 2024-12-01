@@ -62,7 +62,7 @@ def remove_program_info_cache():
     
     
 
-from main import websocket
+
 if __name__ == "__main__":
         
         try:  
