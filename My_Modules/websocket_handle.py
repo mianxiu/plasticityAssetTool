@@ -9,6 +9,8 @@ import win32clipboard
 import ctypes
 import io
 from My_Modules.file_handle import File
+from My_Modules.my_modules import Plasticity_Instance_Info
+from program_info import PLASTICITY_INSTANCE_INFO
 
 
         # 指定要保存到的文件路径
@@ -103,10 +105,15 @@ class Clipboard(Enum):
 # print(Clipboard.set_plasticity_clipboard_data(file_path))
 
 class PlasticityInfo(Enum):
-    @staticmethod
-    def send_plasticity_program_info():
-        return "plasticity_program_info_str"
+    def run_command(command):
+        match command:
+            case "send":
+                return PlasticityInfo.send_plasticity_program_info_to_client()
     
+    @staticmethod
+    def send_plasticity_program_info_to_client(p:str):
+        print("plasticity_program_info_str")
+        return p
 
 
 class Window_Control(Enum):
@@ -160,9 +167,11 @@ def websocket_handle(message: str):
         return Window_Control.window_control(hwnd=_command, sw_str=_menu)
     elif bool(re.search(r"^File", _menu)):
         return File.run_command(_command)
-    elif bool(re.search(r"Info",_menu)):
-        return PlasticityInfo.send_plasticity_program_info()
-        pass
+    elif bool(re.search(r"^Program_Info",_menu)):
+        if bool(re.search(r"Program_Info_Send",_menu)):
+            return PlasticityInfo.send_plasticity_program_info_to_client(_command)
+        else:
+            return PlasticityInfo.run_command(_command)
 
     else:
         print(f"not command:{_message}")

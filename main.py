@@ -14,13 +14,15 @@ WEBSOCKET_PORT = 15151
 WEBSOCKET_URL =  f"ws://127.0.0.1:{HTTP_PORT}/websocket"
 RECENT_PATH = []
 
-clients = {}
+uuid_clients = {}
+clients = []
 
 class WSHandler(websocket.WebSocketHandler):
  
     async def open(self):
         self.id = uuid.uuid4()
-        clients[self.id] = {'id':self.id}
+        uuid_clients[self.id] = {'id':self.id}
+        clients.append(self)
         print(f"WebSocket opened {self.id}")
         
 
@@ -32,15 +34,16 @@ class WSHandler(websocket.WebSocketHandler):
             RECENT_PATH = websocket_handle.websocket_handle(message=message)
 
         await ioloop.IOLoop.current().run_in_executor(None,websocket_hander_call_back)
-        
+        for client in clients:
+                await client.write_message(f"{RECENT_PATH}")
         await self.write_message(f"{RECENT_PATH}")
         
 
     def on_close(self):
         # 清除客户端连接
-        for client_id, client in clients.items():
+        for client_id, client in uuid_clients.items():
             if client == self: 
-                del clients[client_id]
+                del uuid_clients[client_id]
                 
         print(f"WebSocket closed for {client_id}")
     

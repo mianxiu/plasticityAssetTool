@@ -18,7 +18,7 @@
 
 # # 运行异步函数
 # asyncio.run(main())
-from tornado import websocket
+from websockets.sync.client import connect
 import asyncio
 import program_info
 import cdp_method
@@ -34,6 +34,12 @@ def update_program_info_cache():
     p = program_info.PLASTICITY_INSTANCE_INFO 
     if p :
         print("in other py-update")
+        
+        with connect("ws://127.0.0.1:15150/websocket") as ws:
+            ws.send(f"Program_Info_Send:{p}")
+            msg = ws.recv()
+            print(msg)
+
         
         #当成一个客户端，向服务器发送指有新info,服务器再推送全部
         # file_handle.File.write_program_info_cache(new_infos=p)

@@ -233,6 +233,7 @@ class Hwnd_Callback:
             global PLASTICITY_INSTANCE_INFO
             PLASTICITY_INSTANCE_INFO.clear()
             _HWND_LISTS_LEN = len(_HWND_LISTS) 
+            
             print(f"_HWND_LIST_LEN:{_HWND_LISTS_LEN}")
               
             if  _HWND_LISTS_LEN == 2:
