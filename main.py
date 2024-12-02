@@ -7,6 +7,7 @@ import tornado
 from tornado import ioloop,websocket
 import threading
 import program_info
+import json
 
 HTTP_PORT = 15150
 WEBSOCKET_PORT = 15151
@@ -36,8 +37,9 @@ class WSHandler(websocket.WebSocketHandler):
         await ioloop.IOLoop.current().run_in_executor(None,websocket_hander_call_back)
         
         if bool(re.search(r"^FOR_ALL:",str(RECENT_PATH))):
+            msg = re.sub(r"^FOR_ALL:","",str(RECENT_PATH))
             for client in clients:
-                    await client.write_message(f"{str(RECENT_PATH)}")
+                    await client.write_message(json.dumps(msg))
         else:
             await self.write_message(f"{RECENT_PATH}")
         

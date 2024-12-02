@@ -10,7 +10,7 @@ export function Home() {
 
   socket.addEventListener("message", event => {
     console.log("Received message from server:", event.data);
-    setFilePath(event.data);
+    setFilePath(JSON.parse(event.data));
   });
   const file_select_plasticity_file = () => {
     socket.send("File:select_plasticity_file");

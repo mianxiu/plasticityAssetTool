@@ -2,7 +2,7 @@ from enum import Enum
 import re
 import win32gui
 import win32con
-
+import json
 
 import os
 import win32clipboard
