@@ -35,11 +35,14 @@ def update_program_info_cache():
     if p :
         print("in other py-update")
         # for all client
-        # with connect("ws://127.0.0.1:15150/websocket") as ws:
-        #     ws.send(f"Program_Info_Send:{p}")
-        #     msg = ws.recv()
-        #     print(msg)
-        #     ws.close()
+        try:
+            with connect("ws://127.0.0.1:15150/websocket") as ws:
+                ws.send(f"Program_Info_Send:{p}")
+                msg = ws.recv()
+                print(msg)
+                ws.close()
+        except:
+            print("can't connect")
 
         
         #当成一个客户端，向服务器发送指有新info,服务器再推送全部

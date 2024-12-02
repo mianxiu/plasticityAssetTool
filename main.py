@@ -37,7 +37,7 @@ class WSHandler(websocket.WebSocketHandler):
         
         if bool(re.search(r"^FOR_ALL:",str(RECENT_PATH))):
             for client in clients:
-                    await client.write_message(f"{RECENT_PATH}")
+                    await client.write_message(f"{str(RECENT_PATH)}")
         else:
             await self.write_message(f"{RECENT_PATH}")
         
@@ -47,6 +47,8 @@ class WSHandler(websocket.WebSocketHandler):
         for client_id, client in uuid_clients.items():
             if client == self: 
                 del uuid_clients[client_id]
+        if self in clients:
+            clients.remove(self)
                 
         print(f"WebSocket closed for {client_id}")
     
