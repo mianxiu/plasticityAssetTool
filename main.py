@@ -25,6 +25,7 @@ class WSHandler(websocket.WebSocketHandler):
         uuid_clients[self.id] = {'id':self.id}
         clients.append(self)
         print(f"WebSocket opened {self.id}")
+        #todo when connect send info clude like programinfo etc
         
 
     async def on_message(self, message):
