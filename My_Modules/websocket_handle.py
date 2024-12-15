@@ -9,7 +9,7 @@ import win32clipboard
 import ctypes
 import io
 from My_Modules.file_handle import File
-from My_Modules.my_modules import Plasticity_Instance_Info
+from My_Modules.my_modules import Plasticity_Instance_Info,Webscoket_Send_Message
 from program_info import PLASTICITY_INSTANCE_INFO
 
 
@@ -113,7 +113,10 @@ class PlasticityInfo(Enum):
     @staticmethod
     def send_plasticity_program_info_to_client(p:str):
         print("plasticity_program_info_str")
-        return f"FOR_ALL:{p}"
+        w = Webscoket_Send_Message(True,p)
+
+        
+        return w
 
 
 class Window_Control(Enum):

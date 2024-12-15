@@ -1,3 +1,5 @@
+import json
+
 class Plasticity_Instance_Info:
     """
     ws_url
@@ -21,3 +23,32 @@ class Plasticity_Instance_Info:
 class Plasticity_Instance_Info_List(list):
          pass
          
+
+class Webscoket_Send_Message:
+    """
+    is_for_all:bool
+    msg:list
+    """
+    def __init__(self,is_for_all:bool,msg:list) :
+        self.is_for_all = is_for_all
+        self.msg = msg
+    
+    def __str__(self) -> str:
+         return json.dumps({
+             "is_for_all":self.is_for_all,
+             "msg" : self.msg
+         })
+    
+    
+    def __repr__(self) -> str:
+         return json.dumps({
+             "is_for_all":self.is_for_all,
+             "msg" : self.msg
+         })
+        
+    def get(self):
+        return {
+             "is_for_all":self.is_for_all,
+             "msg" : self.msg
+         }
+        

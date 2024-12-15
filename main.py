@@ -1,6 +1,7 @@
 import re
 import asyncio
 import My_Modules.websocket_handle as websocket_handle
+from My_Modules.my_modules import Webscoket_Send_Message
 from webui import webui
 import uuid
 import tornado
@@ -13,7 +14,7 @@ HTTP_PORT = 15150
 WEBSOCKET_PORT = 15151
 
 WEBSOCKET_URL =  f"ws://127.0.0.1:{HTTP_PORT}/websocket"
-RECENT_PATH = []
+SEND_MESSAGE=Webscoket_Send_Message(False,[])
 
 uuid_clients = {}
 clients = []
@@ -26,23 +27,26 @@ class WSHandler(websocket.WebSocketHandler):
         clients.append(self)
         print(f"WebSocket opened {self.id}")
         #todo when connect send info include like programinfo etc  
-        await self.write_message(f"{RECENT_PATH}")
+        await self.write_message(f"{SEND_MESSAGE.msg}")
 
     async def on_message(self, message):
-        global RECENT_PATH
+        global SEND_MESSAGE
 
         def websocket_hander_call_back():  
-            global RECENT_PATH
-            RECENT_PATH = websocket_handle.websocket_handle(message=message)
+            global SEND_MESSAGE
+            SEND_MESSAGE = websocket_handle.websocket_handle(message=message)
 
         await ioloop.IOLoop.current().run_in_executor(None,websocket_hander_call_back)
         
-        if bool(re.search(r"^FOR_ALL:",str(RECENT_PATH))):
-            msg = re.sub(r"^FOR_ALL:","",str(RECENT_PATH))
+        print("on_msg")
+        print(SEND_MESSAGE)
+        if SEND_MESSAGE.is_for_all:
+            # msg = re.sub(r"^FOR_ALL:","",str(SEND_MESSAGE))
+            msg = SEND_MESSAGE.msg
             for client in clients:
                     await client.write_message(json.dumps(msg))
         else:
-            await self.write_message(f"{RECENT_PATH}")
+            await self.write_message(f"{SEND_MESSAGE.msg}")
         
 
     def on_close(self):
