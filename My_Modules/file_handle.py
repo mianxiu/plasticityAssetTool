@@ -4,7 +4,7 @@ import tkinter as tk
 from tkinter import filedialog
 import time
 import os
-
+from My_Modules.my_modules import Webscoket_Send_Message
 import My_Modules.my_modules as my_modules
 
 
@@ -24,7 +24,7 @@ class File(Enum):
     def run_command(command):
         match command:
             case "select_plasticity_file":
-                return File.select_plasticity_file()
+                return Webscoket_Send_Message(False,File.select_plasticity_file())
 
     def select_plasticity_file():
         root = tk.Tk()

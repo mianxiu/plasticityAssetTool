@@ -26,7 +26,7 @@ class WSHandler(websocket.WebSocketHandler):
         uuid_clients[self.id] = {'id':self.id}
         clients.append(self)
         print(f"WebSocket opened {self.id}")
-        #todo when connect send info include like programinfo etc  
+
         await self.write_message(f"{SEND_MESSAGE.msg}")
 
     async def on_message(self, message):
@@ -37,14 +37,12 @@ class WSHandler(websocket.WebSocketHandler):
             SEND_MESSAGE = websocket_handle.websocket_handle(message=message)
 
         await ioloop.IOLoop.current().run_in_executor(None,websocket_hander_call_back)
-        
         print("on_msg")
         print(SEND_MESSAGE)
         if SEND_MESSAGE.is_for_all:
-            # msg = re.sub(r"^FOR_ALL:","",str(SEND_MESSAGE))
-            msg = SEND_MESSAGE.msg
+  
             for client in clients:
-                    await client.write_message(json.dumps(msg))
+                    await client.write_message(json.dumps(SEND_MESSAGE.msg))
         else:
             await self.write_message(f"{SEND_MESSAGE.msg}")
         
