@@ -25,8 +25,8 @@ class WSHandler(websocket.WebSocketHandler):
         uuid_clients[self.id] = {'id':self.id}
         clients.append(self)
         print(f"WebSocket opened {self.id}")
-        #todo when connect send info clude like programinfo etc
-        
+        #todo when connect send info include like programinfo etc  
+        await self.write_message(f"{RECENT_PATH}")
 
     async def on_message(self, message):
         global RECENT_PATH
