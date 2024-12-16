@@ -46,7 +46,7 @@ class Webscoket_Send_Message:
              "msg" : self.msg
          })
         
-    def get(self):
+    def get(self)->dict:
         return {
              "is_for_all":self.is_for_all,
              "msg" : self.msg
