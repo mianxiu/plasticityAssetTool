@@ -11,7 +11,7 @@ from My_Modules import file_handle
 
 
 # def load_program_info_tmp():
-# todo 2024-12-16 program_info live
+# todo 2024-12-16 program_info live --> websocketheartbeat
 # todo client live connect
 def update_program_info_cache():
     p = program_info.PLASTICITY_INSTANCE_INFO 
@@ -28,7 +28,7 @@ def update_program_info_cache():
             print("can't connect")
 
         
-        #当成一个客户端，向服务器发送指有新info,服务器再推送全部
+        #done 当成一个客户端，向服务器发送指有新info,服务器再推送全部
         # file_handle.File.write_program_info_cache(new_infos=p)
 
         print(p)

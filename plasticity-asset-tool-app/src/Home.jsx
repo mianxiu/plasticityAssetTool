@@ -3,18 +3,32 @@ import { WebsocketClient } from "./WebsocketClient";
 
 export function Home() {
   //   <WebsocketClient />;
+  const websocket_server_url = "ws://127.0.0.1:15150/websocket";
+
   const [filePath, setFilePath] = createSignal("");
   const [plasticityInfo, setPlasticityInfo] = createSignal("");
 
-  const socket = new WebSocket("ws://127.0.0.1:15150/websocket");
-
-  socket.addEventListener("message", event => {
+  // const socket = new WebSocket(websocket_server_url);
+  const mmm = event => {
     console.log("Received message from server:", event.data);
     setFilePath(JSON.parse(event.data));
-  });
-  const file_select_plasticity_file = () => {
-    socket.send("File:select_plasticity_file");
   };
+
+  const socket = new WebsocketClient(
+    websocket_server_url,
+    () => {},
+    mmm,
+    () => {}
+  );
+  // socket.addEventListener("message", event => {
+  //   console.log("Received message from server:", event.data);
+  //   setFilePath(JSON.parse(event.data));
+  // });
+
+  const file_select_plasticity_file = () => {
+    socket.sendMessage("File:select_plasticity_file");
+  };
+
   return (
     <div>
       <span>Home</span>
@@ -23,13 +37,14 @@ export function Home() {
       <button
         onClick={file_select_plasticity_file}
         style={{
-          color: "gray",
+          color: "red",
         }}
       >
         Open As Asset
       </button>
       <div>
         <span>websocket stauts</span>
+        <span style={{ color: "blue" }}>{websocket_server_url}</span>
       </div>
       <ul>
         <li>
