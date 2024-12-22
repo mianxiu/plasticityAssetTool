@@ -8,7 +8,10 @@ export function Home() {
   const [filePath, setFilePath] = createSignal("");
   const [plasticityInfo, setPlasticityInfo] = createSignal("");
 
-  // const socket = new WebSocket(websocket_server_url);
+  /**
+   *
+   * @param {MessageEvent} event
+   */
   const mmm = event => {
     console.log("Received message from server:", event.data);
     setFilePath(JSON.parse(event.data));
@@ -20,10 +23,6 @@ export function Home() {
     mmm,
     () => {}
   );
-  // socket.addEventListener("message", event => {
-  //   console.log("Received message from server:", event.data);
-  //   setFilePath(JSON.parse(event.data));
-  // });
 
   const file_select_plasticity_file = () => {
     socket.sendMessage("File:select_plasticity_file");
