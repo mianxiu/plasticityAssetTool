@@ -17,15 +17,17 @@ export function Home() {
     setFilePath(JSON.parse(event.data));
   };
 
-  const socket = new WebsocketClient(
+  const socketClient = new WebsocketClient(
     websocket_server_url,
     () => {},
     mmm,
     () => {}
   );
 
+  socketClient.runHeartBeat(3000);
+
   const file_select_plasticity_file = () => {
-    socket.sendMessage("File:select_plasticity_file");
+    socketClient.sendMessage("File:select_plasticity_file");
   };
 
   return (
