@@ -24,7 +24,14 @@ export function Home() {
     () => {}
   );
 
-  socketClient.runHeartBeat(3000);
+  const ccc = () => {
+    socketClient.connect();
+    socketClient.runHeartBeat(6000);
+  };
+  const ddd = () => {
+    socketClient.disconnect();
+    socketClient.stopHeartBeat();
+  };
 
   const file_select_plasticity_file = () => {
     socketClient.sendMessage("File:select_plasticity_file");
@@ -43,6 +50,8 @@ export function Home() {
       >
         Open As Asset
       </button>
+      <button onclick={ccc}>run heartbeat</button>
+      <button onclick={ddd}>stop HeartBeat</button>
       <div>
         <span>websocket stauts</span>
         <span style={{ color: "blue" }}>{websocket_server_url}</span>

@@ -3,7 +3,7 @@ import re
 import win32gui
 import win32con
 import json
-
+from datetime import datetime
 import os
 import win32clipboard
 import ctypes
@@ -146,6 +146,13 @@ class Window_Control(Enum):
             case "SW_RESTORE":
                 win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
 
+class Client_Info(Enum):
+    @staticmethod
+    def run_command(command):
+        match command:
+            case "HEARTBEAT":
+                return Webscoket_Send_Message(False,str(datetime.now()))
+            
 
 def websocket_handle(message: str):
     """
@@ -175,6 +182,8 @@ def websocket_handle(message: str):
             return PlasticityInfo.send_plasticity_program_info_to_client(_command)
         else:
             return PlasticityInfo.run_command(_command)
+    elif bool(re.search(r"^Client_Info",_menu)):
+        return Client_Info.run_command(_command)
 
     else:
         print(f"not command:{_message}")

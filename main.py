@@ -39,13 +39,14 @@ class WSHandler(websocket.WebSocketHandler):
         await ioloop.IOLoop.current().run_in_executor(None,websocket_hander_call_back)
         print("on_msg")
         print(SEND_MESSAGE)
-        if SEND_MESSAGE.is_for_all:
-  
-            for client in clients:
-                    await client.write_message(json.dumps(SEND_MESSAGE.msg))
+        if SEND_MESSAGE:
+            if SEND_MESSAGE.is_for_all: 
+                for client in clients:
+                        await client.write_message(json.dumps(SEND_MESSAGE.msg))
+            else:
+                await self.write_message(f"{SEND_MESSAGE.msg}")
         else:
-            await self.write_message(f"{SEND_MESSAGE.msg}")
-        
+            print("SEND_MESSAGE IS NONE")
 
     def on_close(self):
         # 清除客户端连接

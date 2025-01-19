@@ -9,7 +9,9 @@ export class WebsocketClient {
     this.url = url;
     // this.socket = new WebSocket(this.url);
     this.ping = "";
-    this.connect();
+    // this.connect();
+    this.openEvent = openEvent;
+    this.messageEvent = messageEvent;
     this.closeEvent = closeEvent;
   }
 
@@ -19,28 +21,29 @@ export class WebsocketClient {
   }
 
   connect() {
+    console.log("Connect Server");
     this.socket = new WebSocket(this.url);
     // 连接建立时的处理
     this.socket.addEventListener("open", event => {
       // console.log("Connected to WebSocket server");
-      openEvent(event);
+      this.openEvent(event);
       // 发送消息到服务器
     });
 
     // 接收到消息时的处理
     this.socket.addEventListener("message", event => {
-      messageEvent(event);
+      this.messageEvent(event);
     });
 
     // 连接关闭时的处理
     this.socket.addEventListener("close", event => {
       // console.log("WebSocket connection closed");
-      this.closeEvent(event);
-      console.log("close");
-      console.log("Try Reconnect to server");
-      let heartbeatTimeout2 = setTimeout(() => {
-        this.connect();
-      }, 3000);
+      // this.closeEvent(event);
+      // console.log("close");
+      // console.log("Try Reconnect to server");
+      // let heartbeatTimeout2 = setTimeout(() => {
+      //   this.connect();
+      // }, 3000);
       // this.runHeartBeat(3000);
     });
 
@@ -49,12 +52,17 @@ export class WebsocketClient {
     });
   }
 
+  disconnect() {
+    this.socket.close();
+    console.log("Disconnect WebSocket");
+  }
+
   runHeartBeat(heartbeatInterval = 3000) {
     let heartbeatTimeout2, heartbeatTimeout;
 
     const sendHeartbeat = () => {
       if (this.socket.readyState === WebSocket.OPEN) {
-        this.socket.send("heartbeat"); // 发送心跳包
+        this.socket.send("Client_Info:HEARTBEAT"); // 发送心跳包
         console.log("Heartbeat sent");
         clearTimeout(heartbeatTimeout2);
       }
