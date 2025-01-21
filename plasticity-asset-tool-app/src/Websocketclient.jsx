@@ -13,6 +13,10 @@ export class WebsocketClient {
     this.openEvent = openEvent;
     this.messageEvent = messageEvent;
     this.closeEvent = closeEvent;
+
+    let heartbeatTimeout2, heartbeatTimeout;
+    this.heartbeatTimeout2 = heartbeatTimeout2;
+    this.heartbeatTimeout = heartbeatTimeout;
   }
 
   sendMessage(str) {
@@ -58,23 +62,22 @@ export class WebsocketClient {
   }
 
   runHeartBeat(heartbeatInterval = 3000) {
-    let heartbeatTimeout2, heartbeatTimeout;
-
     const sendHeartbeat = () => {
       if (this.socket.readyState === WebSocket.OPEN) {
         this.socket.send("Client_Info:HEARTBEAT"); // 发送心跳包
         console.log("Heartbeat sent");
-        clearTimeout(heartbeatTimeout2);
+        clearTimeout(this.heartbeatTimeout2);
       }
       // 设置下一个心跳
-      heartbeatTimeout = setTimeout(sendHeartbeat, heartbeatInterval);
+      this.heartbeatTimeout = setTimeout(sendHeartbeat, heartbeatInterval);
     };
 
-    sendHeartbeat(heartbeatInterval);
+    sendHeartbeat(this.heartbeatInterval);
   }
 
   stopHeartBeat() {
-    clearTimeout(heartbeatTimeout);
+    console.log("clearTimeout");
+    clearTimeout(this.heartbeatTimeout);
   }
 }
 

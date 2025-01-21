@@ -60,7 +60,7 @@ if __name__ == "__main__":
         
         try:  
             print("------load_cache------")
-            
+            print("Plasticity Hook Running....")
             print("------wait-------")
             
             program_info.process_listener_callback(has_new_callback=update_program_info_cache,has_remove_callback=remove_program_info_cache)

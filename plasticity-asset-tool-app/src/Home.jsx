@@ -29,8 +29,8 @@ export function Home() {
     socketClient.runHeartBeat(6000);
   };
   const ddd = () => {
-    socketClient.disconnect();
     socketClient.stopHeartBeat();
+    socketClient.disconnect();
   };
 
   const file_select_plasticity_file = () => {

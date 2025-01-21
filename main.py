@@ -40,11 +40,14 @@ class WSHandler(websocket.WebSocketHandler):
         print("on_msg")
         print(SEND_MESSAGE)
         if SEND_MESSAGE:
+            
+            _JSON_SEND_MESSAGE = json.dumps(SEND_MESSAGE.msg)
+            
             if SEND_MESSAGE.is_for_all: 
                 for client in clients:
-                        await client.write_message(json.dumps(SEND_MESSAGE.msg))
+                        await client.write_message(_JSON_SEND_MESSAGE)
             else:
-                await self.write_message(f"{SEND_MESSAGE.msg}")
+                await self.write_message(_JSON_SEND_MESSAGE)
         else:
             print("SEND_MESSAGE IS NONE")
 
@@ -88,9 +91,11 @@ async def run_http_websocket_server(HTTP_PORT):
     app = make_app()
     app.listen(HTTP_PORT)
     shutdown_event = asyncio.Event()
+    print("-------------")
     print(f'http server running: http://localhost:{HTTP_PORT}')
     print(f'websocket server running: ws://127.0.0.1:{HTTP_PORT}/websocket')
     print('Ctrl+C to exit')
+    print("-------------")
     await shutdown_event.wait() 
 
 
