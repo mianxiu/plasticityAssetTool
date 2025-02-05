@@ -54,9 +54,7 @@ def remove_program_info_cache():
     # file_handle.File.remove_program_info_cache(p)
     
     
-
-
-if __name__ == "__main__":
+def run_plasticity_hook():
         
         try:  
             print("------load_cache------")
@@ -71,3 +69,5 @@ if __name__ == "__main__":
             print("exit")
             
     
+if __name__ == "__main__":
+    run_plasticity_hook()

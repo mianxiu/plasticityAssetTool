@@ -9,6 +9,7 @@ from tornado import ioloop,websocket
 import threading
 import program_info
 import json
+from test import run_plasticity_hook
 
 HTTP_PORT = 15150
 WEBSOCKET_PORT = 15151
@@ -116,16 +117,20 @@ def run_all_server(http_port):
         pass
 
 if __name__ == "__main__":
-
-        
-    # # _thread_http_websocket = threading.Thread(target=run_all_server)
-    # # _thread_http_websocket.daemon = False
-    # # _thread_http_websocket.start()
-    # _thread_ui = threading.Thread(target=run_webui)
-    # _thread_ui.daemon = True
-    # _thread_ui.start()
     try:
-        run_all_server(HTTP_PORT)
+        
+        _thread_http_websocket = threading.Thread(target=run_all_server,args=(HTTP_PORT,))
+        _thread_http_websocket.daemon = True
+        _thread_http_websocket.start()
+        # has error
+        # _thread_ui = threading.Thread(target=run_webui)
+        # _thread_ui.daemon = True
+        # _thread_ui.start()
+        _thread_plasticity_hook = threading.Thread(target=run_plasticity_hook())
+        _thread_plasticity_hook.daemon= True
+        _thread_plasticity_hook.start()
+
+        # run_all_server(HTTP_PORT)
     except KeyboardInterrupt:
         print("Stop Server")
              
