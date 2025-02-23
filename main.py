@@ -129,16 +129,14 @@ if __name__ == "__main__":
         _thread_plasticity_hook = threading.Thread(target=run_plasticity_hook())
         _thread_plasticity_hook.daemon= True
         _thread_plasticity_hook.start()
+        # _thread_plasticity_hook.join()
 
         # run_all_server(HTTP_PORT)
+    except ConnectionError:
+        # _thread_plasticity_hook.start()
+        print("Connection Close")
+        
     except KeyboardInterrupt:
         print("Stop Server")
              
-
-
-
-    
-
-   
-    
 

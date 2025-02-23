@@ -10,23 +10,24 @@ import json
 from My_Modules import file_handle
 
 
-# def load_program_info_tmp():
-# todo 2024-12-16 program_info live --> websocketheartbeat
-# todo client live connect
+WSURL = "ws://127.0.0.1:15150/websocket"
+wsclient = ''
 def update_program_info_cache():
+    global wsclient
     p = program_info.PLASTICITY_INSTANCE_INFO 
     if p :
         print("in other py-update")
-        # for all client
+        if not wsclient:
+            wsclient = connect(WSURL)
         try:
-            with connect("ws://127.0.0.1:15150/websocket") as ws:
-                ws.send(f"Program_Info_Send:{p}")
-                msg = ws.recv()
-                print(msg)
-                ws.close()
-        except:
+                        wsclient.send(f"Program_Info_Send:{p}")
+                        msg = wsclient.recv()
+                        print(msg)
+                        # wsclient.close()
+        except (ConnectionError,KeyboardInterrupt):
             print("can't connect")
-
+            
+            
         
         #done 当成一个客户端，向服务器发送指有新info,服务器再推送全部
         # file_handle.File.write_program_info_cache(new_infos=p)
@@ -55,6 +56,8 @@ def remove_program_info_cache():
     
     
 def run_plasticity_hook():
+        # ws =connect("ws://127.0.0.1:15150/websocket") 
+        # print("pppppppp")
         
         try:  
             print("------load_cache------")

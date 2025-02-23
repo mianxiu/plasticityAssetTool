@@ -187,6 +187,6 @@ def websocket_handle(message: str):
 
     else:
         print(f"not command:{_message}")
-
+        
 
 # websocket_handle("SW_MINMIZE:000000:222")
