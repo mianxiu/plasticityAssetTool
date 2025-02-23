@@ -9,16 +9,17 @@ import win32gui
 import json
 from My_Modules import file_handle
 
-
+# Todo websocket heartBeat
 WSURL = "ws://127.0.0.1:15150/websocket"
 wsclient = ''
 def update_program_info_cache():
     global wsclient
+    if not wsclient:
+            wsclient = connect(WSURL)
     p = program_info.PLASTICITY_INSTANCE_INFO 
     if p :
         print("in other py-update")
-        if not wsclient:
-            wsclient = connect(WSURL)
+
         try:
                         wsclient.send(f"Program_Info_Send:{p}")
                         msg = wsclient.recv()
@@ -29,7 +30,7 @@ def update_program_info_cache():
             
             
         
-        #done 当成一个客户端，向服务器发送指有新info,服务器再推送全部
+        #Done 当成一个客户端，向服务器发送指有新info,服务器再推送全部
         # file_handle.File.write_program_info_cache(new_infos=p)
 
         print(p)
