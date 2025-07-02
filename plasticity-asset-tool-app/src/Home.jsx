@@ -1,5 +1,5 @@
 import { createEffect, createSignal } from "solid-js";
-import { WebsocketClient } from "./WebsocketClient";
+import { WebsocketClient, PlasticityInfoJson } from "./WebsocketClient";
 
 export function Home() {
   //   <WebsocketClient />;
@@ -13,8 +13,10 @@ export function Home() {
    * @param {MessageEvent} event
    */
   const mmm = event => {
-    console.log("Received message from server:", event.data);
-    setFilePath(JSON.parse(event.data));
+    let eventArray = JSON.parse(event.data);
+    let ws_url = eventArray[0].ws_url;
+    console.log(ws_url);
+    setFilePath(ws_url);
   };
 
   const socketClient = new WebsocketClient(
@@ -59,8 +61,6 @@ export function Home() {
       <ul>
         <li>
           <div>
-            <span>test1.plasticity</span>
-            <span>c:/test/test1.plascitity</span>
             <button>injure</button>
             <button>reload</button>
             <button>auto injure</button>

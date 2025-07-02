@@ -21,6 +21,7 @@ def update_program_info_cache():
         print("in other py-update")
 
         try:
+              
                         wsclient.send(f"Program_Info_Send:{p}")
                         msg = wsclient.recv()
                         print(msg)
@@ -33,7 +34,7 @@ def update_program_info_cache():
         #Done 当成一个客户端，向服务器发送指有新info,服务器再推送全部
         # file_handle.File.write_program_info_cache(new_infos=p)
 
-        print(p)
+
         for _ in p:
             _ws_url = _.ws_url
             _hwnd = _.hwnd   
@@ -58,7 +59,7 @@ def remove_program_info_cache():
     
 def run_plasticity_hook():
         # ws =connect("ws://127.0.0.1:15150/websocket") 
-        # print("pppppppp")
+    
         
         try:  
             print("------load_cache------")

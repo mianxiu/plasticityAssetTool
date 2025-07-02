@@ -151,7 +151,8 @@ class Client_Info(Enum):
     def run_command(command):
         match command:
             case "HEARTBEAT":
-                return Webscoket_Send_Message(False,str(datetime.now()))
+                # return Webscoket_Send_Message(False,str(datetime.now()))
+                return Webscoket_Send_Message(False,True)
             
 
 def websocket_handle(message: str):

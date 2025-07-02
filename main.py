@@ -38,11 +38,15 @@ class WSHandler(websocket.WebSocketHandler):
             SEND_MESSAGE = websocket_handle.websocket_handle(message=message)
 
         await ioloop.IOLoop.current().run_in_executor(None,websocket_hander_call_back)
+        
         print("on_msg")
         print(SEND_MESSAGE)
+        
         if SEND_MESSAGE:
             
-            _JSON_SEND_MESSAGE = json.dumps(SEND_MESSAGE.msg)
+            # _JSON_SEND_MESSAGE = json.dumps(SEND_MESSAGE.msg)
+            _JSON_SEND_MESSAGE = SEND_MESSAGE.msg
+            # print(_JSON_SEND_MESSAGE)
             
             if SEND_MESSAGE.is_for_all: 
                 for client in clients:

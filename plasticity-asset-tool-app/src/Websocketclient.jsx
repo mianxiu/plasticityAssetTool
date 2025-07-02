@@ -81,4 +81,15 @@ export class WebsocketClient {
   }
 }
 
+export class PlasticityInfoJson {
+  constructor(ws_url, hwnd) {
+    this.ws_url = ws_url;
+    this.hwnd = hwnd;
+  }
+
+  static FromJSON(jsonStr) {
+    const data = JSON.parse(jsonStr);
+    return data.map(item => new PlasticityInfoJson(item.ws_url, item.hwnd));
+  }
+}
 export function WebsocketHeartBeat(url) {}
