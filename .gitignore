@@ -215,5 +215,7 @@ Scripts/
 /plasticity-asset-tool-app/vite.config.ts.timestamp-*
 
 plasticityAssetToolCache/
+/library/
+/.runtime/
 recent_path.db
 readme.rst

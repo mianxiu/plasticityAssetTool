@@ -1,95 +1,61 @@
-/**
- *
- * @param {*} url
- * @param {Function} messageEvent
- * @returns {WebSocket}
- */
 export class WebsocketClient {
-  constructor(url, openEvent, messageEvent, closeEvent) {
+  constructor(url, onStatus, onEvent) {
     this.url = url;
-    // this.socket = new WebSocket(this.url);
-    this.ping = "";
-    // this.connect();
-    this.openEvent = openEvent;
-    this.messageEvent = messageEvent;
-    this.closeEvent = closeEvent;
-
-    let heartbeatTimeout2, heartbeatTimeout;
-    this.heartbeatTimeout2 = heartbeatTimeout2;
-    this.heartbeatTimeout = heartbeatTimeout;
-  }
-
-  sendMessage(str) {
-    console.log(`Send message:${str}`);
-    this.socket.send(str);
+    this.onStatus = onStatus;
+    this.onEvent = onEvent;
+    this.pending = new Map();
+    this.stopped = false;
+    this.sequence = 0;
   }
 
   connect() {
-    console.log("Connect Server");
-    this.socket = new WebSocket(this.url);
-    // 连接建立时的处理
-    this.socket.addEventListener("open", event => {
-      // console.log("Connected to WebSocket server");
-      this.openEvent(event);
-      // 发送消息到服务器
+    if (this.stopped || this.socket?.readyState === WebSocket.OPEN || this.socket?.readyState === WebSocket.CONNECTING) return;
+    this.onStatus("connecting");
+    const socket = this.socket = new WebSocket(this.url);
+    socket.addEventListener("open", () => this.onStatus("connected"));
+    socket.addEventListener("message", event => {
+      let message;
+      try { message = JSON.parse(event.data); } catch { return; }
+      if (message.type === "response") {
+        const pending = this.pending.get(message.id);
+        if (!pending) return;
+        clearTimeout(pending.timer);
+        this.pending.delete(message.id);
+        message.ok ? pending.resolve(message.data) : pending.reject(new Error(message.error || "操作失败"));
+      } else {
+        this.onEvent(message);
+      }
     });
-
-    // 接收到消息时的处理
-    this.socket.addEventListener("message", event => {
-      this.messageEvent(event);
+    socket.addEventListener("error", () => socket.close());
+    socket.addEventListener("close", () => {
+      if (this.socket !== socket) return;
+      this.onStatus("disconnected");
+      for (const pending of this.pending.values()) {
+        clearTimeout(pending.timer);
+        pending.reject(new Error("连接已断开；操作结果未知，请检查视口后再试"));
+      }
+      this.pending.clear();
+      if (!this.stopped) this.reconnectTimer = setTimeout(() => this.connect(), 2000);
     });
+  }
 
-    // 连接关闭时的处理
-    this.socket.addEventListener("close", event => {
-      // console.log("WebSocket connection closed");
-      // this.closeEvent(event);
-      // console.log("close");
-      // console.log("Try Reconnect to server");
-      // let heartbeatTimeout2 = setTimeout(() => {
-      //   this.connect();
-      // }, 3000);
-      // this.runHeartBeat(3000);
-    });
-
-    window.addEventListener("beforeunload", () => {
-      this.socket.close();
+  request(action, args = {}) {
+    if (this.socket?.readyState !== WebSocket.OPEN) return Promise.reject(new Error("组件库服务未连接"));
+    const id = `${Date.now()}-${++this.sequence}`;
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.pending.delete(id);
+        reject(new Error("操作响应超时；请先检查视口，避免重复置入"));
+      }, 45000);
+      this.pending.set(id, { resolve, reject, timer });
+      try { this.socket.send(JSON.stringify({ id, action, args })); }
+      catch (error) { clearTimeout(timer); this.pending.delete(id); reject(error); }
     });
   }
 
   disconnect() {
-    this.socket.close();
-    console.log("Disconnect WebSocket");
-  }
-
-  runHeartBeat(heartbeatInterval = 3000) {
-    const sendHeartbeat = () => {
-      if (this.socket.readyState === WebSocket.OPEN) {
-        this.socket.send("Client_Info:HEARTBEAT"); // 发送心跳包
-        console.log("Heartbeat sent");
-        clearTimeout(this.heartbeatTimeout2);
-      }
-      // 设置下一个心跳
-      this.heartbeatTimeout = setTimeout(sendHeartbeat, heartbeatInterval);
-    };
-
-    sendHeartbeat(this.heartbeatInterval);
-  }
-
-  stopHeartBeat() {
-    console.log("clearTimeout");
-    clearTimeout(this.heartbeatTimeout);
+    this.stopped = true;
+    clearTimeout(this.reconnectTimer);
+    this.socket?.close();
   }
 }
-
-export class PlasticityInfoJson {
-  constructor(ws_url, hwnd) {
-    this.ws_url = ws_url;
-    this.hwnd = hwnd;
-  }
-
-  static FromJSON(jsonStr) {
-    const data = JSON.parse(jsonStr);
-    return data.map(item => new PlasticityInfoJson(item.ws_url, item.hwnd));
-  }
-}
-export function WebsocketHeartBeat(url) {}

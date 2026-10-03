@@ -151,7 +151,7 @@ def plasticity_window_setoverlay(hwnd,ico_path):
 _hwnd = 2367588
 #plasticity_window_setoverlay(_hwnd,ico_path=title_ico_path_)
 #plasticity_window_icon_change(_hwnd,ico_path=title_ico_path_)
-plasticity_window_title_change(_hwnd,"📘(asset) test 22222")
+# Experimental helpers must not change a user's window at import time.
 
 
 

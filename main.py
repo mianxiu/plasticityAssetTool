@@ -1,146 +1,177 @@
-import re
+"""Plasticity component library: python main.py [--headless] [--port 15150]."""
+import argparse
 import asyncio
-import My_Modules.websocket_handle as websocket_handle
-from My_Modules.my_modules import Webscoket_Send_Message
-from webui import webui
-import uuid
-import tornado
-from tornado import ioloop,websocket
-import threading
-import program_info
 import json
-from test import run_plasticity_hook
+import logging
+import webbrowser
+from pathlib import Path
+from urllib.parse import urlparse
+from tornado import web, websocket
+from asset_service import AssetService
+from library_launcher import LibraryLauncher
 
-HTTP_PORT = 15150
-WEBSOCKET_PORT = 15151
+ROOT = Path(__file__).resolve().parent
+DEFAULT_SHORTCUTS = {"copy": "ctrl+c", "paste": "ctrl+v", "place": "ctrl+shift+v", "move": "g", "rotate": "r", "scale": "s", "focus": "space", "undo": "ctrl+z", "redo": "ctrl+shift+z"}
 
-WEBSOCKET_URL =  f"ws://127.0.0.1:{HTTP_PORT}/websocket"
-SEND_MESSAGE=Webscoket_Send_Message(False,[])
+def load_config():
+    config = json.loads((ROOT / "config.json").read_text(encoding="utf-8"))
+    config.setdefault("keymap", {}).setdefault("desktop_shortcuts", DEFAULT_SHORTCUTS.copy())
+    return config
 
-uuid_clients = {}
-clients = []
+def allowed_origin(origin, port):
+    parsed = urlparse(origin)
+    return parsed.scheme == "http" and parsed.hostname in ("127.0.0.1", "localhost") and parsed.port in (port, 3000)
+
+class LocalHandler(web.RequestHandler):
+    def prepare(self):
+        if self.request.host.split(":", 1)[0] not in ("127.0.0.1", "localhost"):
+            raise web.HTTPError(403)
+        origin = self.request.headers.get("Origin")
+        if origin and not allowed_origin(origin, self.application.settings["port"]):
+            raise web.HTTPError(403)
 
 class WSHandler(websocket.WebSocketHandler):
- 
-    async def open(self):
-        self.id = uuid.uuid4()
-        uuid_clients[self.id] = {'id':self.id}
-        clients.append(self)
-        print(f"WebSocket opened {self.id}")
+    def check_origin(self, origin):
+        return allowed_origin(origin, self.application.settings["port"])
 
-        await self.write_message(f"{SEND_MESSAGE.msg}")
+    async def open(self):
+        if self.request.host.split(":", 1)[0] not in ("127.0.0.1", "localhost"):
+            self.close(1008, "Local connections only")
+            return
+        self.application.clients.add(self)
+        await self.write_message({"type": "connected"})
 
     async def on_message(self, message):
-        global SEND_MESSAGE
-
-        def websocket_hander_call_back():  
-            global SEND_MESSAGE
-            SEND_MESSAGE = websocket_handle.websocket_handle(message=message)
-
-        await ioloop.IOLoop.current().run_in_executor(None,websocket_hander_call_back)
-        
-        print("on_msg")
-        print(SEND_MESSAGE)
-        
-        if SEND_MESSAGE:
-            
-            # _JSON_SEND_MESSAGE = json.dumps(SEND_MESSAGE.msg)
-            _JSON_SEND_MESSAGE = SEND_MESSAGE.msg
-            # print(_JSON_SEND_MESSAGE)
-            
-            if SEND_MESSAGE.is_for_all: 
-                for client in clients:
-                        await client.write_message(_JSON_SEND_MESSAGE)
-            else:
-                await self.write_message(_JSON_SEND_MESSAGE)
-        else:
-            print("SEND_MESSAGE IS NONE")
+        request_id = None
+        try:
+            request = json.loads(message)
+            if not isinstance(request, dict) or not isinstance(request.get("id"), str) or not isinstance(request.get("action"), str):
+                raise ValueError("无效的请求")
+            request_id = request["id"]
+            result = await self.application.service.dispatch(request["action"], request.get("args", {}), self.application.settings["base_url"])
+            if self.ws_connection:
+                await self.write_message({"type": "response", "id": request_id, "ok": True, "data": result})
+            if request["action"].startswith(("library.", "collection.", "folder.")) and request["action"] not in ("library.list", "folder.list"):
+                await self.application.broadcast({"type": "library_changed"})
+        except Exception as exc:
+            if not isinstance(exc, (ValueError, RuntimeError)):
+                logging.exception("Request failed")
+            if self.ws_connection:
+                await self.write_message({"type": "response", "id": request_id, "ok": False, "error": str(exc) or "操作失败"})
 
     def on_close(self):
-        # 清除客户端连接
-        for client_id, client in uuid_clients.items():
-            if client == self: 
-                del uuid_clients[client_id]
-        if self in clients:
-            clients.remove(self)
-                
-        print(f"WebSocket closed for {client_id}")
-    
-                
-    def check_origin(self, origin):
-        return True
-    
-    
-class MainHandler(tornado.web.RequestHandler):
+        self.application.clients.discard(self)
+
+class HealthHandler(LocalHandler):
     def get(self):
-        self.render("index.html")
-      
+        self.write({"ok": True, "app": "plasticity-asset-tool"})
 
-settings ={
-    'template_path':"./plasticity-asset-tool-app/dist/",
-    "static_path": "./plasticity-asset-tool-app/dist/assets/"
-} 
+class PreviewHandler(LocalHandler):
+    async def get(self, asset_id):
+        try:
+            preview = await asyncio.to_thread(self.application.service.library.preview, asset_id)
+            self.set_header("Content-Type", "image/jpeg")
+            self.set_header("Cache-Control", "private, max-age=3600")
+            self.write(preview)
+        except ValueError:
+            raise web.HTTPError(404)
 
+class ExportHandler(LocalHandler):
+    async def get(self, asset_id):
+        try:
+            payload = await asyncio.to_thread(self.application.service.library.export, asset_id)
+        except ValueError:
+            raise web.HTTPError(404)
+        self.set_header("Content-Type", "application/zip")
+        self.set_header("Content-Disposition", f'attachment; filename="component-{asset_id}.patasset"')
+        self.write(payload)
 
-html_root = r"plasticity-asset-tool-app/dist/"
-def make_app():
-    return tornado.web.Application([
-        (r"/", MainHandler),
-        (r"/websocket", WSHandler),
-         (r"/(.*)", tornado.web.StaticFileHandler, {"path": html_root, "default_filename": r"./index.html"}),
-        
-    ],**settings)
+class ImportHandler(LocalHandler):
+    async def post(self):
+        files = self.request.files.get("file", [])
+        if len(files) != 1:
+            self.set_status(400)
+            self.write({"error": "请选择一个 .patasset 文件"})
+            return
+        try:
+            async with self.application.service.lock:
+                result = await asyncio.to_thread(self.application.service.library.import_package, files[0]["body"], self.get_body_argument("library_id", "default"), self.get_body_argument("folder_id", None) or None)
+            self.write({"ok": True, "data": result})
+            await self.application.broadcast({"type": "library_changed"})
+        except (ValueError, OSError) as exc:
+            self.set_status(400)
+            self.write({"error": str(exc)})
 
+class StaticHandler(web.StaticFileHandler):
+    def set_extra_headers(self, path):
+        if path.endswith(".html"):
+            self.set_header("Cache-Control", "no-store")
 
-async def run_http_websocket_server(HTTP_PORT):
-    app = make_app()
-    app.listen(HTTP_PORT)
-    shutdown_event = asyncio.Event()
-    print("-------------")
-    print(f'http server running: http://localhost:{HTTP_PORT}')
-    print(f'websocket server running: ws://127.0.0.1:{HTTP_PORT}/websocket')
-    print('Ctrl+C to exit')
-    print("-------------")
-    await shutdown_event.wait() 
+    def compute_etag(self):
+        # HTML stays at the same path while Vite changes script filenames.
+        # Tornado's cached file hash must not make a rebuilt index return 304.
+        if self.path.endswith(".html"):
+            return None
+        return super().compute_etag()
 
+    def should_return_304(self):
+        return False if self.path.endswith(".html") else super().should_return_304()
 
- 
-def run_webui():
+class Application(web.Application):
+    def __init__(self, config, service=None):
+        self.clients = set()
+        self.service = service or AssetService(config, ROOT)
+        port = config["server"]["http_port"]
+        super().__init__([
+            (r"/websocket", WSHandler), (r"/api/health", HealthHandler),
+            (r"/api/assets/([a-f0-9]{32})/preview", PreviewHandler),
+            (r"/api/assets/([a-f0-9]{32})/export", ExportHandler),
+            (r"/api/import", ImportHandler),
+            (r"/(.*)", StaticHandler, {"path": str(ROOT / "plasticity-asset-tool-app" / "dist"), "default_filename": "index.html"}),
+        ], port=port, base_url=f"http://127.0.0.1:{port}", websocket_max_message_size=8 * 1024 * 1024)
 
-    MyWindow = webui.window()
-    MyWindow.set_size(800,640)
-    MyWindow.show( rf"http://127.0.0.1:{HTTP_PORT}/")
-    webui.wait()
+    async def broadcast(self, message):
+        for client in tuple(self.clients):
+            try:
+                await client.write_message(message)
+            except websocket.WebSocketClosedError:
+                self.clients.discard(client)
 
-    
-def run_webui_tk():
-    pass
-    
-def run_all_server(http_port):
-        asyncio.run(run_http_websocket_server(HTTP_PORT=http_port))
-        pass
+async def run(port=None, headless=False):
+    config = load_config()
+    if port is not None:
+        config["server"]["http_port"] = port
+    app = Application(config)
+    server = app.listen(config["server"]["http_port"], address="127.0.0.1", max_buffer_size=72 * 1024 * 1024)
+    url = app.settings["base_url"]
+    loop = asyncio.get_running_loop()
+    async def quick_launch(target_id):
+        try:
+            opened = await asyncio.to_thread(launcher.toggle, target_id)
+            if opened:
+                await app.broadcast({"type": "quick_launch", "target_id": target_id})
+        except (ValueError, RuntimeError, OSError) as exc:
+            await app.broadcast({"type": "launcher_error", "message": str(exc) or "面板打开失败"})
+    launcher = LibraryLauncher(config.get("launcher", {}), app.service.desktop, url, lambda target_id: loop.call_soon_threadsafe(lambda: asyncio.create_task(quick_launch(target_id))))
+    launcher.start()
+    app.service.launcher = launcher
+    print(f"Plasticity 组件库：{url}", flush=True)
+    if not headless:
+        webbrowser.open(url)
+    try:
+        await asyncio.Event().wait()
+    finally:
+        launcher.close()
+        server.stop()
+        for client in tuple(app.clients):
+            client.close()
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Plasticity 模型组件库")
+    parser.add_argument("--headless", action="store_true", help="只启动服务，不打开浏览器")
+    parser.add_argument("--port", type=int)
+    args = parser.parse_args()
     try:
-        
-        _thread_http_websocket = threading.Thread(target=run_all_server,args=(HTTP_PORT,))
-        _thread_http_websocket.daemon = True
-        _thread_http_websocket.start()
-        # has error
-        # _thread_ui = threading.Thread(target=run_webui)
-        # _thread_ui.daemon = True
-        # _thread_ui.start()
-        _thread_plasticity_hook = threading.Thread(target=run_plasticity_hook())
-        _thread_plasticity_hook.daemon= True
-        _thread_plasticity_hook.start()
-        # _thread_plasticity_hook.join()
-
-        # run_all_server(HTTP_PORT)
-    except ConnectionError:
-        # _thread_plasticity_hook.start()
-        print("Connection Close")
-        
+        asyncio.run(run(args.port, args.headless))
     except KeyboardInterrupt:
-        print("Stop Server")
-             
-
+        print("组件库已停止")

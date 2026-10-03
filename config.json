@@ -1,13 +1,20 @@
 {
   "server": {
     "http_port": 15150,
-    "websocket_url": "/webscoket"
+    "websocket_url": "/websocket"
   },
   "keymap": {
-    "show_panel_event_key_code": "Backquote"
+    "show_panel_event_key_code": "Tab",
+    "desktop_shortcuts": {
+      "copy": "ctrl+c", "paste": "ctrl+v", "place": "ctrl+shift+v", "move": "g",
+      "rotate": "r", "scale": "s", "focus": "space",
+      "undo": "ctrl+z", "redo": "ctrl+shift+z"
+    }
   },
+  "launcher": {"enabled": false, "shortcut": "tab", "frameless": true},
   "plasticity": {
     "listener_reflash_time": 0.5,
-    "wait_loading_time": 1
+    "wait_loading_time": 1,
+    "cdp_endpoints": ["http://127.0.0.1:9223"]
   }
 }
