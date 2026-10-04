@@ -60,6 +60,7 @@ class PlasticityBridge:
         self.config, self.desktop = config, desktop
         self.targets = {}
         self.last_error = ""
+        self.active_target_id = None
 
     async def discover(self):
         desktop = await asyncio.to_thread(self.desktop.windows) if self.desktop else []
@@ -79,6 +80,13 @@ class PlasticityBridge:
         # Never pair HWND and CDP targets by list order.
         targets = cdp + desktop
         self.targets = {target["id"]: target for target in targets}
+        if self.desktop and hasattr(self.desktop, "active_window"):
+            hwnd = await asyncio.to_thread(self.desktop.active_window)
+            active = f"hwnd:{hwnd}" if hwnd else None
+            if active in self.targets:
+                self.active_target_id = active
+        if self.active_target_id not in self.targets:
+            self.active_target_id = None
         self.last_error = "调试接口未连接，仍可使用原生剪贴板模式" if not cdp else ""
         return targets
 

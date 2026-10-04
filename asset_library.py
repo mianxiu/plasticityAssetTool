@@ -12,8 +12,10 @@ from pathlib import Path
 MAX_MODEL_BYTES = 64 * 1024 * 1024
 MAX_PREVIEW_BYTES = 5 * 1024 * 1024
 METADATA_COLUMNS = """id,name,category,tags,note,created_at,updated_at,
-    source_version,digest,archived,library_id,folder_id,kind,length(model) AS bytes,
-    (preview IS NOT NULL AND length(preview)>0) AS has_preview"""
+    source_version,digest,archived,library_id,folder_id,kind,insert_mode,length(model) AS bytes,
+    (preview IS NOT NULL AND length(preview)>0) AS has_preview,
+    EXISTS(SELECT 1 FROM geometry_cache g WHERE g.digest=assets.digest) AS has_geometry,
+    EXISTS(SELECT 1 FROM geometry_cache g WHERE g.digest=assets.digest AND g.thumbnail IS NOT NULL) AS has_geometry_preview"""
 
 
 class AssetLibrary:
@@ -32,13 +34,14 @@ class AssetLibrary:
                 db.execute("ALTER TABLE assets ADD COLUMN updated_at TEXT NOT NULL DEFAULT ''")
                 db.execute("UPDATE assets SET updated_at=created_at")
             columns = {row["name"] for row in db.execute("PRAGMA table_info(assets)")}
-            for name, declaration in [("library_id", "TEXT NOT NULL DEFAULT 'default'"), ("folder_id", "TEXT"), ("kind", "TEXT NOT NULL DEFAULT 'unknown'")]:
+            for name, declaration in [("library_id", "TEXT NOT NULL DEFAULT 'default'"), ("folder_id", "TEXT"), ("kind", "TEXT NOT NULL DEFAULT 'unknown'"), ("insert_mode", "TEXT NOT NULL DEFAULT 'new-body'")]:
                 if name not in columns:
                     db.execute(f"ALTER TABLE assets ADD COLUMN {name} {declaration}")
             db.execute("CREATE TABLE IF NOT EXISTS libraries (id TEXT PRIMARY KEY,name TEXT NOT NULL,created_at TEXT NOT NULL)")
             db.execute("CREATE TABLE IF NOT EXISTS folders (id TEXT PRIMARY KEY,library_id TEXT NOT NULL,parent_id TEXT,name TEXT NOT NULL,created_at TEXT NOT NULL)")
             db.execute("INSERT OR IGNORE INTO libraries VALUES ('default','默认库',?)", (datetime.now(timezone.utc).isoformat(),))
             db.execute("CREATE INDEX IF NOT EXISTS assets_library_archive ON assets(library_id,archived)")
+            db.execute("CREATE TABLE IF NOT EXISTS geometry_cache (digest TEXT PRIMARY KEY,mesh BLOB NOT NULL,thumbnail BLOB)")
 
     @contextmanager
     def connect(self):
@@ -53,9 +56,11 @@ class AssetLibrary:
     @staticmethod
     def metadata(row):
         return {key: row[key] for key in (
-            "id", "name", "category", "tags", "note", "created_at", "updated_at", "source_version", "digest", "archived", "library_id", "folder_id", "kind"
+            "id", "name", "category", "tags", "note", "created_at", "updated_at", "source_version", "digest", "archived", "library_id", "folder_id", "kind", "insert_mode"
         )} | {"bytes": row["bytes"] if "bytes" in row.keys() else len(row["model"]),
-              "has_preview": bool(row["has_preview"] if "has_preview" in row.keys() else row["preview"])}
+              "has_preview": bool(row["has_preview"] if "has_preview" in row.keys() else row["preview"]),
+              "has_geometry": bool(row["has_geometry"]) if "has_geometry" in row.keys() else False,
+              "has_geometry_preview": bool(row["has_geometry_preview"]) if "has_geometry_preview" in row.keys() else False}
 
     def list(self, archived=False, library_id="default"):
         self.require_library(library_id)
@@ -170,6 +175,10 @@ class AssetLibrary:
         if not result["name"]:
             raise ValueError("请输入组件名称")
         result["category"] = result["category"] or "未分类"
+        mode = fields.get("insert_mode", "new-body")
+        if mode not in ("new-body", "union", "difference", "intersection"):
+            raise ValueError("无效的默认置入模式")
+        result["insert_mode"] = mode
         return result
 
     def add(self, model, fields, preview=None, source_version="unknown"):
@@ -184,11 +193,11 @@ class AssetLibrary:
         timestamp = datetime.now(timezone.utc).isoformat()
         with self.connect() as db:
             db.execute("""INSERT INTO assets
-                (id,name,category,tags,note,created_at,updated_at,source_version,digest,model,preview,library_id,folder_id,kind)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", (
+                (id,name,category,tags,note,created_at,updated_at,source_version,digest,model,preview,library_id,folder_id,kind,insert_mode)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", (
                 asset_id, fields["name"], fields["category"], fields["tags"], fields["note"],
                 timestamp, timestamp, source_version,
-                hashlib.sha256(model).hexdigest(), model, preview, *location,
+                hashlib.sha256(model).hexdigest(), model, preview, *location, fields["insert_mode"],
             ))
         return self.details(asset_id)
 
@@ -199,8 +208,8 @@ class AssetLibrary:
         preview = self.validate_preview(fields.get("preview")) if update_preview else None
         fields = self.validate_fields(current | fields)
         with self.connect() as db:
-            db.execute("UPDATE assets SET name=?,category=?,tags=?,note=?,updated_at=?,library_id=?,folder_id=?,kind=? WHERE id=?", (
-                fields["name"], fields["category"], fields["tags"], fields["note"], datetime.now(timezone.utc).isoformat(), *location, asset_id,
+            db.execute("UPDATE assets SET name=?,category=?,tags=?,note=?,updated_at=?,library_id=?,folder_id=?,kind=?,insert_mode=? WHERE id=?", (
+                fields["name"], fields["category"], fields["tags"], fields["note"], datetime.now(timezone.utc).isoformat(), *location, fields["insert_mode"], asset_id,
             ))
             if update_preview:
                 db.execute("UPDATE assets SET preview=? WHERE id=?", (preview, asset_id))

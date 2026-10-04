@@ -1,4 +1,4 @@
-param([switch]$Headless, [switch]$NoBuild, [int]$Port = 15150)
+param([switch]$Headless, [switch]$NoBuild, [switch]$Console, [switch]$NoTray, [int]$Port = 15150)
 $ErrorActionPreference = 'Stop'
 $env:PYTHONIOENCODING = 'utf-8'
 Set-Location -LiteralPath $PSScriptRoot
@@ -40,4 +40,12 @@ if (Test-Path -LiteralPath (Join-Path $assetSitePackages 'tornado')) {
 if ($LASTEXITCODE -ne 0) { throw "Tornado is missing. Run: `"$assetPython`" -m pip install -r requirements.txt" }
 $assetArguments = @('main.py', '--port', "$Port")
 if ($Headless) { $assetArguments += '--headless' }
-& $assetPython @assetArguments
+if ($NoTray) { $assetArguments += '--no-tray' }
+$assetWindowlessPython = Join-Path (Split-Path $assetPython) 'pythonw.exe'
+if (-not $Console -and -not $NoTray -and (Test-Path -LiteralPath $assetWindowlessPython)) {
+    $assetArguments[0] = '"' + (Join-Path $PSScriptRoot 'main.py') + '"'
+    Start-Process -FilePath $assetWindowlessPython -ArgumentList $assetArguments -WorkingDirectory $PSScriptRoot -WindowStyle Hidden | Out-Null
+    Write-Output 'Plasticity 组件库已启动：通过系统托盘图标查看连接、打开组件库或退出服务。'
+} else {
+    & $assetPython @assetArguments
+}

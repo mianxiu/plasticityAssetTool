@@ -9,6 +9,9 @@ from urllib.parse import urlparse
 from tornado import web, websocket
 from asset_service import AssetService
 from library_launcher import LibraryLauncher
+from service_control import ServiceControl
+from service_tray import ServiceTray
+from control_window import ControlWindow
 
 ROOT = Path(__file__).resolve().parent
 DEFAULT_SHORTCUTS = {"copy": "ctrl+c", "paste": "ctrl+v", "place": "ctrl+shift+v", "move": "g", "rotate": "r", "scale": "s", "focus": "space", "undo": "ctrl+z", "redo": "ctrl+shift+z"}
@@ -48,7 +51,7 @@ class WSHandler(websocket.WebSocketHandler):
             if not isinstance(request, dict) or not isinstance(request.get("id"), str) or not isinstance(request.get("action"), str):
                 raise ValueError("无效的请求")
             request_id = request["id"]
-            result = await self.application.service.dispatch(request["action"], request.get("args", {}), self.application.settings["base_url"])
+            result = await self.application.dispatch(request["action"], request.get("args", {}))
             if self.ws_connection:
                 await self.write_message({"type": "response", "id": request_id, "ok": True, "data": result})
             if request["action"].startswith(("library.", "collection.", "folder.")) and request["action"] not in ("library.list", "folder.list"):
@@ -66,6 +69,21 @@ class HealthHandler(LocalHandler):
     def get(self):
         self.write({"ok": True, "app": "plasticity-asset-tool"})
 
+class ServiceHandler(LocalHandler):
+    async def get(self):
+        self.write(await self.application.control.status())
+
+    async def post(self):
+        try:
+            request = json.loads(self.request.body)
+            if not isinstance(request,dict) or not isinstance(request.get("action"),str):
+                raise ValueError("无效的服务请求")
+            result = await self.application.control.dispatch(request["action"], request.get("args",{}))
+            self.write({"ok":True,"data":result})
+        except (ValueError,RuntimeError,OSError) as exc:
+            self.set_status(400)
+            self.write({"ok":False,"error":str(exc)})
+
 class PreviewHandler(LocalHandler):
     async def get(self, asset_id):
         try:
@@ -75,6 +93,43 @@ class PreviewHandler(LocalHandler):
             self.write(preview)
         except ValueError:
             raise web.HTTPError(404)
+
+
+class GeometryHandler(LocalHandler):
+    async def get(self, asset_id, thumbnail=None):
+        try:
+            geometry = self.application.service.geometry
+            if thumbnail:
+                self.set_header("Content-Type", "image/jpeg")
+                self.write(await asyncio.to_thread(geometry.thumbnail, asset_id))
+            else:
+                mesh = await asyncio.to_thread(geometry.cached, asset_id)
+                if mesh is None:
+                    raise ValueError("未生成预览")
+                self.write(mesh)
+        except ValueError:
+            raise web.HTTPError(404)
+
+
+class GeometryWorkerHandler(LocalHandler):
+    def post(self):
+        try:
+            request = json.loads(self.request.body)
+            job = self.application.service.geometry.worker(request.get("target_id"), request.get("token"), request.get("result"))
+            self.write({"job": job})
+        except (ValueError, AttributeError) as error:
+            self.set_status(400)
+            self.write({"error": str(error)})
+
+class NativeWorkerHandler(LocalHandler):
+    def post(self):
+        try:
+            request = json.loads(self.request.body)
+            job = self.application.service.native.worker(request.get("target_id"), request.get("token"), request.get("result"), request.get("capabilities"))
+            self.write({"job": job})
+        except (ValueError, AttributeError) as error:
+            self.set_status(400)
+            self.write({"error": str(error)})
 
 class ExportHandler(LocalHandler):
     async def get(self, asset_id):
@@ -103,27 +158,37 @@ class ImportHandler(LocalHandler):
             self.write({"error": str(exc)})
 
 class StaticHandler(web.StaticFileHandler):
+    def is_html(self):
+        return str(getattr(self,"absolute_path",self.path)).lower().endswith(".html") or not self.path
+
     def set_extra_headers(self, path):
-        if path.endswith(".html"):
+        if self.is_html():
             self.set_header("Cache-Control", "no-store")
 
     def compute_etag(self):
         # HTML stays at the same path while Vite changes script filenames.
         # Tornado's cached file hash must not make a rebuilt index return 304.
-        if self.path.endswith(".html"):
+        if self.is_html():
             return None
         return super().compute_etag()
 
     def should_return_304(self):
-        return False if self.path.endswith(".html") else super().should_return_304()
+        return False if self.is_html() else super().should_return_304()
 
 class Application(web.Application):
     def __init__(self, config, service=None):
         self.clients = set()
         self.service = service or AssetService(config, ROOT)
+        self.control_window = ControlWindow(f'http://127.0.0.1:{config["server"]["http_port"]}', ROOT, self.service.desktop)
+        self.stop_event = asyncio.Event()
+        self.control = ServiceControl(self, self.stop_event)
         port = config["server"]["http_port"]
         super().__init__([
             (r"/websocket", WSHandler), (r"/api/health", HealthHandler),
+            (r"/api/service", ServiceHandler),
+            (r"/api/geometry/worker", GeometryWorkerHandler),
+            (r"/api/native/worker", NativeWorkerHandler),
+            (r"/api/assets/([a-f0-9]{32})/geometry(/preview)?", GeometryHandler),
             (r"/api/assets/([a-f0-9]{32})/preview", PreviewHandler),
             (r"/api/assets/([a-f0-9]{32})/export", ExportHandler),
             (r"/api/import", ImportHandler),
@@ -137,13 +202,29 @@ class Application(web.Application):
             except websocket.WebSocketClosedError:
                 self.clients.discard(client)
 
-async def run(port=None, headless=False):
+    async def dispatch(self, action, args):
+        if not isinstance(args,dict):
+            raise ValueError("参数必须是对象")
+        if action.startswith("service."):
+            return await self.control.dispatch(action,args)
+        return await self.service.dispatch(action,args,self.settings["base_url"])
+
+async def run(port=None, headless=False, no_tray=False):
     config = load_config()
     if port is not None:
         config["server"]["http_port"] = port
     app = Application(config)
-    server = app.listen(config["server"]["http_port"], address="127.0.0.1", max_buffer_size=72 * 1024 * 1024)
     url = app.settings["base_url"]
+    try:
+        server = app.listen(config["server"]["http_port"], address="127.0.0.1", max_buffer_size=96 * 1024 * 1024)
+    except OSError:
+        from tornado.httpclient import AsyncHTTPClient
+        response = await AsyncHTTPClient().fetch(url+"/api/health",request_timeout=2)
+        if json.loads(response.body).get("app") != "plasticity-asset-tool":
+            raise RuntimeError("端口被其他程序占用")
+        if not headless:
+            await asyncio.to_thread(app.control_window.open)
+        return
     loop = asyncio.get_running_loop()
     async def quick_launch(target_id):
         try:
@@ -155,13 +236,54 @@ async def run(port=None, headless=False):
     launcher = LibraryLauncher(config.get("launcher", {}), app.service.desktop, url, lambda target_id: loop.call_soon_threadsafe(lambda: asyncio.create_task(quick_launch(target_id))))
     launcher.start()
     app.service.launcher = launcher
+    async def tray_action(action):
+        try:
+            if action == "control":
+                await asyncio.to_thread(app.control_window.open)
+            elif action == "library":
+                await asyncio.to_thread(webbrowser.open,url+"/")
+            elif action == "toggle":
+                await app.control.dispatch("service.connection",{"enabled":not app.service.model_enabled})
+            elif action == "quit":
+                await app.control.dispatch("service.quit",{})
+            else:
+                await app.control.status()
+            if app.control.tray:
+                app.control.tray.update(await app.control.status())
+        except Exception:
+            logging.exception("Tray action failed")
+    tray = None
+    if not no_tray:
+        tray = ServiceTray(lambda action: loop.call_soon_threadsafe(lambda: asyncio.create_task(tray_action(action))))
+        app.control.tray = tray
+        await asyncio.to_thread(tray.start)
+        if not tray.available:
+            logging.error("系统托盘不可用：%s",tray.error)
+            if headless:
+                await asyncio.to_thread(app.control_window.open)
+    async def update_tray():
+        while not app.stop_event.is_set():
+            try:
+                if tray:
+                    tray.update(await app.control.status())
+            except Exception:
+                logging.exception("Status refresh failed")
+            try:
+                await asyncio.wait_for(app.stop_event.wait(),timeout=3)
+            except asyncio.TimeoutError:
+                pass
+    status_task = asyncio.create_task(update_tray())
     print(f"Plasticity 组件库：{url}", flush=True)
     if not headless:
-        webbrowser.open(url)
+        await asyncio.to_thread(app.control_window.open)
     try:
-        await asyncio.Event().wait()
+        await app.stop_event.wait()
     finally:
         launcher.close()
+        status_task.cancel()
+        await asyncio.gather(status_task,return_exceptions=True)
+        if tray:
+            await asyncio.to_thread(tray.close)
         server.stop()
         for client in tuple(app.clients):
             client.close()
@@ -170,8 +292,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Plasticity 模型组件库")
     parser.add_argument("--headless", action="store_true", help="只启动服务，不打开浏览器")
     parser.add_argument("--port", type=int)
+    parser.add_argument("--no-tray",action="store_true",help="仅运行命令行服务，不创建托盘图标")
     args = parser.parse_args()
     try:
-        asyncio.run(run(args.port, args.headless))
+        (ROOT / ".runtime").mkdir(exist_ok=True)
+        logging.basicConfig(filename=ROOT/".runtime/service.log",level=logging.INFO,format="%(asctime)s %(levelname)s %(message)s")
+        asyncio.run(run(args.port, args.headless,args.no_tray))
     except KeyboardInterrupt:
         print("组件库已停止")

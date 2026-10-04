@@ -7,10 +7,11 @@ from unittest.mock import AsyncMock, patch
 from asset_service import AssetService
 from main import DEFAULT_SHORTCUTS
 from plasticity_bridge import CdpConnection, local_url
+from model_fixture import model_bytes
 
 class FakeDesktop:
     def __init__(self):
-        self.data = b"original-model"
+        self.data = model_bytes("original-model")
         self.number = 10
         self.calls = []
         self.change_on_copy = True
@@ -35,7 +36,7 @@ class FakeDesktop:
     def shortcut(self, hwnd, shortcut):
         self.calls.append(("shortcut", hwnd, shortcut))
         if shortcut == "ctrl+c" and self.change_on_copy:
-            self.data = b"new-selection"
+            self.data = model_bytes("new-selection")
             self.number += 1
 
 class ServiceTests(unittest.IsolatedAsyncioTestCase):
@@ -53,14 +54,56 @@ class ServiceTests(unittest.IsolatedAsyncioTestCase):
         return await self.service.dispatch(action, args, "http://127.0.0.1:15150")
 
     async def test_default_insert_is_ctrl_shift_v_with_exact_model_bytes(self):
-        asset = self.service.library.add(b"saved-component\0\xff", {"name": "test"})
+        asset = self.service.library.add(model_bytes("saved-component"), {"name": "test"})
         result = await self.call("asset.insert", {"id": asset["id"], "target_id": "hwnd:42"})
-        self.assertEqual(self.desktop.data, b"saved-component\0\xff")
+        self.assertEqual(self.desktop.data, model_bytes("saved-component"))
         self.assertIn(("shortcut", 42, "ctrl+shift+v"), self.desktop.calls)
         self.assertFalse(result["verified"])
 
+    async def test_native_insert_and_capture_do_not_touch_clipboard(self):
+        model = model_bytes("native-component")
+        asset = self.service.library.add(model, {"name": "native"})
+        original = self.desktop.data
+        self.service.native.request = AsyncMock(return_value={"started": True})
+        await self.call("asset.insert", {"id": asset["id"], "target_id": "hwnd:42", "transport": "native"})
+        self.service.native.request.assert_awaited_once_with("hwnd:42", "insert", model, True, "new-body")
+        self.service.native.request = AsyncMock(return_value=model)
+        saved = await self.call("library.capture", {"name": "direct", "target_id": "hwnd:42", "transport": "native", "copy_selection": True, "preview_mode": "geometry"})
+        self.assertEqual(bytes(self.service.library.get(saved["id"])["model"]), model)
+        self.assertEqual(self.desktop.data, original)
+        self.assertEqual(self.desktop.calls, [])
+
+    async def test_insert_uses_saved_mode_and_original_position_stays_independent(self):
+        model=model_bytes("cutter")
+        asset=self.service.library.add(model,{"name":"cutter","insert_mode":"difference"})
+        self.service.native.request=AsyncMock(return_value={"started":True})
+        await self.call("asset.insert",{"id":asset["id"],"target_id":"hwnd:42","transport":"native","insert_mode":"union"})
+        self.service.native.request.assert_awaited_once_with("hwnd:42","insert",model,True,"difference")
+        self.service.native.request.reset_mock()
+        await self.call("asset.insert",{"id":asset["id"],"target_id":"hwnd:42","transport":"native","placement":False})
+        self.service.native.request.assert_awaited_once_with("hwnd:42","insert",model,False,"new-body")
+        with self.assertRaisesRegex(ValueError,"原生模型直连"):
+            await self.call("asset.insert",{"id":asset["id"],"target_id":"hwnd:42"})
+        self.assertEqual(self.desktop.calls,[])
+
+    async def test_connected_native_window_survives_missing_desktop_listing(self):
+        self.service.native.worker('hwnd:43','b'*36)
+        state=await self.service.state()
+        self.assertIn('hwnd:43',[row['id'] for row in state['targets']])
+        self.assertIn('hwnd:43',state['native_targets'])
+
+    async def test_follow_active_is_resolved_at_insert_time(self):
+        asset=self.service.library.add(model_bytes(),{'name':'follow'})
+        self.desktop.windows=lambda:[{'id':'hwnd:42','hwnd':42,'title':'A','mode':'desktop'},{'id':'hwnd:43','hwnd':43,'title':'B','mode':'desktop'}]
+        self.desktop.active_window=lambda:43
+        self.service.native.request=AsyncMock(return_value={'started':True})
+        await self.call('asset.insert',{'id':asset['id'],'target_id':'hwnd:42','transport':'native','follow_active':True})
+        self.assertEqual(self.service.native.request.call_args.args[0],'hwnd:43')
+        await self.call('asset.insert',{'id':asset['id'],'target_id':'hwnd:42','transport':'native'})
+        self.assertEqual(self.service.native.request.call_args.args[0],'hwnd:42')
+
     async def test_plain_paste_is_explicit_and_copy_does_not_paste(self):
-        asset = self.service.library.add(b"geometry", {"name": "test"})
+        asset = self.service.library.add(model_bytes(), {"name": "test"})
         await self.call("asset.copy", {"id": asset["id"]})
         self.assertFalse(any(c[0] == "shortcut" for c in self.desktop.calls))
         await self.call("asset.insert", {"id": asset["id"], "target_id": "hwnd:42", "placement": False})
@@ -77,8 +120,39 @@ class ServiceTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_capture_selection_waits_for_new_clipboard(self):
         asset = await self.call("library.capture", {"name": "selected", "copy_selection": True, "target_id": "hwnd:42"})
-        self.assertEqual(self.service.library.get(asset["id"])["model"], b"new-selection")
+        self.assertEqual(self.service.library.get(asset["id"])["model"], model_bytes("new-selection"))
         self.assertEqual(asset["source_version"], "26.1.3")
+
+    async def test_auto_copy_invalid_selection_never_saves_old_clipboard(self):
+        def invalid_copy(hwnd, shortcut):
+            self.desktop.calls.append(("shortcut", hwnd, shortcut))
+            self.desktop.data = b"not a Plasticity model"
+            self.desktop.number += 1
+        with patch.object(self.desktop, "shortcut", side_effect=invalid_copy):
+            with self.assertRaisesRegex(ValueError, "阻止置入"):
+                await self.call("library.capture", {"name": "selected", "copy_selection": True, "target_id": "hwnd:42"})
+        self.assertEqual(self.service.library.list(), [])
+        self.assertEqual(self.desktop.calls, [("shortcut", 42, "ctrl+c")])
+
+    async def test_auto_preview_and_manual_override_and_disable(self):
+        jpeg=b"\xff\xd8viewport"
+        with patch.object(self.service.bridge,"preview",new=AsyncMock(return_value=jpeg)) as preview:
+            asset=await self.call("library.capture",{"name":"auto","target_id":"hwnd:42","auto_preview":True})
+            self.assertEqual(self.service.library.get(asset["id"])["preview"],jpeg)
+            preview.assert_awaited_once_with("hwnd:42")
+            preview.reset_mock()
+            manual="data:image/jpeg;base64,"+base64.b64encode(b"\xff\xd8manual").decode()
+            asset=await self.call("library.capture",{"name":"manual","target_id":"hwnd:42","preview":manual})
+            self.assertEqual(self.service.library.get(asset["id"])["preview"],b"\xff\xd8manual")
+            await self.call("library.capture",{"name":"disabled","target_id":"hwnd:42","auto_preview":False})
+            preview.assert_not_awaited()
+
+    async def test_preview_failure_does_not_prevent_model_save_and_warns(self):
+        with patch.object(self.service.bridge,"preview",new=AsyncMock(side_effect=RuntimeError("not available"))):
+            asset=await self.call("library.capture",{"name":"saved","target_id":"hwnd:42"})
+            self.assertEqual(self.service.library.get(asset["id"])["model"],self.desktop.data)
+            self.assertFalse(asset["has_preview"])
+            self.assertIn("preview_warning",asset)
 
     async def test_invalid_metadata_does_not_issue_copy(self):
         with self.assertRaises(ValueError):
@@ -126,6 +200,51 @@ class ServiceTests(unittest.IsolatedAsyncioTestCase):
         for command, shortcut in [("move", "g"), ("rotate", "r"), ("scale", "s")]:
             await self.call("target.command", {"target_id": "hwnd:42", "command": command})
             self.assertIn(("shortcut", 42, shortcut), self.desktop.calls)
+
+    async def test_tracks_active_model_across_multiple_windows_and_browser_focus(self):
+        first = self.desktop.windows()[0]
+        second = {**first, "id": "hwnd:43", "hwnd": 43, "title": "Second model"}
+        with patch.object(self.desktop, "windows", return_value=[first, second]), patch.object(self.desktop, "active_window", create=True, return_value=42) as active:
+            self.assertEqual((await self.service.state())["active_target_id"], "hwnd:42")
+            active.return_value = 43
+            self.assertEqual((await self.service.state())["active_target_id"], "hwnd:43")
+            active.return_value = None  # Opening the component UI retains the last model.
+            self.assertEqual((await self.service.state())["active_target_id"], "hwnd:43")
+            with patch.object(self.desktop, "windows", return_value=[first]):
+                self.assertIsNone((await self.service.state())["active_target_id"])
+
+    async def test_invalid_saved_or_imported_model_does_not_write_or_activate(self):
+        asset = self.service.library.add(b"text disguised as a model", {"name": "invalid"})
+        for action in ("asset.copy", "asset.insert"):
+            with self.assertRaisesRegex(ValueError, "阻止置入"):
+                await self.call(action, {"id": asset["id"], "target_id": "hwnd:42"})
+        self.assertEqual(self.desktop.calls, [])
+
+    async def test_corrupt_digest_does_not_write_or_activate(self):
+        asset = self.service.library.add(model_bytes(), {"name": "test"})
+        with self.service.library.connect() as db:
+            db.execute("UPDATE assets SET digest='wrong' WHERE id=?", (asset["id"],))
+        with self.assertRaisesRegex(ValueError, "校验失败"):
+            await self.call("asset.insert", {"id": asset["id"], "target_id": "hwnd:42"})
+        self.assertEqual(self.desktop.calls, [])
+
+    async def test_invalid_clipboard_is_not_saved_or_pasted(self):
+        self.desktop.data = b"plain text"
+        with self.assertRaises(ValueError):
+            await self.call("library.capture", {"name": "invalid"})
+        for command in ("paste", "place"):
+            with self.assertRaises(ValueError):
+                await self.call("target.command", {"target_id": "hwnd:42", "command": command})
+        self.assertEqual(self.service.library.list(), [])
+        self.assertEqual(self.desktop.calls, [])
+
+    async def test_clipboard_replaced_before_paste_never_sends_shortcut(self):
+        asset = self.service.library.add(model_bytes(), {"name": "test"})
+        for replacement in (b"text", model_bytes("other component")):
+            with patch.object(self.desktop, "read", return_value=replacement):
+                with self.assertRaises((ValueError, RuntimeError)):
+                    await self.call("asset.insert", {"id": asset["id"], "target_id": "hwnd:42"})
+        self.assertFalse(any(call[0] == "shortcut" for call in self.desktop.calls))
 
 class CdpTests(unittest.IsolatedAsyncioTestCase):
     async def test_unsolicited_events_do_not_replace_command_response(self):

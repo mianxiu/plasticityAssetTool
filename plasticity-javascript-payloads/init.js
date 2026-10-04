@@ -8,8 +8,28 @@ function installAssetPanel(options) {
   }
   const frame = document.createElement("iframe");
   let frameReady = false;
+  let disconnected = false;
+  const previewRequests = new Map();
+  const offline = document.createElement("section");
+  offline.hidden = true;
+  offline.setAttribute("role", "alert");
+  offline.style.cssText = "position:fixed;left:50%;top:24%;transform:translateX(-50%);width:min(560px,calc(100vw - 48px));padding:32px;border:2px solid #f17979;border-top:6px solid #ff8585;border-radius:14px;z-index:10001;background:#351c24;color:#ffe9e9;font:15px 'Segoe UI','Microsoft YaHei',sans-serif;box-shadow:0 20px 100px #000b";
+  const heading = document.createElement("h3");
+  heading.textContent = "组件库后台未连接";
+  heading.style.cssText = "margin:0 0 18px;font-size:26px;font-weight:700;color:#ffaaaa";
+  const detail = document.createElement("p");
+  detail.textContent = "组件置入和保存暂不可用。请先启动组件库后台，再重新打开面板。";
+  detail.style.cssText = "line-height:1.8;margin:0 0 24px";
+  const dismiss = document.createElement("button");
+  dismiss.textContent = "关闭提示";
+  dismiss.style.cssText = "padding:8px 16px;border:1px solid #526786;border-radius:6px;background:#25354b;color:#e8edf5;cursor:pointer";
+  dismiss.onclick = () => hide();
+  offline.append(heading, detail, dismiss);
+  document.body.appendChild(offline);
   frame.id = "plasticity_asset_tool_panel";
   const show = () => {
+    if (disconnected) {frame.hidden = true;offline.hidden = false;return;}
+    offline.hidden = true;
     if (!frame.hasAttribute("src")) frame.src = options.url;
     frame.hidden = false;
     if (frameReady) {
@@ -24,15 +44,24 @@ function installAssetPanel(options) {
   if (!options.hidden) show();
   const hide = () => {
     frame.hidden = true;
+    offline.hidden = true;
     document.activeElement?.blur();
     window.focus();
     const canvas = document.querySelector("plasticity-viewport canvas") || document.querySelector("canvas");
     if (canvas) { if (!canvas.hasAttribute("tabindex")) canvas.tabIndex = -1; canvas.focus(); }
     return canvas;
   };
-  const togglePanel = () => {
-    if (frame.hidden) show(); else hide();
-    return {visible: !frame.hidden};
+  const togglePanel = connected => {
+    if (!frame.hidden || !offline.hidden) hide();
+    else {
+      if (typeof connected === "boolean") {
+        const reconnect = disconnected && connected;
+        disconnected = !connected;
+        if (reconnect) {frameReady = false;frame.src = options.url;}
+      }
+      show();
+    }
+    return {visible: !frame.hidden || !offline.hidden, connected: !disconnected};
   };
   const toggle = event => {
     if ((event.code !== options.key && event.key !== options.key) || event.repeat || event.ctrlKey || event.altKey || event.shiftKey || event.metaKey || /INPUT|TEXTAREA|SELECT/.test(event.target?.tagName) || event.target?.isContentEditable) return;
@@ -50,16 +79,40 @@ function installAssetPanel(options) {
     if (["pat:hide", "pat:prepare"].includes(event.data?.type)) {
       const canvas = hide();
       if (event.data.type === "pat:prepare") {
-        requestAnimationFrame(() => frame.contentWindow.postMessage({type:"pat:prepared",id:event.data.id,ready:!!canvas && document.activeElement === canvas}, new URL(options.url).origin));
+        requestAnimationFrame(() => {
+          const ready = !!canvas && document.activeElement === canvas;
+          if (ready && event.data.preview) {
+            const id = event.data.id;
+            const timer = setTimeout(() => completePreview(id, null), 1800);
+            previewRequests.set(id, {canvas, timer});
+            console.log("PAT_PREVIEW_REQUEST:" + id);
+          } else frame.contentWindow.postMessage({type:"pat:prepared",id:event.data.id,ready}, new URL(options.url).origin);
+        });
       }
     }
   };
   document.addEventListener("keydown", toggle, true);
   window.addEventListener("message", receive);
-  window[key] = { frame, toggle: togglePanel, dispose() {
+  const completePreview = (id, preview) => {
+    const request = previewRequests.get(id);
+    if (!request) return;
+    clearTimeout(request.timer);previewRequests.delete(id);
+    frame.contentWindow.postMessage({type:"pat:prepared",id,ready:document.activeElement === request.canvas,preview}, new URL(options.url).origin);
+  };
+  window[key] = { frame, offline, hide, isVisible: () => !frame.hidden || !offline.hidden, toggle: togglePanel,
+    previewRect(id) {
+      const request = previewRequests.get(id);
+      if (!request || !frame.hidden) return null;
+      const rect = request.canvas.getBoundingClientRect();
+      const x = Math.max(0, Math.ceil(rect.left)), y = Math.max(0, Math.ceil(rect.top));
+      const width = Math.floor(Math.min(rect.right, innerWidth) - x), height = Math.floor(Math.min(rect.bottom, innerHeight) - y);
+      return width > 0 && height > 0 ? {x,y,width,height} : null;
+    }, completePreview, dispose() {
+    for (const request of previewRequests.values()) clearTimeout(request.timer);
+    previewRequests.clear();
     document.removeEventListener("keydown", toggle, true);
     window.removeEventListener("message", receive);
-    frame.remove(); delete window[key];
+    frame.remove(); offline.remove(); delete window[key];
   }};
   return { installed: true, reused: false };
 }

@@ -5,6 +5,7 @@ import time
 from contextlib import contextmanager
 from ctypes import wintypes as W
 from pathlib import Path
+from model_clipboard import validate_model
 
 FORMAT_NAME = "application/vnd.plasticity.items"
 MAX_BYTES = 64 * 1024 * 1024
@@ -55,6 +56,7 @@ class WindowsBridge:
         self.u.CreateWindowExW.argtypes = [W.DWORD, W.LPCWSTR, W.LPCWSTR, W.DWORD, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, W.HWND, W.HMENU, W.HINSTANCE, ctypes.c_void_p]
         self.u.CreateWindowExW.restype = W.HWND
         self.owner = self.u.CreateWindowExW(0, "STATIC", "Plasticity Asset Tool Clipboard", 0, 0, 0, 0, 0, W.HWND(-3), None, None, None)
+        self.last_active_hwnd = None
         if not self.owner:
             raise ctypes.WinError(ctypes.get_last_error())
 
@@ -76,7 +78,7 @@ class WindowsBridge:
     def read(self):
         with self.opened():
             if not self.u.IsClipboardFormatAvailable(self.format_id):
-                raise ValueError("剪贴板没有 Plasticity 模型。请先选中实体并按 Ctrl+C")
+                raise ValueError("剪贴板没有 Plasticity 模型。请先复制选中的实体")
             handle = self.u.GetClipboardData(self.format_id)
             size = self.k.GlobalSize(handle)
             if not handle or not 0 < size <= MAX_BYTES:
@@ -85,13 +87,12 @@ class WindowsBridge:
             if not pointer:
                 raise ctypes.WinError(ctypes.get_last_error())
             try:
-                return ctypes.string_at(pointer, size)
+                return validate_model(ctypes.string_at(pointer, size))
             finally:
                 self.k.GlobalUnlock(handle)
 
     def write(self, data):
-        if not isinstance(data, bytes) or not 0 < len(data) <= MAX_BYTES:
-            raise ValueError("模型数据为空或超过 64 MB")
+        validate_model(data)
         handle = self.k.GlobalAlloc(0x0002, len(data))
         if not handle:
             raise ctypes.WinError(ctypes.get_last_error())
@@ -155,6 +156,17 @@ class WindowsBridge:
     def validate(self, hwnd):
         if not self.u.IsWindow(hwnd) or not self.is_model_window(hwnd):
             raise ValueError("目标 Plasticity 窗口已关闭，请刷新并重新选择")
+
+    def active_window(self):
+        hwnd = self.u.GetForegroundWindow()
+        if hwnd and self.is_model_window(hwnd):
+            self.last_active_hwnd = hwnd
+            return hwnd
+        previous = self.last_active_hwnd
+        if previous and self.u.IsWindow(previous) and self.is_model_window(previous):
+            return previous
+        self.last_active_hwnd = None
+        return None
 
     def activate(self, hwnd):
         self.validate(hwnd)

@@ -5,6 +5,20 @@ from windows_bridge import WindowsBridge
 
 
 class FocusTests(unittest.TestCase):
+    def test_last_cad_window_survives_webui_focus_and_is_removed_when_closed(self):
+        bridge=WindowsBridge.__new__(WindowsBridge)
+        bridge.u=Mock();bridge.last_active_hwnd=None
+        bridge.is_model_window=Mock(side_effect=lambda hwnd:hwnd in (42,43))
+        bridge.u.IsWindow.return_value=True
+        bridge.u.GetForegroundWindow.return_value=42
+        self.assertEqual(bridge.active_window(),42)
+        bridge.u.GetForegroundWindow.return_value=43
+        self.assertEqual(bridge.active_window(),43)
+        bridge.u.GetForegroundWindow.return_value=7
+        self.assertEqual(bridge.active_window(),43)
+        bridge.u.IsWindow.return_value=False
+        self.assertIsNone(bridge.active_window())
+
     def test_console_or_other_process_cannot_receive_model_shortcuts(self):
         bridge = WindowsBridge.__new__(WindowsBridge)
         bridge.process_path = Mock(return_value="C:/Plasticity/Plasticity.exe")

@@ -37,6 +37,18 @@ class LibraryTests(unittest.TestCase):
         self.library.archive(asset["id"], False)
         self.assertEqual(self.library.get(asset["id"])["model"], self.model)
 
+    def test_default_insert_mode_persists_and_round_trips(self):
+        asset = self.library.add(self.model, {"name":"cutter","insert_mode":"difference"})
+        self.assertEqual(AssetLibrary(self.directory.name).details(asset["id"])["insert_mode"], "difference")
+        imported = self.library.import_package(self.library.export(asset["id"]))
+        self.assertEqual(imported["insert_mode"], "difference")
+        self.assertEqual(self.library.update(asset["id"], {"note":"changed"})["insert_mode"], "difference")
+        for mode in ("new-body", "union", "intersection"):
+            self.assertEqual(self.library.update(asset["id"], {"insert_mode":mode})["insert_mode"], mode)
+        with self.assertRaisesRegex(ValueError, "默认置入模式"):
+            self.library.update(asset["id"], {"insert_mode":"invalid"})
+        self.assertEqual(self.library.get(asset["id"])["model"], self.model)
+
     def test_corrupt_package_rejected_without_partial_import(self):
         asset = self.library.add(self.model, {"name": "测试"})
         original = zipfile.ZipFile(io.BytesIO(self.library.export(asset["id"])))

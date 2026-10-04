@@ -3,6 +3,7 @@ import styles from "./App.module.css";
 import { createEffect, createSignal, mergeProps, Show } from "solid-js";
 import { Dynamic } from "solid-js/web";
 import { Home } from "./Home";
+import { ControlCenter } from "./ControlCenter";
 
 export function MyComponent(props) {}
 
@@ -26,7 +27,7 @@ export function App() {
 
   return (
     <div>
-      <Home />
+      {new URLSearchParams(location.search).has("control") ? <ControlCenter/> : <Home/>}
     </div>
   );
 }

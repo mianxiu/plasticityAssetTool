@@ -11,6 +11,9 @@ importers:
       solid-js:
         specifier: ^1.8.11
         version: 1.8.11
+      three:
+        specifier: 0.180.0
+        version: 0.180.0
     devDependencies:
       solid-devtools:
         specifier: ^0.29.2
@@ -702,6 +705,9 @@ packages:
   supports-color@5.5.0:
     resolution: {integrity: sha512-QjVjwdXIt408MIiAqCX4oUKsgU2EqAGzs2Ppkm4aQYbjm+ZEWEcW4SfFNTr4uMNZma0ey4f5lgLrkB0aX0QMow==}
     engines: {node: '>=4'}
+
+  three@0.180.0:
+    resolution: {integrity: sha512-o+qycAMZrh+TsE01GqWUxUIKR1AL0S8pq7zDkYOQw8GqfX8b8VoCKYUoHbhiX5j+7hr8XsuHDVU6+gkQJQKg9w==}
 
   to-fast-properties@2.0.0:
     resolution: {integrity: sha512-/OaKK0xYrs3DmxRYqL/yDc+FxFUVYhDlXMhRmv3z915w2HF1tnN1omB354j8VUGO/hbRzyD6Y3sA7v7GS/ceog==}
@@ -1408,6 +1414,7 @@ snapshots:
       '@solid-devtools/debugger': 0.23.3(solid-js@1.8.11)
       '@solid-devtools/shared': 0.13.1(solid-js@1.8.11)
       solid-js: 1.8.11
+    optionalDependencies:
       vite: 5.0.11
     transitivePeerDependencies:
       - supports-color
@@ -1430,6 +1437,8 @@ snapshots:
   supports-color@5.5.0:
     dependencies:
       has-flag: 3.0.0
+
+  three@0.180.0: {}
 
   to-fast-properties@2.0.0: {}
 
@@ -1464,7 +1473,7 @@ snapshots:
       fsevents: 2.3.3
 
   vitefu@0.2.5(vite@5.0.11):
-    dependencies:
+    optionalDependencies:
       vite: 5.0.11
 
   yallist@3.1.1: {}

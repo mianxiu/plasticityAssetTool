@@ -63,6 +63,8 @@ class LibraryLauncher:
         refresh_at = 0
         while not self.stop.wait(0.1):
             try:
+                # Keep the last CAD target when the user switches to the WebUI.
+                self.desktop.active_window()
                 if time.monotonic() >= refresh_at:
                     self.targets = {row['hwnd'] for row in self.desktop.windows()}
                     refresh_at = time.monotonic() + 0.5
