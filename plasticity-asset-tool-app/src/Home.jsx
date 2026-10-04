@@ -19,7 +19,6 @@ export function Home() {
   const [floatingPanel, setFloatingPanel] = createSignal(embedded || new URLSearchParams(location.search).get("panel") === "1");
   const [sidebarMode, setSidebarMode] = createSignal("fixed");
   const pendingHost = new Map();
-  let groupReadPending=false;
   const hostOrigin = document.referrer.startsWith("file:") || !document.referrer ? "*" : new URL(document.referrer).origin;
   function hidePanel() {
     if (embedded) window.parent.postMessage({type:"pat:hide"}, hostOrigin);
@@ -27,7 +26,7 @@ export function Home() {
   }
   function hostMessage(event) {
     if (!embedded || event.source !== window.parent) return;
-    if (event.data?.type === "pat:shown") { groupReadPending=true;if (preferredTarget) setTargetId(preferredTarget); refresh().catch(error => showNotice(error.message, true)); focusSearch(); }
+    if (event.data?.type === "pat:shown") { if (preferredTarget) setTargetId(preferredTarget); refresh().catch(error => showNotice(error.message, true)); focusSearch(); }
     if (event.data?.type === "pat:prepared") pendingHost.get(event.data.id)?.(event.data);
   }
   function prepareHost(preview = false) {
@@ -214,7 +213,6 @@ export function Home() {
       if (requestedLibrary !== libraryId() || requestedArchive !== archived()) { refreshQueued = true; return; }
       setAssets(rows);
       if (!rows.some(asset => asset.id === selectedId())) setSelectedId("");
-      if(groupReadPending && nativeTargets().includes(preferredTarget || targetId())) {groupReadPending=false;queueMicrotask(()=>readSelectedGroup(true));}
     } finally {
       refreshPending = false;
       if (refreshQueued && ready()) { refreshQueued = false; queueMicrotask(() => refresh().catch(error => showNotice(error.message, true))); }
@@ -288,29 +286,24 @@ export function Home() {
     if (result) setDetailsOpen(false);
     if (result && embedded) hidePanel();
   }
-  const [groupSelection,setGroupSelection] = createSignal(null);
-  let groupReading=false;
-  async function readSelectedGroup(open=false) {
-    if (groupReading || busy() || !ready() || !modelEnabled()) return;
+  async function openCapture() {
+    if (!ready()) return;
     const id=embedded ? preferredTarget || targetId() : targetId();
-    if (!nativeTargets().includes(id)) return;
-    groupReading=true;
+    setBusy(true);
     try {
-      const value=await client.request("selection.group",{target_id:id});
-      setGroupSelection(value.recipe ? {...value,target:id} : null);
-      if (open && value.recipe && (dialog()!=="capture" || form().group_signature!==value.signature)) openCapture(value);
-      return value;
-    } catch(error) {setGroupSelection(null); if (!error.message.includes('尚未加载组运算')) {showNotice(error.message,true);return false;}}
-    finally {groupReading=false;}
-  }
-  async function openCapture(group) {
-    if (!group?.recipe) {if(await readSelectedGroup()===false)return;group=groupSelection();}
-    setFormFolders(folders()); setFoldersLoading(false);
-    setForm({ name: group?.recipe?.name || "", recipe:group?.recipe || null, group_signature:group?.signature, category: category() === "全部组件" ? "" : category(), tags: "", note: "", preview: "", library_id:libraryId(),folder_id:folderId(),insert_mode:"new-body",kind:group?.recipe ? "solid" : kind() === "all" ? "unknown" : kind() });
-    setCopySelection(!!target() && modelEnabled());
-    setAutoPreview(true);
-    setNotice(null);
-    setDialog("capture");
+      let group=null;
+      if (modelEnabled() && nativeTargets().includes(id)) {
+        try {group=await client.request("selection.group",{target_id:id});}
+        catch(error) {if (!error.message.includes('尚未加载组运算')) throw error;}
+      }
+      setFormFolders(folders()); setFoldersLoading(false);
+      setForm({ name: group?.recipe?.name || "", recipe:group?.recipe || null, group_signature:group?.signature, capture_target:id, category: category() === "全部组件" ? "" : category(), tags: "", note: "", preview: "", library_id:libraryId(),folder_id:folderId(),insert_mode:"new-body",kind:group?.recipe ? "solid" : kind() === "all" ? "unknown" : kind() });
+      setCopySelection(!!target() && modelEnabled());
+      setAutoPreview(true);
+      setNotice(null);
+      setDialog("capture");
+    } catch(error) {showNotice(error.message,true);}
+    finally {setBusy(false);}
   }
   function openEdit(asset = selected()) {
     setFormFolders(folders()); setFoldersLoading(false);
@@ -326,7 +319,7 @@ export function Home() {
       return;
     }
     const result = await operate(capturing ? "library.capture" : "library.update", {
-      ...form(), id: selectedId(), target_id: capturing && form().recipe ? groupSelection()?.target || preferredTarget || targetId() : targetId(), copy_selection: copySelection(), auto_preview:autoPreview(), preview_mode:'geometry', transport:"native",
+      ...form(), id: selectedId(), target_id: capturing && form().recipe ? form().capture_target || preferredTarget || targetId() : targetId(), copy_selection: copySelection(), auto_preview:autoPreview(), preview_mode:'geometry', transport:"native",
       follow_active:!embedded && followActive() && !form().recipe,
     }, capturing ? "组件已保存，可重复置入" : "组件信息已更新");
     if (result) {
@@ -403,7 +396,7 @@ export function Home() {
       <Show when={form().recipe} fallback={<fieldset class="insert-mode-picker" title="布尔模式使用置入前选中的实体作为目标。原位置粘贴始终保持独立对象。"><legend>默认置入模式</legend><div class="insert-mode-options"><For each={Object.entries(insertModes)}>{item=><label><input type="radio" name="insert_mode" value={item[0]} checked={(form().insert_mode || "new-body") === item[0]} onChange={()=>setField("insert_mode",item[0])}/><span>{item[1]}</span></label>}</For></div></fieldset>}><fieldset class="group-recipe"><legend>组：{form().recipe?.name} · 按顺序执行</legend><ol><For each={form().recipe?.parts}>{part=><li><span>{part.name}</span><small>{insertModes[part.mode]}</small></li>}</For></ol></fieldset></Show>
       <label>分组<select aria-label="组件所属分组" disabled={foldersLoading()} onChange={event => setField("folder_id",event.currentTarget.value || null)}><option value="" selected={!form().folder_id}>{foldersLoading() ? "正在加载分组…" : "库根目录"}</option><For each={formFolders()}>{item => <option value={item.id} selected={form().folder_id === item.id}>{folderLabel(item.id,formFolders())}</option>}</For></select></label>
       <div class="form-row"><label>分类<input maxlength="80" placeholder="未分类" list="asset-categories" value={form().category} onInput={event => setField("category", event.currentTarget.value)}/></label><label>标签<input maxlength="300" placeholder="螺栓，紧固件" value={form().tags} onInput={event => setField("tags", event.currentTarget.value)}/></label></div><datalist id="asset-categories"><For each={categories()}>{name => <option value={name}/>}</For></datalist><label>备注<textarea maxlength="2000" rows="3" placeholder="尺寸、用途或使用说明" value={form().note} onInput={event => setField("note", event.currentTarget.value)}/></label>
-      <Show when={props.capture}><label class="check-label" title={copySelection() ? "直接读取选中模型，不占用系统剪贴板。" : "从剪贴板保存，请先手动复制模型。"}><input type="checkbox" checked={copySelection()} disabled={busy() || !target() || !modelEnabled() || !!form().recipe} onChange={event => setCopySelection(event.currentTarget.checked)}/><span>直接保存选中的模型</span></label></Show>
+      <Show when={props.capture}><label class="check-label" title={copySelection() ? "直接读取选中模型，不占用系统剪贴板。" : "从剪贴板保存，请先手动复制模型。"}><input type="checkbox" checked={copySelection()} disabled={busy() || !target() || !modelEnabled() || !!form().recipe} onChange={event => setCopySelection(event.currentTarget.checked)}/><span>{form().recipe ? "直接保存选中的组" : "直接保存选中的部件"}</span></label></Show>
       <label class="preview-picker">预览图（可选）<input type="file" accept="image/jpeg" onChange={readPreview}/></label>
       <Show when={props.capture}><label class="check-label" title="从模型生成正交缩略图和三维预览，需要连接 Plasticity；上传的预览图优先使用。"><input type="checkbox" checked={autoPreview()} disabled={busy()} onChange={event=>setAutoPreview(event.currentTarget.checked)}/><span>自动生成几何预览</span></label></Show>
       <Show when={form().preview || (!props.capture && form().preview === undefined && selected()?.has_preview)}><div class="preview-editor"><img class="form-preview" src={form().preview || previewUrl(selected())} alt="组件预览"/><button type="button" class="secondary" disabled={busy()} onClick={() => setField("preview", "")}>移除预览图</button></div></Show>
@@ -479,7 +472,7 @@ export function Home() {
       <footer class="page-footer component-browser-footer"><div class="browser-location"><span>{currentLibrary()?.name || "资产库"}</span><span> / </span><span>{folderLabel(folderId())}</span><button aria-label="新建资产库" title="新建资产库" disabled={!ready()} onClick={()=>openOrganization("library")}>＋</button></div><div class="browser-display"><select aria-label="组件排序" value={sortMode()} onChange={event=>setSortMode(event.currentTarget.value)}><option value="recent">最近保存</option><option value="oldest">最早保存</option><option value="name">名称排序</option></select><label title={`${cardSize()}px · 自动保存`}>大小<input type="range" aria-label="组件卡片大小" aria-valuetext={`第 ${(cardSize()-112)/8+1} 档，共 37 档，${cardSize()} 像素`} min="112" max="400" step="8" value={cardSize()} disabled={status() !== "connected"} onInput={changeCardSize} onChange={saveCardSize}/><output class="size-level">{(cardSize()-112)/8+1}/37</output></label><a href="/?control=1" target="_blank" rel="noopener noreferrer" title="控制中心">控制中心 ↗</a></div></footer>
     </main>
 
-    <Show when={dialog()}><div class="modal-backdrop" onClick={event => { if (event.target === event.currentTarget && !busy()) setDialog(null); }}><section class="modal" role="dialog" aria-modal="true" aria-labelledby="dialog-title"><div class="modal-heading"><h2 id="dialog-title">保存组件<span class="help-tip" tabindex="0" aria-label="保存帮助" data-tip={copySelection() ? "选中模型并完成当前工具后保存，无需系统剪贴板。" : "先在 Plasticity 复制模型，再保存剪贴板中的组件。"}>?</span></h2><button class="icon-button" disabled={busy()} aria-label="关闭对话框" onClick={() => setDialog(null)}>×</button></div>
+    <Show when={dialog()}><div class="modal-backdrop" onClick={event => { if (event.target === event.currentTarget && !busy()) setDialog(null); }}><section class="modal" role="dialog" aria-modal="true" aria-labelledby="dialog-title"><div class="modal-heading"><h2 id="dialog-title">{form().recipe ? "保存组组件" : "保存普通组件"}<span class="help-tip" tabindex="0" aria-label="保存帮助" data-tip={copySelection() ? "选中模型并完成当前工具后保存，无需系统剪贴板。" : "先在 Plasticity 复制模型，再保存剪贴板中的组件。"}>?</span></h2><button class="icon-button" disabled={busy()} aria-label="关闭对话框" onClick={() => setDialog(null)}>×</button></div>
       <AssetForm capture onCancel={()=>setDialog(null)}/>
     </section></div></Show>
     <Show when={organizationDialog()}><div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="organization-title"><h2 id="organization-title">{{library:"新建资产库",folder:"新建分组","rename-library":"重命名资产库","rename-folder":"重命名分组"}[organizationDialog()]}</h2><p class="modal-description">{organizationDialog() === "folder" ? `创建到：${folderLabel(folderId())}` : "库和分组用于组织已保存的组件。"}</p><form onSubmit={saveOrganization}><label>名称<input aria-label="库或分组名称" autofocus required maxlength="120" value={organizationName()} onInput={event => setOrganizationName(event.currentTarget.value)}/></label><Show when={notice()?.error}><p class="form-error" role="alert">{notice().message}</p></Show><div class="modal-actions"><button type="button" class="secondary" disabled={busy()} onClick={() => setOrganizationDialog(null)}>取消</button><button class="primary" type="submit" disabled={!ready() || !organizationName().trim()}>保存</button></div></form></section></div></Show>
