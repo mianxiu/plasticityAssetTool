@@ -1,10 +1,16 @@
-param([switch]$Headless, [switch]$NoBuild, [switch]$Console, [switch]$NoTray, [int]$Port = 15150)
+﻿param([switch]$Headless, [switch]$NoBuild, [switch]$Console, [switch]$NoTray, [int]$Port = 15150)
 $ErrorActionPreference = 'Stop'
+$OutputEncoding = [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)
 $env:PYTHONIOENCODING = 'utf-8'
 Set-Location -LiteralPath $PSScriptRoot
+if (-not $PSBoundParameters.ContainsKey('Port')) {
+    $Port = (Get-Content -LiteralPath (Join-Path $PSScriptRoot 'config.json') -Raw | ConvertFrom-Json).server.http_port
+}
+if ($Port -lt 1 -or $Port -gt 65535) { throw '后台端口必须在 1–65535 之间。' }
 
 $assetPython = $null
 $assetCandidates = @(
+    (Join-Path $PSScriptRoot 'runtime/python/python.exe'),
     (Join-Path $PSScriptRoot '.venv/Scripts/python.exe'),
     (Join-Path $env:USERPROFILE '.cache/codex-runtimes/codex-primary-runtime/dependencies/python/python.exe')
 )
@@ -20,7 +26,8 @@ if (-not $assetPython) { throw 'Python 3.10+ is required. Install Python and run
 
 # Prefer the project environment; retain the old dependency directory while
 # an already-running backend may still be using it.
-$assetSitePackages = Join-Path $PSScriptRoot '.venv/Lib/site-packages'
+$assetSitePackages = Join-Path $PSScriptRoot 'runtime/python/Lib/site-packages'
+if (-not (Test-Path -LiteralPath $assetSitePackages)) { $assetSitePackages = Join-Path $PSScriptRoot '.venv/Lib/site-packages' }
 if (-not (Test-Path -LiteralPath $assetSitePackages)) { $assetSitePackages = Join-Path $PSScriptRoot 'Lib/site-packages' }
 if (Test-Path -LiteralPath (Join-Path $assetSitePackages 'tornado')) {
     $env:PYTHONPATH = "$assetSitePackages;$env:PYTHONPATH"
@@ -52,7 +59,9 @@ if ($NoTray) { $assetArguments += '--no-tray' }
 $assetWindowlessPython = Join-Path (Split-Path $assetPython) 'pythonw.exe'
 if (-not $Console -and -not $NoTray -and (Test-Path -LiteralPath $assetWindowlessPython)) {
     $assetArguments[0] = '"' + (Join-Path $PSScriptRoot 'main.py') + '"'
-    Start-Process -FilePath $assetWindowlessPython -ArgumentList $assetArguments -WorkingDirectory $PSScriptRoot -WindowStyle Hidden | Out-Null
+    $assetRuntime = Join-Path $PSScriptRoot '.runtime'
+    New-Item -ItemType Directory -Path $assetRuntime -Force | Out-Null
+    Start-Process -FilePath $assetWindowlessPython -ArgumentList $assetArguments -WorkingDirectory $PSScriptRoot -WindowStyle Hidden -RedirectStandardOutput (Join-Path $assetRuntime 'backend.stdout.log') -RedirectStandardError (Join-Path $assetRuntime 'backend.stderr.log') | Out-Null
     Write-Output 'Plasticity 组件库已启动：通过系统托盘图标查看连接、打开组件库或退出服务。'
 } else {
     & $assetPython @assetArguments

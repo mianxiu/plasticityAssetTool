@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$Target,
     [string]$Backup,
     [string]$UpgradeFrom,
@@ -27,7 +27,9 @@ if ($Restore) {
     $Description = '恢复原插件入口：' + $Description
 }
 if (-not $Python) {
-    $Python = Join-Path $env:USERPROFILE '.cache/codex-runtimes/codex-primary-runtime/dependencies/python/python.exe'
+    $Python = Join-Path $installerRoot 'runtime/python/python.exe'
+    if (-not (Test-Path -LiteralPath $Python)) { $Python = Join-Path $installerRoot '.venv/Scripts/python.exe' }
+    if (-not (Test-Path -LiteralPath $Python)) { $Python = Join-Path $env:USERPROFILE '.cache/codex-runtimes/codex-primary-runtime/dependencies/python/python.exe' }
     if (-not (Test-Path -LiteralPath $Python)) { $Python = (Get-Command python.exe -ErrorAction Stop).Source }
 }
 $installerArgs = @('--backup', [IO.Path]::GetFullPath($Backup))

@@ -206,6 +206,21 @@ File:select_plasticity_file
 
 ## 项目目录
 
+### Windows EXE 发布包
+
+从 GitHub Releases 下载 `PlasticityAssetTool-windows-x64.zip`，解压整个目录后双击 `Plasticity 模型组件库.exe`。包中自带 Python、Tornado 和已构建的界面，无需另装 Python 或 Node.js；EXE 需与发布目录一起使用。启动器打开控制窗口，后台由系统托盘控制退出；重复打开复用同一后台。日常启动不请求管理员权限。需要在 Plasticity 内使用 Tab 时，再按安装说明安装内嵌插件。
+
+组件数据位于发布目录的 `library/`，日志、设置与安装恢复备份位于 `.runtime/`，更新前保留这两个目录。发布包不携带开发机的组件数据、缓存、环境或安装备份。Release 提供 SHA-256 校验文件；源码仓库仅保存启动器源码和构建脚本，生成的 EXE、ZIP 不进入 Git。
+
+开发时运行 `./build-launcher.ps1` 生成根目录的 EXE 入口，仍使用当前项目环境。完整发布包先执行前端构建，再运行：
+
+```powershell
+python packaging/build_release.py --python-runtime "完整 Windows Python 目录" --dependencies ".venv/Lib/site-packages"
+python tests/verify_windows_release.py
+```
+
+验证脚本解压到隔离目录，使用临时端口，屏蔽开发机 Python 路径，检查冷启动、托盘和三个并发启动保持同一后台 PID，并退出测试后台。当前验证范围为本机 Windows x64 和 Plasticity 26.1.3。
+
 Curve 预览直接读取内核中的 `WireBody`：直线读取端点，圆弧和样条按相对误差自适应采样，按原边分组绘制，避免把独立曲线连接起来。边的采样参数使用原生归一化的 0–1 区间。缩略图与详情沿用正交视图，无需截图或改变建模文档。已用本机保存的两条闭合轮廓验证预览与缩略图生成，并测试闭合圆、振荡曲线、坐标校验及复杂度限制。安装更新备份为 `.runtime/plasticity-formal-main-before-curve-preview.js`，已有窗口下次启动加载新转换器。
 
 - `main.py`、`start.ps1`：后台启动入口，原有启动命令保持兼容。
