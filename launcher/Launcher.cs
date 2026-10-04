@@ -48,21 +48,26 @@ internal static class Launcher {
             return request;
         }
     }
+    private static int ProbeBackend(string root) {
+        try {
+            var serializer = new JavaScriptSerializer();
+            var metadata = serializer.Deserialize<Dictionary<string,object>>(
+                File.ReadAllText(Path.Combine(root,".runtime/backend-instance.json")));
+            int port = Convert.ToInt32(metadata["port"]);
+            if (port < 1 || port > 65535) return 0;
+            using (var client = new LocalClient()) {
+                var health = serializer.Deserialize<Dictionary<string,object>>(
+                    client.DownloadString("http://127.0.0.1:" + port + "/api/health"));
+                if (Convert.ToString(health["app"]) == "plasticity-asset-tool") return Convert.ToInt32(metadata["pid"]);
+            }
+        } catch (Exception) { }
+        return 0;
+    }
     private static int WaitForBackend(string root) {
-        var serializer = new JavaScriptSerializer();
         var deadline = DateTime.UtcNow.AddSeconds(15);
         while (DateTime.UtcNow < deadline) {
-            try {
-                var metadata = serializer.Deserialize<Dictionary<string,object>>(
-                    File.ReadAllText(Path.Combine(root,".runtime/backend-instance.json")));
-                int port = Convert.ToInt32(metadata["port"]);
-                if (port < 1 || port > 65535) throw new InvalidDataException("无效的后台端口");
-                using (var client = new LocalClient()) {
-                    var health = serializer.Deserialize<Dictionary<string,object>>(
-                        client.DownloadString("http://127.0.0.1:" + port + "/api/health"));
-                    if (Convert.ToString(health["app"]) == "plasticity-asset-tool") return Convert.ToInt32(metadata["pid"]);
-                }
-            } catch (Exception) { }
+            int owner = ProbeBackend(root);
+            if (owner > 0) return owner;
             Thread.Sleep(50);
         }
         throw new InvalidOperationException("后台未在预期时间内连接。请查看 .runtime/service.log 和 .runtime/launcher.log。");
@@ -92,12 +97,14 @@ internal static class Launcher {
                 WorkingDirectory = root, UseShellExecute = false, CreateNoWindow = true
             };
             info.EnvironmentVariables["PYTHONIOENCODING"] = "utf-8";
+            int previousOwner = ProbeBackend(root);
             var started = Stopwatch.StartNew();
             using (var process = Process.Start(info)) {
                 int owner = WaitForBackend(root);
-                // Reusers must finish before reporting success: otherwise an
-                // immediate tray exit could race a not-yet-initialized child.
-                if (owner != process.Id && !process.WaitForExit(10000))
+                // Wait for an existing service reuse to finish. A Windows venv
+                // redirector has a different PID from its long-lived Python
+                // child, so PID inequality alone does not indicate reuse.
+                if (previousOwner > 0 && owner == previousOwner && !process.WaitForExit(10000))
                     throw new InvalidOperationException("已有后台复用检查超时，请查看后台日志。");
                 if (process.HasExited && process.ExitCode != 0)
                     throw new InvalidOperationException("后台启动失败，请查看 .runtime/service.log。");
