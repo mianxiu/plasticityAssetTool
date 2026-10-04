@@ -35,7 +35,7 @@ class ServiceControl:
             return await asyncio.to_thread(self.app.control_window.open)
         if action == "service.panel_settings":
             async with service.lock:
-                settings = await asyncio.to_thread(service.panel_settings.update, args.get("position"), args.get("sidebar_mode"))
+                settings = await asyncio.to_thread(service.panel_settings.update, args.get("position"), args.get("sidebar_mode"), args.get("card_size"))
             await self.app.broadcast({"type": "service_changed"})
             return {"message": "面板设置已保存", "panel_settings": settings}
         if action == "service.connection":

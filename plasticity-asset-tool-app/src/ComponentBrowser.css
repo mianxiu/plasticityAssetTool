@@ -3,6 +3,7 @@
 .component-first input,.component-first textarea{-webkit-user-select:text;user-select:text}
 .component-first img,.component-first svg{-webkit-user-drag:none}
 .sidebar-content{display:contents}
+.size-level{min-width:32px;font-size:10px;font-variant-numeric:tabular-nums;text-align:right}
 .component-first .sidebar{width:156px;padding:10px 6px;gap:0}
 .component-first .brand{margin-bottom:12px;gap:5px}.component-first .brand .cube-icon{width:30px;height:30px}.component-first .brand strong{font-size:17px}.component-first .brand span{display:none}
 .component-first .sidebar-label{font-size:10px;margin:9px 4px 4px}.component-first .nav-item{font-size:12px;padding:5px 4.5px}

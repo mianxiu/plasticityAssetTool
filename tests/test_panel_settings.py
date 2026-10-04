@@ -10,7 +10,7 @@ class PanelSettingsTests(unittest.TestCase):
     def test_default_save_restart_and_invalid_value(self):
         with tempfile.TemporaryDirectory() as root:
             settings = PanelSettings(root)
-            self.assertEqual(settings.snapshot(), {"position": "fixed", "sidebar_mode": "fixed"})
+            self.assertEqual(settings.snapshot(), {"position": "fixed", "sidebar_mode": "fixed", "card_size":184})
             settings.update("cursor")
             self.assertEqual(PanelSettings(root).position, "cursor")
             with self.assertRaises(ValueError):
@@ -32,7 +32,7 @@ class PanelSettingsTests(unittest.TestCase):
             settings = PanelSettings(root)
             settings.update("cursor")
             settings.update(sidebar_mode="hover")
-            self.assertEqual(PanelSettings(root).snapshot(), {"position":"cursor", "sidebar_mode":"hover"})
+            self.assertEqual(PanelSettings(root).snapshot(), {"position":"cursor", "sidebar_mode":"hover", "card_size":184})
             settings.update("fixed")
             self.assertEqual(settings.sidebar_mode, "hover")
             with self.assertRaises(ValueError):
@@ -50,4 +50,18 @@ class PanelControlTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual((await app.dispatch("service.status", {}))["panel_settings"]["position"], "cursor")
             self.assertEqual(PanelSettings(root).position, "cursor")
             await app.dispatch("service.panel_settings", {"sidebar_mode":"hover"})
-            self.assertEqual((await app.dispatch("state", {}))["panel_settings"], {"position":"cursor", "sidebar_mode":"hover"})
+            self.assertEqual((await app.dispatch("state", {}))["panel_settings"], {"position":"cursor", "sidebar_mode":"hover", "card_size":184})
+            await app.dispatch("service.panel_settings", {"card_size":400})
+            self.assertEqual((await app.dispatch("state", {}))["panel_settings"]["card_size"], 400)
+
+    async def test_card_sizes_validate_and_restore_without_overwriting_other_settings(self):
+        with tempfile.TemporaryDirectory() as root:
+            settings = PanelSettings(root)
+            settings.update(position="cursor", sidebar_mode="hover", card_size=112)
+            for size in range(112, 401, 8):
+                settings.update(card_size=size)
+                self.assertEqual(PanelSettings(root).card_size, size)
+            for size in [104, 408, 113, 184.0, True, "184"]:
+                with self.assertRaises(ValueError):
+                    settings.update(card_size=size)
+            self.assertEqual(PanelSettings(root).snapshot(), {"position":"cursor", "sidebar_mode":"hover", "card_size":400})

@@ -77,6 +77,21 @@ export function Home() {
   function previewPointerUp(event) { if (event.button === 2) closeHeldPreview(); }
   const [connectionSettings, setConnectionSettings] = createSignal(false);
   const [cardSize, setCardSize] = createSignal(184);
+  let cardSizeTimer, cardSizePending = false, cardSizeVersion = 0;
+  function changeCardSize(event) {
+    setCardSize(Number(event.currentTarget.value));
+    cardSizePending = true;cardSizeVersion++;
+    clearTimeout(cardSizeTimer);
+    cardSizeTimer = setTimeout(saveCardSize, 300);
+  }
+  async function saveCardSize() {
+    clearTimeout(cardSizeTimer);
+    if (!cardSizePending) return;
+    const version = cardSizeVersion;
+    try {await client.request("service.panel_settings", {card_size:cardSize()});}
+    catch(error) {showNotice("大小设置未保存：" + error.message, true);}
+    finally {if (version === cardSizeVersion) cardSizePending = false;}
+  }
   const [sortMode, setSortMode] = createSignal("recent");
   const [busy, setBusy] = createSignal(false);
   const [notice, setNotice] = createSignal(null);
@@ -191,6 +206,7 @@ export function Home() {
       setNativeTargets(state.native_targets || []);
       setModelEnabled(state.model_enabled !== false);
       setSidebarMode(state.panel_settings?.sidebar_mode || "fixed");
+      if (!cardSizePending) setCardSize(state.panel_settings?.card_size || 184);
       if (embedded) window.parent.postMessage({type:"pat:panel-settings",settings:state.panel_settings}, hostOrigin);
       setTargetId(chooseTarget({embedded,preferredTarget,current:targetId(),followActive:followActive(),state}));
       const rows = requestedArchive ? await client.request("library.list", { archived: true, library_id: requestedLibrary }) : state.assets;
@@ -357,7 +373,7 @@ export function Home() {
     window.addEventListener("pointercancel", closeHeldPreview, true);
     window.addEventListener("blur", closeHeldPreview);
   });
-  onCleanup(() => { clearInterval(poll); client.disconnect(); window.removeEventListener("keydown",onSearchKey);window.removeEventListener("message",hostMessage);
+  onCleanup(() => { clearInterval(poll); clearTimeout(cardSizeTimer); client.disconnect(); window.removeEventListener("keydown",onSearchKey);window.removeEventListener("message",hostMessage);
     window.removeEventListener("pointerup", previewPointerUp, true);
     window.removeEventListener("pointercancel", closeHeldPreview, true);
     window.removeEventListener("blur", closeHeldPreview);
@@ -442,7 +458,7 @@ export function Home() {
         </Show></aside></div></Show>
       </div>
 
-      <footer class="page-footer component-browser-footer"><div class="browser-location"><span>{currentLibrary()?.name || "资产库"}</span><span> / </span><span>{folderLabel(folderId())}</span><button aria-label="新建资产库" title="新建资产库" disabled={!ready()} onClick={()=>openOrganization("library")}>＋</button></div><div class="browser-display"><select aria-label="组件排序" value={sortMode()} onChange={event=>setSortMode(event.currentTarget.value)}><option value="recent">最近保存</option><option value="oldest">最早保存</option><option value="name">名称排序</option></select><label>大小<input type="range" aria-label="组件卡片大小" min="136" max="260" step="12" value={cardSize()} onInput={event=>setCardSize(Number(event.currentTarget.value))}/></label><a href="/?control=1" target="_blank" rel="noopener noreferrer" title="控制中心">控制中心 ↗</a></div></footer>
+      <footer class="page-footer component-browser-footer"><div class="browser-location"><span>{currentLibrary()?.name || "资产库"}</span><span> / </span><span>{folderLabel(folderId())}</span><button aria-label="新建资产库" title="新建资产库" disabled={!ready()} onClick={()=>openOrganization("library")}>＋</button></div><div class="browser-display"><select aria-label="组件排序" value={sortMode()} onChange={event=>setSortMode(event.currentTarget.value)}><option value="recent">最近保存</option><option value="oldest">最早保存</option><option value="name">名称排序</option></select><label title={`${cardSize()}px · 自动保存`}>大小<input type="range" aria-label="组件卡片大小" aria-valuetext={`第 ${(cardSize()-112)/8+1} 档，共 37 档，${cardSize()} 像素`} min="112" max="400" step="8" value={cardSize()} disabled={status() !== "connected"} onInput={changeCardSize} onChange={saveCardSize}/><output class="size-level">{(cardSize()-112)/8+1}/37</output></label><a href="/?control=1" target="_blank" rel="noopener noreferrer" title="控制中心">控制中心 ↗</a></div></footer>
     </main>
 
     <Show when={dialog()}><div class="modal-backdrop" onClick={event => { if (event.target === event.currentTarget && !busy()) setDialog(null); }}><section class="modal" role="dialog" aria-modal="true" aria-labelledby="dialog-title"><div class="modal-heading"><h2 id="dialog-title">保存组件<span class="help-tip" tabindex="0" aria-label="保存帮助" data-tip={copySelection() ? "选中模型并完成当前工具后保存，无需系统剪贴板。" : "先在 Plasticity 复制模型，再保存剪贴板中的组件。"}>?</span></h2><button class="icon-button" disabled={busy()} aria-label="关闭对话框" onClick={() => setDialog(null)}>×</button></div>
