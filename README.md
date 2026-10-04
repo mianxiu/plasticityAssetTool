@@ -245,3 +245,5 @@ Plasticity 视口加载完成后，插件确认本地后台身份，再预加载
 入口插件升级后，下一次启动 Plasticity 才加载隐藏预加载及长轮询代码；本次安装备份为 `.runtime/plasticity-formal-main-before-performance.js`。大型组件库与大模型进一步优化见 `TODO.md`。
 
 源码目录启动器兼容 Windows 虚拟环境的 Python 重定向子进程：以启动前已在线的后台判断复用，不把子进程 PID 差异误判为重复启动检查超时。`python tests/verify_windows_release.py --venv` 可单独验证该路径；默认仍验证发布包自带 Python。两种方式均已验证冷启动、托盘和并发单实例。
+
+Tab 内嵌面板外框为 1px，直接引用 Plasticity 原生 `--accent-500` 主题变量，切换 Appearance 的 Accent Color 时自动同步，无需轮询。默认主题使用 Plasticity 自带的绿色回退值。插件更新回滚备份为 `.runtime/plasticity-formal-main-before-accent-border.js`；已有窗口下次启动加载更新。

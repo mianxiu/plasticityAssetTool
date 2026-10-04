@@ -59,7 +59,7 @@ function installAssetPanel(options) {
   };
   frame.title = "Plasticity 模型组件库";
   frame.hidden = !!options.hidden;
-  frame.style.cssText = "position:fixed;right:20px;top:70px;width:min(1000px,calc(100vw - 40px));height:calc(100vh - 100px);border:1px solid #414958;border-radius:16px;z-index:10000;box-shadow:0 20px 80px #0008;background:#10151d";
+  frame.style.cssText = "position:fixed;right:20px;top:70px;width:min(1000px,calc(100vw - 40px));height:calc(100vh - 100px);border:1px solid rgb(var(--accent-500, 16 185 129));border-radius:16px;z-index:10000;box-shadow:0 20px 80px #0008;background:#10151d";
   document.body.appendChild(frame);
   if (!options.hidden) show();
   const hide = () => {
