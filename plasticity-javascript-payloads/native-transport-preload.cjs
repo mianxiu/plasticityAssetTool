@@ -5,6 +5,33 @@ const modelFormat = 'application/vnd.plasticity.items';
 let transportBusy = false;
 let calculation = null;
 function calculationStatus() {return calculation ? {...calculation} : null;}
+function labelGroupModel(data,recipe) {
+  // Paste/placement may return bodies in a different order. Bind each body to
+  // its recipe step with a unique temporary name, never the user's name.
+  let offset=56;
+  const block=()=>{const n=data.readUInt32LE(offset);offset+=4;const value=data.subarray(offset,offset+n);offset+=n;if(offset>data.length)throw new Error('组模型数据不完整');return value;};
+  block();block();
+  const count=data.readUInt32LE(offset);offset+=4;
+  if(count!==recipe.parts.length)throw new Error('组子部件与模型数量不一致');
+  const chunks=[data.subarray(0,offset)],names=[];
+  const token=nativeRequire('crypto').randomUUID().replace(/-/g,'');
+  const encodedBlock=value=>{const header=NativeBuffer.alloc(4);header.writeUInt32LE(value.length);return [header,value];};
+  for(let index=0;index<count;index++) {
+    const geometry=block(),metadata=JSON.parse(block().toString('utf8'));
+    const name=`PAT-${token}-${index}`;names.push(name);
+    chunks.push(...encodedBlock(geometry),...encodedBlock(NativeBuffer.from(JSON.stringify({...metadata,name}))));
+  }
+  return {data:NativeBuffer.concat(chunks),names};
+}
+function showCalculationError(error) {
+  if(typeof document==='undefined') return;
+  document.querySelector('#pat-calculation-error')?.remove();
+  const alert=document.createElement('section');alert.id='pat-calculation-error';alert.setAttribute('role','alert');
+  alert.style.cssText='position:fixed;top:24px;left:50%;transform:translateX(-50%);z-index:2147483647;max-width:calc(100vw - 48px);padding:16px;border:1px solid #b96969;border-radius:8px;background:#352326;color:#f1cccc;font:14px "Segoe UI","Microsoft YaHei",sans-serif;box-shadow:0 8px 32px #0008';
+  const text=document.createElement('p');text.textContent=`组件库置入失败：${error.message || error}`;text.style.cssText='margin:0 0 10px;overflow-wrap:anywhere';
+  const close=document.createElement('button');close.textContent='关闭';close.onclick=()=>alert.remove();
+  alert.append(text,close);document.body.append(alert);
+}
 function beginCalculation(total) {
   if (calculation) throw new Error('组件正在计算，请等待本次操作结束');
   calculation = {startedAt:Date.now(),total,completed:0,step:0,label:'正在置入模型'};
@@ -18,6 +45,7 @@ function beginCalculation(total) {
     timer=setTimeout(render,1000);
   };
   if (typeof document !== 'undefined') {
+    document.querySelector('#pat-calculation-error')?.remove();
     overlay=document.createElement('div');
     overlay.id='pat-calculation-lock';
     overlay.style.cssText='position:fixed;inset:0;z-index:2147483647;background:#0004;display:grid;place-items:center;cursor:wait;user-select:none';
@@ -140,16 +168,19 @@ async function insertModel(editor, args, PasteCommand, OperationType, BooleanFac
   if (booleanMode && !targets.length) throw new Error('请先在 Plasticity 选中布尔目标实体，再置入组件');
   const operation = booleanMode ? OperationType?.[{union:'Union',difference:'Difference',intersection:'Intersection'}[mode]] : null;
   if (booleanMode && typeof operation !== 'number') throw new Error('当前版本不支持默认布尔置入，请更新内嵌插件');
+  if (booleanMode && typeof BooleanFactory !== 'function') throw new Error('当前版本不支持安全布尔置入，请更新内嵌插件');
   if (typeof args.model !== 'string' || args.model.length > 90*1024*1024 || !/^[A-Za-z0-9+/]*={0,2}$/.test(args.model)) throw new Error('组件模型编码无效');
   let data = NativeBuffer.from(args.model,'base64');
   if (data.length < 68 || data.length > 64*1024*1024) throw new Error('组件模型长度无效');
+  let partNames;
+  if(recipe) {const tagged=labelGroupModel(data,recipe);data=tagged.data;partNames=tagged.names;}
   const Command = args.placement ? editor.commands.PasteWithPlacementCommand : PasteCommand;
   if (typeof Command !== 'function') throw new Error('原生置入命令不可用');
   const command = new Command(editor);
   command.remember = false;
-  let configured = !booleanMode && !recipe, placementFactory, progress;
+  let configured = !booleanMode && !recipe, placementFactory, progress, calculationError;
   const report=(step,label,completed)=>progress?.update(step,label,completed);
-  const finish=()=>{progress?.finish();progress=null;};
+  const finish=()=>{progress?.finish();progress=null;if(calculationError)showCalculationError(calculationError);};
   if (typeof command.register === 'function') {
     const register = command.register;
     if (typeof register !== 'function') throw new Error('当前版本不支持默认布尔置入');
@@ -158,12 +189,12 @@ async function insertModel(editor, args, PasteCommand, OperationType, BooleanFac
         // Set the native factory before its controls and first pointer update.
         // Targets are snapshots of this window's selected solids only.
         if (recipe) {
-          configureGroupPlacement(editor,command,resource,recipe,args.placement ? targets : [],OperationType,BooleanFactory,!!args.placement,report);
+          configureGroupPlacement(editor,command,resource,recipe,args.placement ? targets : [],OperationType,BooleanFactory,!!args.placement,report,partNames);
         } else if (booleanMode) {
-          resource.targets = targets;
-          resource.operationType = operation;
-          resource.keepTools = false;
-          if (resource.operationType !== operation || resource.targets.length !== targets.length) throw new Error('原生布尔置入设置失败');
+          // PlaceFactory's boolean path can commit its placement cache rather
+          // than the requested operation. Use the same explicit kernel factory
+          // as recipes, inside this command's single undo transaction.
+          configureBooleanPlacement(editor,command,resource,targets,operation,BooleanFactory);
         }
         const commit=resource.commit;
         if(typeof commit === 'function') resource.commit=async function(...params) {
@@ -173,9 +204,10 @@ async function insertModel(editor, args, PasteCommand, OperationType, BooleanFac
             // Paint the lock before entering a potentially expensive kernel call.
             if(typeof requestAnimationFrame === 'function') await new Promise(resolve=>requestAnimationFrame(()=>setTimeout(resolve,0)));
             const result=await commit.apply(this,params);
+            if(booleanMode && !Array.from(result || []).length) throw new Error('布尔结果为空，已撤销本次置入');
             report(recipe ? recipe.parts.length : 1,'正在完成置入',recipe ? recipe.parts.length : 1);
             return result;
-          } catch(error) {report(calculation?.step || 0,'计算失败，正在回滚');throw error;}
+          } catch(error) {calculationError=error;report(calculation?.step || 0,'计算失败，正在回滚');throw error;}
         };
         configured = true;
         placementFactory = resource;
@@ -250,7 +282,20 @@ async function insertModel(editor, args, PasteCommand, OperationType, BooleanFac
   } catch(error) {finish();throw error;}
   return started;
 }
-function configureGroupPlacement(editor,command,factory,recipe,targets,OperationType,BooleanFactory,performBoolean,report=()=>{}) {
+function configureBooleanPlacement(editor,command,factory,targets,operation,BooleanFactory) {
+  const boolean=new BooleanFactory(editor);command.register(boolean);
+  const commit=factory.commit;
+  factory.commit=async function(...args) {
+    if(this.shouldPerformBoolean) throw new Error('定位置入被切换为整体布尔，请重新置入；组件布尔在确认后执行');
+    const placed=Array.from(await commit.apply(this,args));
+    if(!placed.length) throw new Error('未取得置入实体，已停止布尔运算');
+    boolean.targets=targets;boolean.tools=placed;boolean.keepTools=false;boolean.operationType=operation;
+    const result=Array.from(await boolean.commit());
+    if(!result.length) throw new Error('布尔结果为空，已撤销本次置入');
+    return result;
+  };
+}
+function configureGroupPlacement(editor,command,factory,recipe,targets,OperationType,BooleanFactory,performBoolean,report=()=>{},partNames) {
   // The native command owns the placement and every following factory, so
   // cancellation/failure rolls back its single transaction and undo restores it.
   const commit = factory.commit;
@@ -260,11 +305,19 @@ function configureGroupPlacement(editor,command,factory,recipe,targets,Operation
   });
   factory.commit = async function(...args) {
     if(this.shells.length !== recipe.parts.length) throw new Error('组子部件与置入模型数量不一致');
-    // Native non-boolean placement returns one transformed solid for each
-    // input shell, in model-envelope order. Geometry tests verify this with
-    // unequal bodies and non-commutative operations; names are never keys.
-    const placed = Array.from(await commit.apply(this,args));
+    if(this.shouldPerformBoolean) throw new Error('组定位置入被切换为整体布尔，请重新置入；组内布尔由子部件名称决定');
+    let placed = Array.from(await commit.apply(this,args));
     if (placed.length !== recipe.parts.length || placed.some(v=>v.constructor.name !== 'Solid')) throw new Error('置入部件与保存的组顺序不一致');
+    if(partNames) {
+      const byName=new Map();
+      for(const body of placed) {
+        const name=editor.nodes.getName(editor.nodes.item2key(body));
+        if(!partNames.includes(name) || byName.has(name)) throw new Error('无法确认置入子部件的身份，已停止组运算');
+        byName.set(name,body);
+      }
+      placed=partNames.map(name=>byName.get(name));
+      if(placed.some(body=>!body)) throw new Error('组子部件身份不完整，已停止组运算');
+    }
     let accumulator=targets.slice(); const independent=[];
     for (const part of recipe.parts) {
       const action=({union:'布尔合并',difference:'布尔减去',intersection:'布尔相交','new-body':'保留独立实体'})[part.mode];
@@ -277,7 +330,8 @@ function configureGroupPlacement(editor,command,factory,recipe,targets,Operation
       const boolean = booleans[part.index];
       boolean.targets=accumulator; boolean.tools=[tool]; boolean.keepTools=false;
       boolean.operationType=OperationType[{union:'Union',difference:'Difference',intersection:'Intersection'}[part.mode]];
-      accumulator=Array.from(await boolean.commit());
+      try {accumulator=Array.from(await boolean.commit());}
+      catch(error) {throw new Error(`第 ${part.index+1} 个部件“${part.name}”${action}失败：${error.message || error}`);}
       if (!accumulator.length) throw new Error(`部件 ${part.name} 的布尔结果为空，已撤销本次置入`);
     }
     const results=[...accumulator,...independent];

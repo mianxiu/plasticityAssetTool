@@ -42,12 +42,13 @@ const editor={executor:{isBusy:false},selection:{selected:{size:1}},commands:{Pa
    execute(){clipboard.readBuffer('application/vnd.plasticity.items');factory=new PlaceFactory();this.register(factory);selected.clear();return new Promise(()=>{});}
  }
  const booleanEditor={...editor,selection:{selected:{solids:selected}},commands:{PasteWithPlacementCommand:BooleanPlaceCommand}};
+ class BooleanFactory {commit(){return [];}}
  const operations={Union:15903,Difference:15902,Intersection:15901};
  for(const [mode,type] of [['union',15903],['difference',15902],['intersection',15901]]) {
    selected.add(targetA);selected.add(targetB);
-   const result=await api.insertModel(booleanEditor,{model:model.toString('base64'),placement:true,insert_mode:mode},null,operations);
-   assert.equal(result.insert_mode,mode);assert.equal(factory.operationType,type);
-   assert.deepEqual(Array.from(factory.targets),[targetA,targetB]);assert.equal(factory.keepTools,false);
+   const result=await api.insertModel(booleanEditor,{model:model.toString('base64'),placement:true,insert_mode:mode},null,operations,BooleanFactory);
+   assert.equal(result.insert_mode,mode);assert.equal(factory.operationType,'new-body');
+   assert.deepEqual(Array.from(factory.targets),[]);
  }
  await assert.rejects(api.insertModel(booleanEditor,{model:model.toString('base64'),placement:true,insert_mode:'difference'},null,operations),/选中布尔目标/);
  selected.add(targetA);

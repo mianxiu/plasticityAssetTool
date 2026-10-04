@@ -4,7 +4,7 @@ sandbox.globalThis=sandbox;
 vm.runInNewContext(fs.readFileSync('plasticity-javascript-payloads/native-transport-preload.cjs','utf8'),sandbox);
 class Solid {constructor(name,values){this.name=name;this.values=new Set(values);}}
 const modes={Union:1,Difference:2,Intersection:3};
-async function check(parts,expected,expectedIndependent=[],targetValues=[1,2]) {
+async function check(parts,expected,expectedIndependent=[],targetValues=[1,2],badIdentity=false) {
   const prefix='unique-',placed=parts.map((p,i)=>new Solid(prefix+i,p.values));
   const calls=[],groups=[],registered=[];
   const editor={nodes:{getName:v=>v.name,setName(v,n){v.name=n;},item2key:v=>v},groups:{create(){const g={members:[]};groups.push(g);return g;},deleteMembership(){},addMembership(v,g,index){g.members.splice(index,0,v);}}};
@@ -19,9 +19,9 @@ async function check(parts,expected,expectedIndependent=[],targetValues=[1,2]) {
     }
   }
   const command={register(f){registered.push(f);}}; // Real native API returns void.
-  const factory={shells:placed,async commit(){return placed;}};
+  const factory={shells:placed,async commit(){if(badIdentity)placed[0].name='missing-id';return placed.slice().reverse();}};
   const recipe={version:1,name:'组名',parts:parts.map((p,i)=>({index:i,name:p.name,mode:p.mode}))};
-  sandbox.configureGroupPlacement(editor,command,factory,recipe,targetValues?[new Solid('target',targetValues)]:[],modes,BooleanFactory,true);
+  sandbox.configureGroupPlacement(editor,command,factory,recipe,targetValues?[new Solid('target',targetValues)]:[],modes,BooleanFactory,true,()=>{},parts.map((_,i)=>prefix+i));
   const result=await factory.commit();
   assert.deepEqual([...result[0].values].sort(),expected);
   assert.equal(groups[0].name,'组名');
@@ -35,6 +35,24 @@ async function check(parts,expected,expectedIndependent=[],targetValues=[1,2]) {
   await check([{name:'+ 重名',mode:'union',values:[3]},{name:'+ 重名',mode:'union',values:[4]},{name:'& 截取',mode:'intersection',values:[2,4]}],[2,4]);
   await check([{name:'+ 基体',mode:'union',values:[1,2]},{name:'- 孔',mode:'difference',values:[2]}],[1],[],null);
   await assert.rejects(check([{name:'- 清空',mode:'difference',values:[1,2]}],[]),/结果为空/);
+  await assert.rejects(check([{name:'+ A',mode:'union',values:[3]}],[1,2,3],[],[1,2],true),/身份/);
+  for(const [operation,expected] of [[1,[1,2,3]],[2,[1]],[3,[2]]]) {
+    const registered=[],target=new Solid('target',[1,2]),tool=new Solid('tool',[2,3]);
+    class BooleanFactory {
+      async commit(){
+        assert.equal(this.operationType,operation);assert.equal(this.targets[0],target);assert.equal(this.tools[0],tool);assert.equal(this.keepTools,false);
+        const values=new Set(target.values);
+        if(operation===1)for(const n of tool.values)values.add(n);
+        if(operation===2)for(const n of tool.values)values.delete(n);
+        if(operation===3)for(const n of values)if(!tool.values.has(n))values.delete(n);
+        return [new Solid('result',values)];
+      }
+    }
+    const factory={async commit(){return [tool];}};
+    sandbox.configureBooleanPlacement({}, {register(f){registered.push(f);}},factory,[target],operation,BooleanFactory);
+    assert.equal(registered.length,1);
+    assert.deepEqual([...(await factory.commit())[0].values],expected);
+  }
   const selected={groupIds:[2],size:1};
   const solid=new Solid('+ 子实体',[]),group={id:2};solid.userData={versionId:1};
   const editor={executor:{},selection:{selected},groups:{lookupById:()=>group,getChildren:()=>[10]},db:{key2item:()=>solid},geo:{body2version:new Map([[100,1]])},nodes:{item2key:()=>512,getName:key=>key===512?'组名称':key===10?solid.name:undefined}};
