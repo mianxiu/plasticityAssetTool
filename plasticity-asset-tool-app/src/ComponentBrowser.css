@@ -97,6 +97,11 @@ body:has(.component-first){background:#181818}
 .component-first .primary:hover:not(:disabled){background:#00ad81}
 .component-first .asset-card:hover{border-color:#666}
 .component-first .asset-card.selected{border-color:#009b73;box-shadow:0 0 0 1px #009b73}
+.asset-preview[data-insert-mode=union]{--mode-color:#00ad81;--mode-tint:#183c31}
+.asset-preview[data-insert-mode=difference]{--mode-color:#ed6b6b;--mode-tint:#442626}
+.asset-preview[data-insert-mode=intersection]{--mode-color:#77a9ed;--mode-tint:#26374d}
+.asset-preview[data-insert-mode=union]::after,.asset-preview[data-insert-mode=difference]::after,.asset-preview[data-insert-mode=intersection]::after{content:"";position:absolute;inset:0;border:2px solid var(--mode-color);border-radius:inherit;pointer-events:none;z-index:1}
+.asset-insert-mode{position:absolute;top:6px;right:6px;z-index:2;padding:2px 4px;border:1px solid var(--mode-color);border-radius:4px;background:var(--mode-tint);color:var(--mode-color);font-size:10px;line-height:1.4;pointer-events:none}
 .component-first .asset-format{background:#191919dd;color:#bcbcbc;border-color:#484848}
 .component-first .asset-hover-action{background:#111e;color:#eee}
 .component-first .sidebar-label,.component-first .sidebar-bottom,.component-first .nav-item span,.component-first .library-tab span,.component-first .asset-meta,.component-first .card-footer>span,.component-first .section-name span,.component-first .component-note,.component-first .details-panel dt,.component-first .detail-heading,.component-first .browser-display label,.component-first .page-footer{color:#929292}
