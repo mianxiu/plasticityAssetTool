@@ -12,6 +12,7 @@ class NativeTransport:
     def __init__(self):
         self.workers = {}
         self.jobs = {}
+        self.notifications = {}
 
     def connected_targets(self):
         return [key for key, value in self.workers.items() if time.monotonic()-value['seen'] < 5]
@@ -21,6 +22,7 @@ class NativeTransport:
             raise ValueError('无效的模型工作连接')
         now=time.monotonic()
         self.workers={key:value for key,value in self.workers.items() if now-value['seen'] < 30}
+        self.notifications={key:value for key,value in self.notifications.items() if key in self.workers}
         previous=self.workers.get(target)
         if previous and previous['token']!=token and now-previous['seen'] < 5:
             raise ValueError('目标窗口已有模型连接')
@@ -65,6 +67,25 @@ class NativeTransport:
                 return {'id':job_id,'action':job['action'],**job['payload']}
         return None
 
+    async def poll(self, target, token, result=None, capabilities=None, wait_ms=0):
+        if not isinstance(wait_ms, int) or isinstance(wait_ms, bool) or not 0 <= wait_ms <= 2000:
+            raise ValueError('无效的模型等待时间')
+        job = self.worker(target, token, result, capabilities)
+        if job is not None or not wait_ms:
+            return job
+        # The waiter is window-bound. Clearing and checking again before await
+        # avoids losing jobs queued on the boundary of the previous response.
+        notification = self.notifications.setdefault(target, asyncio.Event())
+        notification.clear()
+        job = self.worker(target, token, capabilities=capabilities)
+        if job is not None:
+            return job
+        try:
+            await asyncio.wait_for(notification.wait(), wait_ms / 1000)
+        except asyncio.TimeoutError:
+            pass
+        return self.worker(target, token, capabilities=capabilities)
+
     async def request(self, target, action, model=None, placement=True, insert_mode="new-body", recipe=None, signature=None):
         if target not in self.connected_targets():
             raise ValueError('目标窗口的原生模型插件未连接，请重新打开已安装插件的 Plasticity')
@@ -95,6 +116,8 @@ class NativeTransport:
         future=asyncio.get_running_loop().create_future()
         job_id=uuid.uuid4().hex
         self.jobs[job_id]={'target':target,'action':action,'payload':payload,'future':future,'sent':False}
+        if target in self.notifications:
+            self.notifications[target].set()
         try:
             return await asyncio.wait_for(asyncio.shield(future),10)
         except asyncio.TimeoutError as exc:

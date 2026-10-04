@@ -35,9 +35,11 @@ function startNativeWorker(win, baseURL, target) {
   });
   async function poll() {
     if (stopped || win.isDestroyed()) return;
+    let delay=750;
     try {
       if (!editor) await discover();
-      const response=await send({target_id:target,token,result,capabilities:['boolean-placement-v1','group-recipe-v1']});result=null;
+      const response=await send({target_id:target,token,result,wait_ms:2000,capabilities:['boolean-placement-v1','group-recipe-v1']});result=null;
+      delay=response.wait_supported ? 10 : 750;
       if (response.job) {
         const job=response.job;
         if (!/^[a-f0-9]{32}$/.test(job.id) || !['capture','insert','inspect-group','capture-group'].includes(job.action)) throw new Error('无效模型任务');
@@ -67,7 +69,7 @@ function startNativeWorker(win, baseURL, target) {
         } catch(error) {result={id:job.id,error:error.message};}
       }
     } catch(error) { /* Reconnect after a backend stop. Never retry a sent command. */ }
-    if (!stopped) timer=setTimeout(poll,result?10:750);
+    if (!stopped) timer=setTimeout(poll,result?0:delay);
   }
   win.webContents.on('destroyed',()=>{stopped=true;clearTimeout(timer);});
   win.webContents.on('did-start-navigation',(_event,_url,_inPlace,isMainFrame)=>{

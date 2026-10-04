@@ -44,11 +44,13 @@ class AssetService:
         self.model_enabled = True
 
     async def state(self, library_id="default"):
-        targets = await self.bridge.discover()
+        targets, assets, libraries, folders = await asyncio.gather(
+            self.bridge.discover(), asyncio.to_thread(self.library.list, False, library_id),
+            asyncio.to_thread(self.library.libraries), asyncio.to_thread(self.library.folders, library_id))
         native_targets = self.native.connected_targets()
         listed = {target['id'] for target in targets}
         targets += [{'id':target, 'hwnd':int(target[5:]), 'title':'Plasticity · '+target[5:], 'mode':'native'} for target in native_targets if target not in listed]
-        return {"native_targets": self.native.connected_targets(), "geometry_targets": self.geometry.connected_targets(), "model_enabled": self.model_enabled, "assets": await asyncio.to_thread(self.library.list, False, library_id), "libraries": await asyncio.to_thread(self.library.libraries), "folders": await asyncio.to_thread(self.library.folders, library_id), "launcher": self.launcher.snapshot() if self.launcher else {"registered": False, "message": "Ctrl+K 搜索"}, "targets": targets, "active_target_id": self.bridge.active_target_id, "connection_note": self.desktop_error or self.bridge.last_error, "clipboard_supported": self.desktop is not None}
+        return {"native_targets": self.native.connected_targets(), "geometry_targets": self.geometry.connected_targets(), "model_enabled": self.model_enabled, "assets": assets, "libraries": libraries, "folders": folders, "launcher": self.launcher.snapshot() if self.launcher else {"registered": False, "message": "Ctrl+K 搜索"}, "targets": targets, "active_target_id": self.bridge.active_target_id, "connection_note": self.desktop_error or self.bridge.last_error, "clipboard_supported": self.desktop is not None}
 
     def clipboard(self):
         if not self.desktop:

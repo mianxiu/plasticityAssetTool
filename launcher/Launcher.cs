@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.IO;
 using System.Net;
@@ -48,7 +48,7 @@ internal static class Launcher {
             return request;
         }
     }
-    private static void WaitForBackend(string root) {
+    private static int WaitForBackend(string root) {
         var serializer = new JavaScriptSerializer();
         var deadline = DateTime.UtcNow.AddSeconds(15);
         while (DateTime.UtcNow < deadline) {
@@ -60,10 +60,10 @@ internal static class Launcher {
                 using (var client = new LocalClient()) {
                     var health = serializer.Deserialize<Dictionary<string,object>>(
                         client.DownloadString("http://127.0.0.1:" + port + "/api/health"));
-                    if (Convert.ToString(health["app"]) == "plasticity-asset-tool") return;
+                    if (Convert.ToString(health["app"]) == "plasticity-asset-tool") return Convert.ToInt32(metadata["pid"]);
                 }
             } catch (Exception) { }
-            Thread.Sleep(250);
+            Thread.Sleep(50);
         }
         throw new InvalidOperationException("后台未在预期时间内连接。请查看 .runtime/service.log 和 .runtime/launcher.log。");
     }
@@ -78,38 +78,31 @@ internal static class Launcher {
             Directory.CreateDirectory(Path.Combine(root,".runtime"));
             if (!File.Exists(Path.Combine(root,"plasticity-asset-tool-app/dist/index.html")))
                 throw new InvalidOperationException("缺少组件库页面。请先运行 start.ps1 构建页面，再双击启动入口。");
-            string powershell = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System),
-                "WindowsPowerShell/v1.0/powershell.exe");
-            var info = new ProcessStartInfo(powershell,
-                "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File " +
-                Quote(Path.Combine(root,"start.ps1")) + " -NoBuild" + (headless ? " -Headless" : "")) {
-                WorkingDirectory = root, UseShellExecute = false, CreateNoWindow = true,
-                RedirectStandardOutput = true, RedirectStandardError = true,
-                StandardOutputEncoding = Encoding.UTF8, StandardErrorEncoding = Encoding.UTF8
+            // The backend owns the instance lock and runtime checks. Start it
+            // directly instead of spawning PowerShell and three Python probes.
+            string python = null;
+            foreach (string relative in new [] {"runtime/python/pythonw.exe", ".venv/Scripts/pythonw.exe",
+                "runtime/python/python.exe", ".venv/Scripts/python.exe"}) {
+                string candidate = Path.Combine(root,relative);
+                if (File.Exists(candidate)) { python = candidate;break; }
+            }
+            if (python == null) throw new InvalidOperationException("缺少 Python 运行环境，请下载完整发布包或运行 start.ps1。");
+            var info = new ProcessStartInfo(python,Quote(Path.Combine(root,"main.py")) +
+                (headless ? " --headless" : "")) {
+                WorkingDirectory = root, UseShellExecute = false, CreateNoWindow = true
             };
             info.EnvironmentVariables["PYTHONIOENCODING"] = "utf-8";
+            var started = Stopwatch.StartNew();
             using (var process = Process.Start(info)) {
-                var gate = new object();
-                var output = new StringBuilder();var errors = new StringBuilder();
-                process.OutputDataReceived += (sender,eventArgs) => { if(eventArgs.Data != null) lock(gate) output.AppendLine(eventArgs.Data); };
-                process.ErrorDataReceived += (sender,eventArgs) => { if(eventArgs.Data != null) lock(gate) errors.AppendLine(eventArgs.Data); };
-                process.BeginOutputReadLine();process.BeginErrorReadLine();
-                if (!process.WaitForExit(30000)) {
-                    process.Kill();
-                    throw new InvalidOperationException("启动检查超时，请查看后台日志后重试。");
-                }
-                // A detached backend may retain inherited handles. Finish on
-                // the starter's exit rather than waiting indefinitely for EOF.
-                Thread.Sleep(100);
-                try {process.CancelOutputRead();} catch(InvalidOperationException) { }
-                try {process.CancelErrorRead();} catch(InvalidOperationException) { }
-                string outputText,errorText;
-                lock(gate) {outputText=output.ToString();errorText=errors.ToString();}
-                Log(root,DateTime.Now.ToString("s") + "\r\n" + outputText + errorText);
-                if (process.ExitCode != 0) throw new InvalidOperationException(
-                    "组件库启动失败。\r\n" + errorText + "\r\n详细日志：.runtime/launcher.log");
+                int owner = WaitForBackend(root);
+                // Reusers must finish before reporting success: otherwise an
+                // immediate tray exit could race a not-yet-initialized child.
+                if (owner != process.Id && !process.WaitForExit(10000))
+                    throw new InvalidOperationException("已有后台复用检查超时，请查看后台日志。");
+                if (process.HasExited && process.ExitCode != 0)
+                    throw new InvalidOperationException("后台启动失败，请查看 .runtime/service.log。");
             }
-            WaitForBackend(root);
+            Log(root,DateTime.Now.ToString("s") + " ready_ms="+started.ElapsedMilliseconds+"\r\n");
             return 0;
         } catch (Exception error) {
             Log(root,error + "\r\n");

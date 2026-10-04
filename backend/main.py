@@ -101,6 +101,7 @@ class GeometryHandler(LocalHandler):
     async def get(self, asset_id, thumbnail=None):
         try:
             geometry = self.application.service.geometry
+            self.set_header("Cache-Control", "private, max-age=3600")
             if thumbnail:
                 self.set_header("Content-Type", "image/jpeg")
                 self.write(await asyncio.to_thread(geometry.thumbnail, asset_id))
@@ -124,11 +125,11 @@ class GeometryWorkerHandler(LocalHandler):
             self.write({"error": str(error)})
 
 class NativeWorkerHandler(LocalHandler):
-    def post(self):
+    async def post(self):
         try:
             request = json.loads(self.request.body)
-            job = self.application.service.native.worker(request.get("target_id"), request.get("token"), request.get("result"), request.get("capabilities"))
-            self.write({"job": job})
+            job = await self.application.service.native.poll(request.get("target_id"), request.get("token"), request.get("result"), request.get("capabilities"), request.get("wait_ms", 0))
+            self.write({"job": job, "wait_supported": True})
         except (ValueError, AttributeError) as error:
             self.set_status(400)
             self.write({"error": str(error)})
@@ -346,6 +347,9 @@ def cli():
             raise SystemExit(3)
     except KeyboardInterrupt:
         print("组件库已停止")
+    except Exception:
+        logging.exception("Backend startup failed")
+        raise
 
 
 if __name__ == "__main__":

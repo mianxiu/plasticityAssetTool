@@ -111,3 +111,26 @@ class NativeTransportTests(unittest.IsolatedAsyncioTestCase):
         self.transport.worker(self.target,self.token,{'id':first_job['id'],'value':{'started':True}})
         self.transport.worker(other,other_token,{'id':second_job['id'],'value':{'started':True}})
         await first;await second
+
+    async def test_long_poll_wakes_only_the_requested_window_and_sends_once(self):
+        other='hwnd:43';other_token='b'*36
+        self.transport.worker(other,other_token)
+        first=asyncio.create_task(self.transport.poll(self.target,self.token,wait_ms=2000))
+        second=asyncio.create_task(self.transport.poll(other,other_token,wait_ms=2000))
+        await asyncio.sleep(.01)
+        request=asyncio.create_task(self.transport.request(self.target,'insert',model_bytes()))
+        job=await asyncio.wait_for(first,.2)
+        self.assertEqual(job['action'],'insert')
+        self.assertFalse(second.done())
+        self.assertIsNone(self.transport.worker(self.target,self.token))
+        self.transport.worker(self.target,self.token,{'id':job['id'],'value':{'started':True}})
+        self.assertEqual(await request,{'started':True})
+        second.cancel()
+        await asyncio.gather(second,return_exceptions=True)
+
+    async def test_long_poll_timeout_legacy_poll_and_validation(self):
+        self.assertIsNone(await self.transport.poll(self.target,self.token,wait_ms=10))
+        self.assertIsNone(await self.transport.poll(self.target,self.token))
+        for wait in [-1,2001,'2000',True]:
+            with self.assertRaises(ValueError):
+                await self.transport.poll(self.target,self.token,wait_ms=wait)

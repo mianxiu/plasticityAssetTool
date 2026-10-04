@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import {geometryCache} from '../plasticity-asset-tool-app/src/geometryCache.mjs';
+const mesh=values=>({parts:[{positions:Array(values).fill(1),indices:[],edges:[]}]});
+const cache=geometryCache(10,3);
+const a=mesh(4),b=mesh(4),c=mesh(4);
+cache.set('a',a);cache.set('b',b);
+assert.equal(cache.get('a'),a);
+cache.set('c',c);assert.equal(cache.get('b'),undefined);assert.equal(cache.get('a'),a);
+cache.set('a',mesh(11));assert.equal(cache.get('a'),undefined);
+cache.set('a',a);cache.set('a',mesh(1));cache.set('d',mesh(4));
+assert.equal(cache.get('c'),c);assert.equal(cache.get('a').parts[0].positions.length,1);
+console.log('Bounded geometry LRU handles reuse, replacement and eviction');

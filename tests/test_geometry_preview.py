@@ -23,6 +23,12 @@ class GeometryTests(unittest.IsolatedAsyncioTestCase):
         subprocess.run(['node', str(root / 'tests/test_curve_preview.js')],
             cwd=root, check=True, capture_output=True, timeout=10)
 
+    @unittest.skipUnless(shutil.which('node'), 'Node.js required')
+    def test_geometry_memory_cache(self):
+        root = Path(__file__).resolve().parent.parent
+        subprocess.run(['node', str(root / 'tests/test_geometry_cache.mjs')],
+            cwd=root, check=True, capture_output=True, timeout=10)
+
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
         self.library = AssetLibrary(self.directory.name)

@@ -43,6 +43,19 @@ app.on("browser-window-created", (_event, win) => {
     if (!preloads.includes(geometryPreloadFile)) session.setPreloads([...preloads,geometryPreloadFile]);
   }
   let toggleRequest = 0, operationLocked = false;
+    const probe = () => new Promise(resolve => {
+      let done = false;
+      const finish = value => {if (!done) {done = true;resolve(value);}};
+      const check = require("http").get(new URL("/api/health", ''' + json.dumps(url) + '''), response => {
+        let body = "";
+        response.on("data", chunk => {body += chunk;if (body.length > 4096) {finish(false);check.destroy();}});
+        response.on("end", () => {try {finish(response.statusCode === 200 && JSON.parse(body).app === "plasticity-asset-tool");} catch {finish(false);}});
+        response.on("error", () => finish(false));
+      });
+      const timer = setTimeout(() => {finish(false);check.destroy();}, 1000);
+      check.on("close", () => clearTimeout(timer));
+      check.on("error", () => finish(false));
+    });
   win.webContents.on("console-message", async (_event, _level, message) => {
     if (message === "PAT_OPERATION_LOCK:on" || message === "PAT_OPERATION_LOCK:off") {
       operationLocked = message.endsWith(":on");return;
@@ -69,19 +82,6 @@ app.on("browser-window-created", (_event, win) => {
     event.preventDefault();
     if (input.isAutoRepeat) return;
     const request = ++toggleRequest;
-    const probe = () => new Promise(resolve => {
-      let done = false;
-      const finish = value => {if (!done) {done = true;resolve(value);}};
-      const check = require("http").get(new URL("/api/health", ''' + json.dumps(url) + '''), response => {
-        let body = "";
-        response.on("data", chunk => {body += chunk;if (body.length > 4096) {finish(false);check.destroy();}});
-        response.on("end", () => {try {finish(response.statusCode === 200 && JSON.parse(body).app === "plasticity-asset-tool");} catch {finish(false);}});
-        response.on("error", () => finish(false));
-      });
-      const timer = setTimeout(() => {finish(false);check.destroy();}, 1000);
-      check.on("close", () => clearTimeout(timer));
-      check.on("error", () => finish(false));
-    });
     win.webContents.executeJavaScript("window.__plasticityAssetToolPanel?.isVisible()")
       .then(async visible => {
         const connected = visible ? true : await probe();
@@ -108,6 +108,13 @@ app.on("browser-window-created", (_event, win) => {
       if (geometryReady) startGeometryWorker(win, options.url, "hwnd:"+hwnd);
       const nativeReady = await win.webContents.executeJavaScript("typeof window.__plasticityAssetTransport?.captureSelection === 'function'");
       if (nativeReady) startNativeWorker(win, options.url, "hwnd:"+hwnd);
+      // Prepare the hidden iframe only after the renderer is initialized and
+      // the local service identity is confirmed. Never focus it during warmup.
+      setTimeout(async () => {
+        if (win.isDestroyed() || !await probe() || win.isDestroyed()) return;
+        win.webContents.executeJavaScript("window.__plasticityAssetToolPanel?.warmup()")
+          .catch(()=>{});
+      }, 500);
     } catch (error) { console.error("PAT_EMBED_ERROR", error.stack || error.message); }
   });
 });

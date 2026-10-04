@@ -65,6 +65,7 @@ function installAssetPanel(options) {
   const hide = () => {
     frame.hidden = true;
     offline.hidden = true;
+    if (frameReady) frame.contentWindow?.postMessage({type:"pat:hidden"}, new URL(options.url).origin);
     document.activeElement?.blur();
     window.focus();
     const canvas = document.querySelector("plasticity-viewport canvas") || document.querySelector("canvas");
@@ -130,6 +131,10 @@ function installAssetPanel(options) {
     frame.contentWindow.postMessage({type:"pat:prepared",id,ready:document.activeElement === request.canvas,preview}, new URL(options.url).origin);
   };
   window[key] = { frame, offline, hide, isVisible: () => !frame.hidden || !offline.hidden, toggle: togglePanel,
+    warmup() {
+      if (!disconnected && !frame.hasAttribute("src")) frame.src = options.url;
+      return {loaded:frame.hasAttribute("src"),visible:!frame.hidden};
+    },
     previewRect(id) {
       const request = previewRequests.get(id);
       if (!request || !frame.hidden) return null;

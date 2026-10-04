@@ -1,7 +1,8 @@
-import { createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
+import { createMemo, createSignal, lazy, For, onCleanup, onMount, Show } from "solid-js";
 import { WebsocketClient } from "./Websocketclient";
 import "./ComponentBrowser.css";
-import { GeometryPreview, renderThumbnail } from './GeometryPreview';
+const GeometryPreview = lazy(() => import('./GeometryPreview').then(module => ({default:module.GeometryPreview})));
+import { geometryCache } from "./geometryCache.mjs";
 import { chooseTarget } from './targetSelection';
 
 export function Cube(props) {
@@ -19,6 +20,7 @@ export function Home() {
   const [floatingPanel, setFloatingPanel] = createSignal(embedded || new URLSearchParams(location.search).get("panel") === "1");
   const [sidebarMode, setSidebarMode] = createSignal("fixed");
   const pendingHost = new Map();
+  let panelVisible = !embedded;
   const hostOrigin = document.referrer.startsWith("file:") || !document.referrer ? "*" : new URL(document.referrer).origin;
   function hidePanel() {
     if (embedded) window.parent.postMessage({type:"pat:hide"}, hostOrigin);
@@ -26,7 +28,8 @@ export function Home() {
   }
   function hostMessage(event) {
     if (!embedded || event.source !== window.parent) return;
-    if (event.data?.type === "pat:shown") { if (preferredTarget) setTargetId(preferredTarget); refresh().catch(error => showNotice(error.message, true)); focusSearch(); }
+    if (event.data?.type === "pat:hidden") panelVisible = false;
+    if (event.data?.type === "pat:shown") { panelVisible = true; if (preferredTarget) setTargetId(preferredTarget); refresh().catch(error => showNotice(error.message, true)); focusSearch(); }
     if (event.data?.type === "pat:prepared") pendingHost.get(event.data.id)?.(event.data);
   }
   function prepareHost(preview = false) {
@@ -136,18 +139,23 @@ export function Home() {
   const [previewRevision, setPreviewRevision] = createSignal(0);
   const previewUrl = asset => `${api}/api/assets/${asset.id}/${asset.has_preview ? 'preview' : 'geometry/preview'}?v=${encodeURIComponent(asset.updated_at || asset.created_at)}&render=${previewRevision()}`;
   const meshRequests = new Map();
+  const meshCache = geometryCache();
   async function loadGeometry(asset, thumbnailRequired = false, refreshThumbnail = false) {
     if(meshRequests.has(asset.digest))return meshRequests.get(asset.digest);
     const request = (async()=>{
+      let mesh = meshCache.get(asset.digest);
+      if (!mesh) {
       const response = await fetch(`${api}/api/assets/${asset.id}/geometry`);
-      let mesh;
       if(response.ok) mesh = await response.json();
       else {
         const generated=await client.request('asset.geometry',{id:asset.id,target_id:preferredTarget || targetId() || undefined});
         mesh=generated.mesh;
       }
+      meshCache.set(asset.digest,mesh);
+      }
       if(refreshThumbnail || !asset.has_geometry_preview) {
         try {
+          const {renderThumbnail} = await import('./GeometryPreview');
           const preview=renderThumbnail(mesh);
           await client.request('asset.geometry.thumbnail',{id:asset.id,digest:asset.digest,preview});
           setPreviewRevision(value=>value+1);
@@ -213,7 +221,10 @@ export function Home() {
       setTargetId(chooseTarget({embedded,preferredTarget,current:targetId(),followActive:followActive(),state}));
       const rows = requestedArchive ? await client.request("library.list", { archived: true, library_id: requestedLibrary }) : state.assets;
       if (requestedLibrary !== libraryId() || requestedArchive !== archived()) { refreshQueued = true; return; }
-      setAssets(rows);
+      setAssets(previous => {
+        const current = new Map(previous.map(row => [row.id,row]));
+        return rows.map(row => {const old=current.get(row.id);return old && JSON.stringify(old)===JSON.stringify(row) ? old : row;});
+      });
       if (!rows.some(asset => asset.id === selectedId())) setSelectedId("");
     } finally {
       refreshPending = false;
@@ -375,7 +386,7 @@ export function Home() {
 
   onMount(() => {
     client.connect();
-    poll = setInterval(() => { if (ready()) refresh().catch(() => {}); }, 10000);
+    poll = setInterval(() => { if (panelVisible && ready()) refresh().catch(() => {}); }, 10000);
     window.addEventListener("keydown",onSearchKey);
     window.addEventListener("message",hostMessage);
     if (embedded) window.parent.postMessage({type:"pat:ready"}, hostOrigin);
@@ -455,7 +466,7 @@ export function Home() {
         <section class="asset-grid" aria-label="组件列表">
           <Show when={filtered().length} fallback={<div class="empty-state"><div class="empty-cube"><Cube /></div><h2>{query() || category() !== "全部组件" || kind() !== "all" ? "没有匹配的组件" : archived() ? "没有归档组件" : folderId() || childFolders().length ? "当前分组没有直接保存的组件" : "从你的第一个组件开始"}</h2><p>{query() ? "换个关键词，或者查看全部组件。" : archived() ? "归档的组件会保留模型数据，随时可以恢复。" : "在 Plasticity 中选中模型，\n点击保存组件即可直接读取并保存。以后只需一点，即可原生置入。"}</p><Show when={!archived() && !query()}><button class="primary" disabled={!ready() || !clipboardSupported()} onClick={openCapture}>＋ 保存组件</button></Show></div>}>
             <For each={filtered()}>{asset => <article data-insert-mode={displayMode(asset)} class={selectedId() === asset.id ? "asset-card selected" : "asset-card"}>
-              <button class="asset-preview" data-insert-mode={displayMode(asset)} aria-label={"置入 " + asset.name} aria-disabled={!canInsert()} onClick={() => {if(canInsert())insert(asset);}} onPointerDown={event=>previewPointerDown(event,asset)} onContextMenu={event=>event.preventDefault()}><Show when={asset.has_geometry_preview || asset.has_preview} fallback={<div class="model-placeholder"><Cube /><span>原生模型</span></div>}><img classList={{"geometry-thumbnail":!asset.has_preview}} src={previewUrl(asset)} alt={asset.name} draggable="false"/></Show><span class="asset-format">{kindNames[asset.kind]}</span><Show when={asset.recipe || (asset.insert_mode && asset.insert_mode !== "new-body")}><span class="asset-insert-mode" title={asset.recipe ? "按组内子部件顺序执行" : "默认置入：" + modeLabel(asset)}>{modeLabel(asset)}</span></Show></button>
+              <button class="asset-preview" data-insert-mode={displayMode(asset)} aria-label={"置入 " + asset.name} aria-disabled={!canInsert()} onClick={() => {if(canInsert())insert(asset);}} onPointerDown={event=>previewPointerDown(event,asset)} onContextMenu={event=>event.preventDefault()}><Show when={asset.has_geometry_preview || asset.has_preview} fallback={<div class="model-placeholder"><Cube /><span>原生模型</span></div>}><img loading="lazy" decoding="async" classList={{"geometry-thumbnail":!asset.has_preview}} src={previewUrl(asset)} alt={asset.name} draggable="false"/></Show><span class="asset-format">{kindNames[asset.kind]}</span><Show when={asset.recipe || (asset.insert_mode && asset.insert_mode !== "new-body")}><span class="asset-insert-mode" title={asset.recipe ? "按组内子部件顺序执行" : "默认置入：" + modeLabel(asset)}>{modeLabel(asset)}</span></Show></button>
               <div class="asset-body"><div class="asset-name">{asset.name}</div><div class="asset-meta" title={asset.recipe ? "连续布尔 · " + asset.recipe.parts.length + " 个子部件" : "默认置入：" + modeLabel(asset)}>{asset.category}<span>{Math.max(1, Math.round(asset.bytes / 1024))} KB</span></div><div class="card-footer"><span title={asset.tags}>{asset.tags || ""}</span><button class="insert-button" aria-label={"编辑 " + asset.name} onClick={() => openEdit(asset)}>编辑</button></div></div>
             </article>}</For>
           </Show>
