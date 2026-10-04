@@ -6,8 +6,8 @@ class Solid {constructor(name,values){this.name=name;this.values=new Set(values)
 const modes={Union:1,Difference:2,Intersection:3};
 async function check(parts,expected,expectedIndependent=[],targetValues=[1,2],badIdentity=false) {
   const prefix='unique-',placed=parts.map((p,i)=>new Solid(prefix+i,p.values));
-  const calls=[],groups=[],registered=[];
-  const editor={nodes:{getName:v=>v.name,setName(v,n){v.name=n;},item2key:v=>v},groups:{create(){const g={members:[]};groups.push(g);return g;},deleteMembership(){},addMembership(v,g,index){g.members.splice(index,0,v);}}};
+  const calls=[],groups=[],registered=[],root={members:[]};
+  const editor={nodes:{getName:v=>v.name,setName(v,n){v.name=n;},item2key:v=>v},groups:{root,create(){const g={members:[]};groups.push(g);return g;},deleteMembership(){},addMembership(v,g,index=0){g.members.splice(index,0,v);}}};
   class BooleanFactory {
     async commit(){
       const t=new Set(this.targets.flatMap(v=>[...v.values])),tool=this.tools[0];
@@ -25,6 +25,7 @@ async function check(parts,expected,expectedIndependent=[],targetValues=[1,2],ba
   const result=await factory.commit();
   assert.deepEqual([...result[0].values].sort(),expected);
   assert.equal(groups[0].name,'组名');
+  assert.equal(root.members[0],groups[0],'The result group must be reachable from the scene root');
   assert.equal(registered.length,parts.filter(p=>p.mode!=='new-body').length);
   assert.deepEqual(groups[0].members.slice(1).map(v=>v.name),expectedIndependent);
   return calls;

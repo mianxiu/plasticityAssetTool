@@ -336,6 +336,9 @@ function configureGroupPlacement(editor,command,factory,recipe,targets,Operation
     }
     const results=[...accumulator,...independent];
     const group=editor.groups.create(); editor.nodes.setName(editor.nodes.item2key(group),recipe.name);
+    // create() allocates a group but does not attach it to the scene. Moving
+    // the results into an orphan group removes them from the visible tree.
+    editor.groups.addMembership(editor.nodes.item2key(group),editor.groups.root);
     for (const [index,result] of results.entries()) {
       const key=editor.nodes.item2key(result);
       editor.groups.deleteMembership(key); editor.groups.addMembership(key,group,index);
