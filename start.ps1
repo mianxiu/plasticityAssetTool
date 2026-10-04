@@ -3,18 +3,6 @@ $ErrorActionPreference = 'Stop'
 $env:PYTHONIOENCODING = 'utf-8'
 Set-Location -LiteralPath $PSScriptRoot
 
-if (-not $NoBuild) {
-    Push-Location -LiteralPath (Join-Path $PSScriptRoot 'plasticity-asset-tool-app')
-    try {
-        if (-not (Test-Path -LiteralPath 'node_modules')) {
-            & npm.cmd install
-            if ($LASTEXITCODE -ne 0) { throw 'Frontend dependency installation failed.' }
-        }
-        & npm.cmd run build
-        if ($LASTEXITCODE -ne 0) { throw 'Frontend build failed.' }
-    } finally { Pop-Location }
-}
-
 $assetPython = $null
 $assetCandidates = @(
     (Join-Path $PSScriptRoot 'Scripts/python.exe'),
@@ -38,6 +26,25 @@ if (Test-Path -LiteralPath (Join-Path $assetSitePackages 'tornado')) {
 }
 & $assetPython -c 'import tornado' 2>$null
 if ($LASTEXITCODE -ne 0) { throw "Tornado is missing. Run: `"$assetPython`" -m pip install -r requirements.txt" }
+# Reuse the lock owner before building or spawning another tray process.
+$assetReuseArguments = @('main.py', '--reuse-only')
+if ($Headless) { $assetReuseArguments += '--headless' }
+& $assetPython @assetReuseArguments
+if ($LASTEXITCODE -eq 0) { return }
+if ($LASTEXITCODE -ne 3) { throw 'Existing backend did not respond. No duplicate instance was started.' }
+
+if (-not $NoBuild) {
+    Push-Location -LiteralPath (Join-Path $PSScriptRoot 'plasticity-asset-tool-app')
+    try {
+        if (-not (Test-Path -LiteralPath 'node_modules')) {
+            & npm.cmd install
+            if ($LASTEXITCODE -ne 0) { throw 'Frontend dependency installation failed.' }
+        }
+        & npm.cmd run build
+        if ($LASTEXITCODE -ne 0) { throw 'Frontend build failed.' }
+    } finally { Pop-Location }
+}
+
 $assetArguments = @('main.py', '--port', "$Port")
 if ($Headless) { $assetArguments += '--headless' }
 if ($NoTray) { $assetArguments += '--no-tray' }

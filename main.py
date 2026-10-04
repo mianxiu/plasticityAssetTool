@@ -12,6 +12,8 @@ from library_launcher import LibraryLauncher
 from service_control import ServiceControl
 from service_tray import ServiceTray
 from control_window import ControlWindow
+from single_instance import BackendInstance
+from tornado.httpclient import AsyncHTTPClient, HTTPClientError
 
 ROOT = Path(__file__).resolve().parent
 DEFAULT_SHORTCUTS = {"copy": "ctrl+c", "paste": "ctrl+v", "place": "ctrl+shift+v", "move": "g", "rotate": "r", "scale": "s", "focus": "space", "undo": "ctrl+z", "redo": "ctrl+shift+z"}
@@ -209,7 +211,48 @@ class Application(web.Application):
             return await self.control.dispatch(action,args)
         return await self.service.dispatch(action,args,self.settings["base_url"])
 
-async def run(port=None, headless=False, no_tray=False):
+async def reuse_backend(port, headless):
+    url = f"http://127.0.0.1:{port}"
+    response = await AsyncHTTPClient().fetch(url + "/api/health", request_timeout=1)
+    if json.loads(response.body).get("app") != "plasticity-asset-tool":
+        raise RuntimeError("端口被其他程序占用")
+    if not headless:
+        try:
+            response = await AsyncHTTPClient().fetch(
+                url + "/api/service", method="POST", headers={"Content-Type": "application/json"},
+                body=json.dumps({"action": "service.open_control"}), request_timeout=10)
+        except (HTTPClientError, OSError) as exc:
+            raise RuntimeError("已有后台正在运行，但控制窗口打开失败；未启动重复实例") from exc
+        if not json.loads(response.body).get("ok"):
+            raise RuntimeError("已有后台的控制窗口打开失败")
+    print(f"后台已运行，复用现有实例：{url}", flush=True)
+
+
+async def run(port=None, headless=False, no_tray=False, reuse_only=False):
+    instance = BackendInstance(ROOT / ".runtime")
+    if not instance.acquire():
+        # The winner may still be starting. Never start a second backend on timeout.
+        deadline = asyncio.get_running_loop().time() + 5
+        while asyncio.get_running_loop().time() < deadline:
+            existing_port = instance.read_port()
+            if existing_port is not None:
+                try:
+                    await reuse_backend(existing_port, headless)
+                    return True
+                except (HTTPClientError, OSError):
+                    pass
+            await asyncio.sleep(0.1)
+        raise RuntimeError("后台实例正在启动或未响应，请稍后重试；未启动重复实例")
+    try:
+        if reuse_only:
+            return False
+        await run_backend(port, headless, no_tray, instance)
+        return True
+    finally:
+        instance.close()
+
+
+async def run_backend(port, headless, no_tray, instance):
     config = load_config()
     if port is not None:
         config["server"]["http_port"] = port
@@ -218,13 +261,10 @@ async def run(port=None, headless=False, no_tray=False):
     try:
         server = app.listen(config["server"]["http_port"], address="127.0.0.1", max_buffer_size=96 * 1024 * 1024)
     except OSError:
-        from tornado.httpclient import AsyncHTTPClient
-        response = await AsyncHTTPClient().fetch(url+"/api/health",request_timeout=2)
-        if json.loads(response.body).get("app") != "plasticity-asset-tool":
-            raise RuntimeError("端口被其他程序占用")
-        if not headless:
-            await asyncio.to_thread(app.control_window.open)
+        # Compatibility with an already-running backend from before instance locks.
+        await reuse_backend(config["server"]["http_port"], headless)
         return
+    instance.publish(config["server"]["http_port"])
     loop = asyncio.get_running_loop()
     async def quick_launch(target_id):
         try:
@@ -293,10 +333,13 @@ if __name__ == "__main__":
     parser.add_argument("--headless", action="store_true", help="只启动服务，不打开浏览器")
     parser.add_argument("--port", type=int)
     parser.add_argument("--no-tray",action="store_true",help="仅运行命令行服务，不创建托盘图标")
+    parser.add_argument("--reuse-only", action="store_true", help="复用已有后台；没有实例时退出码为 3")
     args = parser.parse_args()
     try:
         (ROOT / ".runtime").mkdir(exist_ok=True)
         logging.basicConfig(filename=ROOT/".runtime/service.log",level=logging.INFO,format="%(asctime)s %(levelname)s %(message)s")
-        asyncio.run(run(args.port, args.headless,args.no_tray))
+        reused = asyncio.run(run(args.port, args.headless,args.no_tray,args.reuse_only))
+        if args.reuse_only and not reused:
+            raise SystemExit(3)
     except KeyboardInterrupt:
         print("组件库已停止")
