@@ -92,7 +92,7 @@ export function GeometryPreview(props) {
     try {
       renderer = new THREE.WebGLRenderer({antialias:true});
       renderer.setPixelRatio(Math.min(devicePixelRatio,2));
-      renderer.domElement.setAttribute('aria-label','组件三维预览，可拖动旋转及滚轮缩放');
+      renderer.domElement.setAttribute('aria-label','组件三维预览，按住右键旋转及滚轮缩放');
       container.append(renderer.domElement);
       resize = new ResizeObserver(fit);resize.observe(container);
     }catch(e){setError('当前设备无法启用三维预览');}
@@ -107,11 +107,13 @@ export function GeometryPreview(props) {
       if(current !== revision || !renderer)return;
       view=sceneFor(mesh);
       controls=new OrbitControls(view.camera,renderer.domElement);
+      controls.mouseButtons.LEFT=null;
+      controls.mouseButtons.RIGHT=THREE.MOUSE.ROTATE;
       if(props.heldOrigin)controls.enabled=false;
       controls.enablePan=false;controls.minZoom=0.2;controls.maxZoom=20;
       controls.addEventListener('change',draw);fit();
     }).catch(e=>{if(current===revision)setError(e.message);}).finally(()=>{if(current===revision)setLoading(false);});
   });
   onCleanup(()=>{revision++;window.removeEventListener('pointermove',rotateHeld,true);resize?.disconnect();destroy();renderer?.dispose();renderer?.forceContextLoss();});
-  return <div class="geometry-viewer" title={props.heldOrigin ? "按住右键移动旋转，松开恢复" : "拖动旋转 · 滚轮缩放"}><div class="geometry-canvas" ref={container}/><Show when={loading()}><p class="geometry-message">正在生成几何预览…</p></Show><Show when={error()}><p class="geometry-message geometry-error" role="status">{error()}</p></Show></div>;
+  return <div class="geometry-viewer" title={props.heldOrigin ? "按住右键移动旋转，松开恢复" : "右键拖动旋转 · 滚轮缩放"}><div class="geometry-canvas" ref={container}/><Show when={loading()}><p class="geometry-message">正在生成几何预览…</p></Show><Show when={error()}><p class="geometry-message geometry-error" role="status">{error()}</p></Show></div>;
 }
