@@ -120,5 +120,14 @@ body:has(.component-first){background:#181818}
 .asset-edit-form .check-label{flex-direction:row;align-items:center}
 .asset-edit-form .check-label input{width:auto}
 .asset-edit-form .form-row{gap:6px}
+.asset-edit-form .insert-mode-picker{min-width:0;margin:0 0 6px;padding:0;border:0}
+.insert-mode-picker legend{padding:0;margin-bottom:3px;font-size:11px;color:#aaa}
+.insert-mode-options{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:3px}
+.insert-mode-options label{position:relative;cursor:pointer;min-width:0}
+.component-first .insert-mode-options input{position:absolute;width:1px;height:1px;opacity:0;padding:0;margin:0}
+.insert-mode-options span{display:block;padding:5px 2px;border:1px solid #444;border-radius:5px;background:#202020;color:#aaa;text-align:center;font-size:11px;white-space:nowrap}
+.insert-mode-options label:hover span{border-color:#777;color:#ddd}
+.insert-mode-options input:checked+span{background:#009b73;border-color:#009b73;color:#fff}
+.insert-mode-options input:focus-visible+span{outline:2px solid #ddd;outline-offset:1px}
 .asset-edit-form .modal-actions{gap:6px;margin-top:8px}
 .component-first .details-panel .modal-actions .primary,.component-first .details-panel .modal-actions .secondary{padding:5px 9px;font-size:12px}
