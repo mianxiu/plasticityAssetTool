@@ -20,8 +20,9 @@ function installAssetPanel(options) {
     const clamp = (value, size, available) => Math.max(margin, Math.min(value, available - size - margin));
     const anchor = openingPoint || {x:innerWidth / 2,y:innerHeight / 2};
     frame.style.right = "auto";
-    frame.style.left = clamp(positionMode === "cursor" ? anchor.x + 12 : innerWidth - width - 20, width, innerWidth) + "px";
-    frame.style.top = clamp(positionMode === "cursor" ? anchor.y + 12 : 70, height, innerHeight) + "px";
+    frame.style.left = clamp(positionMode === "cursor" ? anchor.x - width / 2 : innerWidth - width - 20, width, innerWidth) + "px";
+    frame.style.top = clamp(positionMode === "cursor" ? anchor.y - height / 2 : 70, height, innerHeight) + "px";
+    frame.style.boxSizing = "border-box";
     frame.style.width = width + "px";
     frame.style.height = height + "px";
   };

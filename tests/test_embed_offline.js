@@ -38,14 +38,18 @@ panel.toggle();assert(!panel.isVisible());
 panel.toggle(false);panel.offline.children[2].onclick();assert(!panel.isVisible());
 context.innerWidth=1920;context.innerHeight=1080;
 const settings = position => events.message({source:panel.frame.contentWindow,origin:'http://127.0.0.1:15150',data:{type:'pat:panel-settings',settings:{position}}});
-settings('cursor');events.pointermove({clientX:100,clientY:20});panel.toggle(true);
-assert.strictEqual(panel.frame.style.left,'112px');assert.strictEqual(panel.frame.style.top,'32px');
+settings('cursor');events.pointermove({clientX:960,clientY:540});panel.toggle(true);
+assert.strictEqual(panel.frame.style.left,'460px');assert.strictEqual(panel.frame.style.top,'50px');
+assert.strictEqual(parseFloat(panel.frame.style.left)+parseFloat(panel.frame.style.width)/2,960);
+assert.strictEqual(parseFloat(panel.frame.style.top)+parseFloat(panel.frame.style.height)/2,540);
 events.pointermove({clientX:700,clientY:800});settings('cursor');
-assert.strictEqual(panel.frame.style.left,'112px'); // An open panel stays put.
+assert.strictEqual(panel.frame.style.left,'460px'); // An open panel stays put.
 panel.toggle(true);panel.toggle(true);
-assert.strictEqual(panel.frame.style.left,'712px');assert.strictEqual(panel.frame.style.top,'88px');
+assert.strictEqual(panel.frame.style.left,'200px');assert.strictEqual(panel.frame.style.top,'88px');
 events.message({source:{},origin:'http://127.0.0.1:15150',data:{type:'pat:panel-settings',settings:{position:'fixed'}}});
-assert.strictEqual(panel.frame.style.left,'712px');
+assert.strictEqual(panel.frame.style.left,'200px');
+panel.toggle(true);events.pointermove({clientX:100,clientY:20});panel.toggle(true);
+assert.strictEqual(panel.frame.style.left,'12px');assert.strictEqual(panel.frame.style.top,'12px');
 settings('fixed');assert.strictEqual(panel.frame.style.left,'900px');assert.strictEqual(panel.frame.style.top,'70px');
 context.innerWidth=320;context.innerHeight=260;events.resize();
 assert(parseFloat(panel.frame.style.left)>=0);assert(parseFloat(panel.frame.style.top)>=0);
