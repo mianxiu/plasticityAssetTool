@@ -21,7 +21,7 @@ async function check(parts,expected,expectedIndependent=[],targetValues=[1,2]) {
   const command={register(f){registered.push(f);}}; // Real native API returns void.
   const factory={shells:placed,async commit(){return placed;}};
   const recipe={version:1,name:'组名',parts:parts.map((p,i)=>({index:i,name:p.name,mode:p.mode}))};
-  sandbox.configureGroupPlacement(editor,command,factory,recipe,targetValues?[new Solid('target',targetValues)]:[],modes,BooleanFactory,true,prefix);
+  sandbox.configureGroupPlacement(editor,command,factory,recipe,targetValues?[new Solid('target',targetValues)]:[],modes,BooleanFactory,true);
   const result=await factory.commit();
   assert.deepEqual([...result[0].values].sort(),expected);
   assert.equal(groups[0].name,'组名');

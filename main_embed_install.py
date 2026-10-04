@@ -42,8 +42,11 @@ app.on("browser-window-created", (_event, win) => {
     const session=win.webContents.session, preloads=session.getPreloads();
     if (!preloads.includes(geometryPreloadFile)) session.setPreloads([...preloads,geometryPreloadFile]);
   }
-  let toggleRequest = 0;
+  let toggleRequest = 0, operationLocked = false;
   win.webContents.on("console-message", async (_event, _level, message) => {
+    if (message === "PAT_OPERATION_LOCK:on" || message === "PAT_OPERATION_LOCK:off") {
+      operationLocked = message.endsWith(":on");return;
+    }
     if (!message.startsWith("PAT_PREVIEW_REQUEST:")) return;
     const id = message.slice("PAT_PREVIEW_REQUEST:".length);
     if (!/^[a-zA-Z0-9-]{1,64}$/.test(id) || !win.webContents.getURL().includes("/renderer/app_window/index.html")) return;
@@ -58,6 +61,7 @@ app.on("browser-window-created", (_event, win) => {
     if (!win.isDestroyed()) win.webContents.executeJavaScript("window.__plasticityAssetToolPanel?.completePreview("+JSON.stringify(id)+","+JSON.stringify(preview)+")").catch(()=>{});
   });
   win.webContents.on("before-input-event", (event, input) => {
+    if (operationLocked) {event.preventDefault();return;}
     if (input.key === ''' + json.dumps(key) + ''' || input.code === ''' + json.dumps(key) + ''') console.log("PAT_EMBED_INPUT", JSON.stringify(input));
     if (!["keyDown","rawKeyDown"].includes(input.type) || (input.code !== ''' + json.dumps(key) + ''' && input.key !== ''' + json.dumps(key) + ''') || input.control || input.shift || input.alt || input.meta) return;
     const address = win.webContents.getURL();
@@ -88,6 +92,7 @@ app.on("browser-window-created", (_event, win) => {
       .catch(error => console.error("PAT_EMBED_ERROR", error.message));
   });
   win.webContents.on("did-finish-load", async () => {
+    operationLocked = false;
     try {
       const address = new URL(win.webContents.getURL());
       if (address.protocol !== "file:" || !decodeURIComponent(address.pathname).endsWith("/renderer/app_window/index.html")) return;

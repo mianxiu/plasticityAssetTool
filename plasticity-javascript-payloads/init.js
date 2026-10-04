@@ -72,6 +72,7 @@ function installAssetPanel(options) {
     return canvas;
   };
   const togglePanel = connected => {
+    if (window.__plasticityAssetTransport?.calculationStatus?.()) return {visible:false, calculating:true};
     if (!frame.hidden || !offline.hidden) hide();
     else {
       if (typeof connected === "boolean") {

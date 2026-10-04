@@ -20,6 +20,7 @@ class GroupRecipeTests(unittest.TestCase):
     def test_native_group_execution(self):
         root=Path(__file__).resolve().parent.parent
         subprocess.run(['node',str(root/'tests/test_group_recipe.js')],cwd=root,check=True,capture_output=True,timeout=10)
+        subprocess.run(['node',str(root/'tests/test_calculation_progress.js')],cwd=root,check=True,capture_output=True,timeout=10)
 
     def test_round_trip_and_edit_preserve_order_and_original_model(self):
         with tempfile.TemporaryDirectory() as root:

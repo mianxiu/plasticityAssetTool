@@ -3,7 +3,54 @@
 const transportClipboard = nativeRequire('electron').clipboard;
 const modelFormat = 'application/vnd.plasticity.items';
 let transportBusy = false;
+let calculation = null;
+function calculationStatus() {return calculation ? {...calculation} : null;}
+function beginCalculation(total) {
+  if (calculation) throw new Error('组件正在计算，请等待本次操作结束');
+  calculation = {startedAt:Date.now(),total,completed:0,step:0,label:'正在置入模型'};
+  let overlay, text, timer;
+  const events=['pointerdown','pointerup','pointermove','mousedown','mouseup','mousemove','click','dblclick','contextmenu','wheel','keydown','keyup','dragstart','drop','touchstart','touchmove','touchend'];
+  const block=event=>{event.preventDefault();event.stopImmediatePropagation();};
+  const render=()=>{
+    if (!text || !calculation) return;
+    const seconds=Math.floor((Date.now()-calculation.startedAt)/1000);
+    text.textContent=`${calculation.label}${calculation.step ? ` · 第 ${calculation.step}/${calculation.total} 个部件` : ''} · 已用时 ${seconds} 秒`;
+    timer=setTimeout(render,1000);
+  };
+  if (typeof document !== 'undefined') {
+    overlay=document.createElement('div');
+    overlay.id='pat-calculation-lock';
+    overlay.style.cssText='position:fixed;inset:0;z-index:2147483647;background:#0004;display:grid;place-items:center;cursor:wait;user-select:none';
+    const card=document.createElement('section');
+    card.style.cssText='max-width:calc(100vw - 40px);padding:18px 24px;border:1px solid #555;border-radius:10px;background:#222;color:#eee;font:14px "Segoe UI","Microsoft YaHei",sans-serif;box-shadow:0 8px 40px #0008';
+    card.setAttribute('role','status');card.setAttribute('aria-live','polite');
+    const title=document.createElement('strong');title.textContent='组件库正在计算';
+    text=document.createElement('p');text.style.cssText='margin:10px 0;overflow-wrap:anywhere';
+    const hint=document.createElement('small');hint.textContent='此窗口的操作暂时锁定，计算结束后自动恢复';hint.style.color='#aaa';
+    card.append(title,text,hint);overlay.append(card);document.body.append(overlay);
+    for(const event of events) window.addEventListener(event,block,{capture:true,passive:false});
+    console.log('PAT_OPERATION_LOCK:on');
+    render();
+  }
+  return {
+    update(step,label,completed=calculation?.completed || 0) {
+      if (!calculation) return;
+      Object.assign(calculation,{step,label,completed});
+      if(timer) clearTimeout(timer);render();
+    },
+    finish() {
+      if(timer) clearTimeout(timer);
+      overlay?.remove();
+      if(typeof document !== 'undefined') {
+        for(const event of events) window.removeEventListener(event,block,true);
+        console.log('PAT_OPERATION_LOCK:off');
+      }
+      calculation=null;
+    }
+  };
+}
 function requireIdle(editor) {
+  if (calculation) throw new Error('组件正在计算，请等待本次操作结束');
   const active = editor.executor.activeCommand;
   if (!transportBusy && !editor.executor.isBusy && !active) return;
   const name = active?.constructor?.name || '';
@@ -32,7 +79,7 @@ function inspectGroup(editor) {
 }
 function captureGroup(editor, signature) {
   const inspected = inspectGroup(editor);
-  if (!inspected.recipe || inspected.signature !== signature) throw new Error('组或模型已变化，请重新选择组并按 Tab 读取');
+  if (!inspected.recipe || inspected.signature !== signature) throw new Error('组或模型已变化，请重新选择组并点击保存组件');
   const groupId = Array.from(editor.selection.selected.groupIds)[0];
   const keys = Array.from(editor.groups.getChildren(groupId));
   const selected = editor.selection.selected, saved = selected.saveToMemento();
@@ -100,8 +147,10 @@ async function insertModel(editor, args, PasteCommand, OperationType, BooleanFac
   if (typeof Command !== 'function') throw new Error('原生置入命令不可用');
   const command = new Command(editor);
   command.remember = false;
-  let configured = !booleanMode && !recipe, placementFactory;
-  if (booleanMode || recipe) {
+  let configured = !booleanMode && !recipe, placementFactory, progress;
+  const report=(step,label,completed)=>progress?.update(step,label,completed);
+  const finish=()=>{progress?.finish();progress=null;};
+  if (typeof command.register === 'function') {
     const register = command.register;
     if (typeof register !== 'function') throw new Error('当前版本不支持默认布尔置入');
     command.register = function(resource, ...rest) {
@@ -109,19 +158,31 @@ async function insertModel(editor, args, PasteCommand, OperationType, BooleanFac
         // Set the native factory before its controls and first pointer update.
         // Targets are snapshots of this window's selected solids only.
         if (recipe) {
-          configureGroupPlacement(editor,command,resource,recipe,args.placement ? targets : [],OperationType,BooleanFactory,!!args.placement);
-        } else {
+          configureGroupPlacement(editor,command,resource,recipe,args.placement ? targets : [],OperationType,BooleanFactory,!!args.placement,report);
+        } else if (booleanMode) {
           resource.targets = targets;
           resource.operationType = operation;
           resource.keepTools = false;
           if (resource.operationType !== operation || resource.targets.length !== targets.length) throw new Error('原生布尔置入设置失败');
         }
+        const commit=resource.commit;
+        if(typeof commit === 'function') resource.commit=async function(...params) {
+          progress=beginCalculation(recipe ? recipe.parts.length : 1);
+          if(!recipe) report(1,({union:'正在布尔合并',difference:'正在布尔减去',intersection:'正在布尔相交'})[mode] || '正在置入模型');
+          try {
+            // Paint the lock before entering a potentially expensive kernel call.
+            if(typeof requestAnimationFrame === 'function') await new Promise(resolve=>requestAnimationFrame(()=>setTimeout(resolve,0)));
+            const result=await commit.apply(this,params);
+            report(recipe ? recipe.parts.length : 1,'正在完成置入',recipe ? recipe.parts.length : 1);
+            return result;
+          } catch(error) {report(calculation?.step || 0,'计算失败，正在回滚');throw error;}
+        };
         configured = true;
         placementFactory = resource;
       }
       return register.call(this,resource,...rest);
     };
-  }
+  } else if(booleanMode || recipe) throw new Error('当前版本不支持默认布尔置入');
   const execute = command.execute;
   let startedResolve, startedReject, invoked = false;
   const started = new Promise((resolve,reject)=>{startedResolve=resolve;startedReject=reject;});
@@ -181,12 +242,15 @@ async function insertModel(editor, args, PasteCommand, OperationType, BooleanFac
     }
     return pending;
   };
-  Promise.resolve(editor.exec(command)).then(()=>{
-    if (!invoked) startedReject(new Error('置入命令未执行'));
-  },startedReject);
+  try {
+    Promise.resolve(editor.exec(command)).then(()=>{
+      finish();
+      if (!invoked) startedReject(new Error('置入命令未执行'));
+    },error=>{finish();startedReject(error);});
+  } catch(error) {finish();throw error;}
   return started;
 }
-function configureGroupPlacement(editor,command,factory,recipe,targets,OperationType,BooleanFactory,performBoolean) {
+function configureGroupPlacement(editor,command,factory,recipe,targets,OperationType,BooleanFactory,performBoolean,report=()=>{}) {
   // The native command owns the placement and every following factory, so
   // cancellation/failure rolls back its single transaction and undo restores it.
   const commit = factory.commit;
@@ -203,6 +267,8 @@ function configureGroupPlacement(editor,command,factory,recipe,targets,Operation
     if (placed.length !== recipe.parts.length || placed.some(v=>v.constructor.name !== 'Solid')) throw new Error('置入部件与保存的组顺序不一致');
     let accumulator=targets.slice(); const independent=[];
     for (const part of recipe.parts) {
+      const action=({union:'布尔合并',difference:'布尔减去',intersection:'布尔相交','new-body':'保留独立实体'})[part.mode];
+      report(part.index+1,`${action}：${part.name}`,part.index);
       const tool=placed[part.index];
       editor.nodes.setName(editor.nodes.item2key(tool),part.name);
       if (!performBoolean || part.mode === 'new-body') {independent.push(tool);continue;}
@@ -223,4 +289,4 @@ function configureGroupPlacement(editor,command,factory,recipe,targets,Operation
     return results;
   };
 }
-globalThis.__plasticityAssetTransport = Object.freeze({captureSelection,captureGroup,inspectGroup,insertModel});
+globalThis.__plasticityAssetTransport = Object.freeze({captureSelection,captureGroup,inspectGroup,insertModel,calculationStatus});
