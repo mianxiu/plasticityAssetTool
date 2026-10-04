@@ -209,7 +209,10 @@ class Application(web.Application):
             raise ValueError("参数必须是对象")
         if action.startswith("service."):
             return await self.control.dispatch(action,args)
-        return await self.service.dispatch(action,args,self.settings["base_url"])
+        result = await self.service.dispatch(action,args,self.settings["base_url"])
+        if action == "state":
+            result["panel_settings"] = self.service.panel_settings.snapshot()
+        return result
 
 async def reuse_backend(port, headless):
     url = f"http://127.0.0.1:{port}"

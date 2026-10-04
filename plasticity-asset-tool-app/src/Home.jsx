@@ -189,6 +189,7 @@ export function Home() {
       setClipboardSupported(state.clipboard_supported);
       setNativeTargets(state.native_targets || []);
       setModelEnabled(state.model_enabled !== false);
+      if (embedded) window.parent.postMessage({type:"pat:panel-settings",settings:state.panel_settings}, hostOrigin);
       setTargetId(chooseTarget({embedded,preferredTarget,current:targetId(),followActive:followActive(),state}));
       const rows = requestedArchive ? await client.request("library.list", { archived: true, library_id: requestedLibrary }) : state.assets;
       if (requestedLibrary !== libraryId() || requestedArchive !== archived()) { refreshQueued = true; return; }

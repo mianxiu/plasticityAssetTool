@@ -9,6 +9,23 @@ function installAssetPanel(options) {
   const frame = document.createElement("iframe");
   let frameReady = false;
   let disconnected = false;
+  let positionMode = "fixed", pointer = null, openingPoint = null;
+  const trackPointer = event => {
+    if (Number.isFinite(event.clientX) && Number.isFinite(event.clientY)) pointer = {x:event.clientX,y:event.clientY};
+  };
+  const positionPanel = () => {
+    const margin = Math.min(12, innerWidth / 4, innerHeight / 4);
+    const width = Math.max(1, Math.min(1000, innerWidth - margin * 2));
+    const height = Math.max(1, innerHeight - Math.min(100, innerHeight / 4));
+    const clamp = (value, size, available) => Math.max(margin, Math.min(value, available - size - margin));
+    const anchor = openingPoint || {x:innerWidth / 2,y:innerHeight / 2};
+    frame.style.right = "auto";
+    frame.style.left = clamp(positionMode === "cursor" ? anchor.x + 12 : innerWidth - width - 20, width, innerWidth) + "px";
+    frame.style.top = clamp(positionMode === "cursor" ? anchor.y + 12 : 70, height, innerHeight) + "px";
+    frame.style.width = width + "px";
+    frame.style.height = height + "px";
+  };
+  const resizePanel = () => {if (!frame.hidden) positionPanel();};
   const previewRequests = new Map();
   const offline = document.createElement("section");
   offline.hidden = true;
@@ -29,6 +46,8 @@ function installAssetPanel(options) {
   frame.id = "plasticity_asset_tool_panel";
   const show = () => {
     if (disconnected) {frame.hidden = true;offline.hidden = false;return;}
+    if (frame.hidden) openingPoint = pointer ? {...pointer} : null;
+    positionPanel();
     offline.hidden = true;
     if (!frame.hasAttribute("src")) frame.src = options.url;
     frame.hidden = false;
@@ -71,6 +90,13 @@ function installAssetPanel(options) {
   };
   const receive = event => {
     if (event.source !== frame.contentWindow || event.origin !== new URL(options.url).origin) return;
+    if (event.data?.type === "pat:panel-settings") {
+      const mode = event.data.settings?.position;
+      if (["fixed", "cursor"].includes(mode) && mode !== positionMode) {
+        positionMode = mode;
+        if (!frame.hidden) positionPanel();
+      }
+    }
     if (event.data?.type === "pat:ready") {
       frameReady = true;
       if (!frame.hidden) show();
@@ -93,6 +119,8 @@ function installAssetPanel(options) {
   };
   document.addEventListener("keydown", toggle, true);
   window.addEventListener("message", receive);
+  window.addEventListener("pointermove", trackPointer, true);
+  window.addEventListener("resize", resizePanel);
   const completePreview = (id, preview) => {
     const request = previewRequests.get(id);
     if (!request) return;
@@ -112,6 +140,8 @@ function installAssetPanel(options) {
     previewRequests.clear();
     document.removeEventListener("keydown", toggle, true);
     window.removeEventListener("message", receive);
+    window.removeEventListener("pointermove", trackPointer, true);
+    window.removeEventListener("resize", resizePanel);
     frame.remove(); offline.remove(); delete window[key];
   }};
   return { installed: true, reused: false };

@@ -20,6 +20,7 @@ class ServiceControl:
                 "targets": targets, "active_target_id": service.bridge.active_target_id, "panel_clients": len(self.app.clients),
                 "component_count": sum(row["count"] for row in libraries), "libraries": libraries,
                 "url": self.app.settings["base_url"],
+                "panel_settings": service.panel_settings.snapshot(),
                 "shortcut": service.config["keymap"].get("show_panel_event_key_code", "Tab"),
                 "tray_available": bool(self.tray and self.tray.available),
                 "tray_error": self.tray.error if self.tray else ""}
@@ -32,6 +33,11 @@ class ServiceControl:
             return await self.status()
         if action == "service.open_control":
             return await asyncio.to_thread(self.app.control_window.open)
+        if action == "service.panel_settings":
+            async with service.lock:
+                settings = await asyncio.to_thread(service.panel_settings.update, args.get("position"))
+            await self.app.broadcast({"type": "service_changed"})
+            return {"message": "面板位置已保存", "panel_settings": settings}
         if action == "service.connection":
             if not isinstance(args.get("enabled"), bool):
                 raise ValueError("请指定暂停或恢复连接")

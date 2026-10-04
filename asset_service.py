@@ -9,6 +9,7 @@ from windows_bridge import WindowsBridge
 from model_clipboard import validate_model
 from geometry_preview import GeometryPreview
 from native_transport import NativeTransport
+from panel_settings import PanelSettings
 
 
 def decode_preview(value):
@@ -25,6 +26,7 @@ def decode_preview(value):
 class AssetService:
     def __init__(self, config, root, desktop=None):
         self.config = config
+        self.panel_settings = PanelSettings(root)
         self.library = AssetLibrary(Path(root) / "library")
         self.geometry = GeometryPreview(self.library)
         self.native = NativeTransport()

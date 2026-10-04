@@ -62,6 +62,9 @@ export function ControlCenter() {
           <div class="model-window-list"><For each={state()?.targets}>{target=><article class="model-window-row"><Cube/><div><strong>{target.title}</strong><small>{target.mode === "desktop" ? "原生模型窗口" : "调试接口"} · {enabled() ? "可进行模型操作" : "模型操作暂停"}</small></div><button class="secondary-button" disabled={busy() || target.mode !== "desktop"} onClick={()=>command("service.focus",{target_id:target.id})}>切换到窗口 ↗</button></article>}</For></div>
         </Show>
       </section>
+      <section class="control-section control-panel-settings">
+        <h2>面板位置</h2><div class="control-position-options" role="group" aria-label="面板位置"><For each={[["fixed","固定位置"],["cursor","鼠标位置"]]}>{item=><button class="secondary-button" aria-pressed={(state()?.panel_settings?.position || "fixed") === item[0]} disabled={!online() || busy()} onClick={()=>command("service.panel_settings",{position:item[0]})}>{item[1]}</button>}</For></div>
+      </section>
       <section class="control-section control-management">
         <div><h2>连接与运行</h2><p>托盘图标始终保留后台入口，双击可打开此控制中心。</p><small>{online() ? `${state()?.panel_clients || 0} 个面板连接` : "服务离线"}</small><Show when={online() && !state()?.tray_available}><p class="control-warning">托盘暂不可用：{state()?.tray_error || "正在初始化"}</p></Show></div>
         <div class="control-actions"><button class="secondary-button" disabled={!online() || busy()} onClick={()=>command("service.connection",{enabled:!enabled()})}>{enabled() ? "暂停模型连接" : "恢复模型连接"}</button><button class="control-quit" disabled={!online() || busy()} onClick={()=>setConfirmQuit(true)}>退出后台服务</button></div>
