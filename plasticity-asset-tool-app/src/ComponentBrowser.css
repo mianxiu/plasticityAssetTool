@@ -99,6 +99,7 @@ body:has(.component-first){background:#181818}
 .asset-card[data-insert-mode=new-body]{--mode-color:#888;--mode-tint:#333}
 .asset-card[data-insert-mode=union]{--mode-color:#00ad81;--mode-tint:#183c31}
 .asset-card[data-insert-mode=difference]{--mode-color:#ed6b6b;--mode-tint:#442626}
+.asset-card[data-insert-mode=sequence]{--mode-color:#b28aeb;--mode-tint:#35283f}
 .asset-card[data-insert-mode=intersection]{--mode-color:#77a9ed;--mode-tint:#26374d}
 .component-first .asset-card[data-insert-mode],.component-first .asset-card[data-insert-mode]:hover,.component-first .asset-card[data-insert-mode].selected{border:1px solid var(--mode-color);box-shadow:none}
 .component-first.sidebar-hover{position:relative}
@@ -144,7 +145,7 @@ body:has(.component-first){background:#181818}
 .insert-mode-options input:focus-visible+span{outline:2px solid #ddd;outline-offset:1px}
 .asset-edit-form .modal-actions{gap:6px;margin-top:8px}
 .component-first .details-panel .modal-actions .primary,.component-first .details-panel .modal-actions .secondary{padding:5px 9px;font-size:12px}
-.group-recipe { margin: 0; padding: 6px; border: 1px solid #444; border-radius: 6px; }
+.group-recipe { margin: 0; padding: 6px; border: 1px solid #b28aeb; color: #b28aeb; border-radius: 6px; }
 .group-recipe ol { margin: 0; padding-left: 24px; max-height: 220px; overflow-y: auto; }
 .group-recipe li { padding: 3px; }
 .group-recipe li span { overflow-wrap: anywhere; }

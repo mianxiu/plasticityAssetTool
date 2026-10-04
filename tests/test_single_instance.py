@@ -7,8 +7,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
-from single_instance import BackendInstance
-import main
+from backend.single_instance import BackendInstance
+from backend import main
 from tornado import web
 from tornado.testing import AsyncHTTPTestCase, gen_test
 
@@ -17,7 +17,7 @@ class InstanceLockTests(unittest.TestCase):
     def test_concurrent_processes_and_crash_release(self):
         script = """
 import sys
-from single_instance import BackendInstance
+from backend.single_instance import BackendInstance
 instance = BackendInstance(sys.argv[1])
 owned = instance.acquire()
 if owned: instance.publish(15150)

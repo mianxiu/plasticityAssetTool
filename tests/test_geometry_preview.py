@@ -3,8 +3,8 @@ import hashlib
 import tempfile
 import unittest
 import uuid
-from asset_library import AssetLibrary
-from geometry_preview import GeometryPreview, validate_mesh
+from backend.asset_library import AssetLibrary
+from backend.geometry_preview import GeometryPreview, validate_mesh
 from model_fixture import model_bytes
 
 

@@ -4,13 +4,13 @@ import binascii
 import hashlib
 import json
 from pathlib import Path
-from asset_library import AssetLibrary, MAX_PREVIEW_BYTES
-from plasticity_bridge import PlasticityBridge
-from windows_bridge import WindowsBridge
-from model_clipboard import validate_model
-from geometry_preview import GeometryPreview
-from native_transport import NativeTransport
-from panel_settings import PanelSettings
+from .asset_library import AssetLibrary, MAX_PREVIEW_BYTES
+from .plasticity_bridge import PlasticityBridge
+from .windows_bridge import WindowsBridge
+from .model_clipboard import validate_model
+from .geometry_preview import GeometryPreview
+from .native_transport import NativeTransport
+from .panel_settings import PanelSettings
 
 
 def decode_preview(value):

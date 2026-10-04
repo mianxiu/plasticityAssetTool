@@ -7,7 +7,7 @@ from urllib.parse import urlparse, quote
 from tornado.httpclient import AsyncHTTPClient, HTTPRequest
 from tornado.websocket import websocket_connect
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parent.parent
 EVENTS = {"copy": "edit:copy", "paste": "edit:paste", "place": "edit:paste-with-placement", "move": "command:move", "rotate": "command:rotate", "scale": "command:scale", "focus": "viewport:focus", "undo": "edit:undo", "redo": "edit:redo"}
 
 def local_url(url, schemes=("http",)):

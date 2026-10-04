@@ -4,8 +4,8 @@ import base64
 import binascii
 import time
 import uuid
-from model_clipboard import validate_model, MAX_BYTES
-from group_recipe import validate_recipe
+from .model_clipboard import validate_model, MAX_BYTES
+from .group_recipe import validate_recipe
 
 
 class NativeTransport:

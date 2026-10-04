@@ -62,7 +62,7 @@ Tab 唤起内嵌面板前，main 入口会检查本机后台身份和连接（�
 
 停止模型连接或后台断开时，组件库与控制中心顶部显示明显的红色警示、停用说明与恢复入口；后台自动重连期间保留断开提示。内嵌入口的离线提示使用更大的居中红色面板。界面按钮、页脚、输入提示及操作提示已移除快捷键文案，原有按键功能保留。85 项测试及构建通过，已检查停止连接警示和可见快捷键文案清理，并恢复测试前的正常连接状态。本次入口回滚备份为 `.runtime/plasticity-formal-main-before-clean-hints.js`。
 
-本次升级的前一个入口备份为 `.runtime/plasticity-formal-main-before-offline.js`；管理员终端运行 `python main_embed_install.py --restore --backup .runtime/plasticity-formal-main-before-offline.js` 可回到升级前入口。需要完全移除补丁时，先回滚本次升级，再恢复 `.runtime/plasticity-formal-main-original.js`。
+本次升级的前一个入口备份为 `.runtime/plasticity-formal-main-before-offline.js`；管理员终端运行 `python -m installer.main_embed_install --restore --backup .runtime/plasticity-formal-main-before-offline.js` 可回到升级前入口。需要完全移除补丁时，先回滚本次升级，再恢复 `.runtime/plasticity-formal-main-original.js`。
 
 ## 保存和置入组件
 
@@ -117,19 +117,19 @@ Windows 服务运行期间，在 Plasticity 前台按 **Tab** 打开组件库并
 
 ## 真正的内嵌面板
 
-`main_embed_install.py` 在 `resources/app/.webpack/main/index.js` 前添加 Electron 加载钩子，保留原始编译加载器字节和 `index.compiled.jsc`。建模页面完成加载后注入 iframe，默认隐藏，第一次 Tab 才加载组件库。不修改 renderer HTML，也不需要 CDP。每个窗口的 URL 自动带上它自己的 HWND，避免将组件发到其他建模窗口。
+`installer/main_embed_install.py` 在 `resources/app/.webpack/main/index.js` 前添加 Electron 加载钩子，保留原始编译加载器字节和 `index.compiled.jsc`。建模页面完成加载后注入 iframe，默认隐藏，第一次 Tab 才加载组件库。不修改 renderer HTML，也不需要 CDP。每个窗口的 URL 自动带上它自己的 HWND，避免将组件发到其他建模窗口。
 
 Tab 在 Electron 输入层处理，并兼容原生/模拟输入的 `code` 和 `key`，忽略组合键及长按重复；面板获得焦点后仍可再次 Tab 关闭。首次加载通过 `pat:ready` 握手，避免向尚未加载的子页面发送消息。置入前隐藏 iframe、聚焦 CAD 画布，收到焦点确认后发送 Ctrl+Shift+V；操作失败时重新显示面板和错误提示。Esc / × 也可收起。
 
 安装前关闭 Plasticity，在有安装目录写权限的终端运行（替换版本路径）：
 
 ```powershell
-python main_embed_install.py --target "C:/Program Files/Plasticity/app-26.1.3/resources/app/.webpack/main/index.js" --backup ".runtime/plasticity-formal-main-original.js"
+python -m installer.main_embed_install --target "C:/Program Files/Plasticity/app-26.1.3/resources/app/.webpack/main/index.js" --backup ".runtime/plasticity-formal-main-original.js"
 ```
 
 使用内嵌模式时将 `launcher.enabled` 设为 `false`；`keymap.show_panel_event_key_code` 指定按键，如 `Tab` 或 `F8`，改键后需要先恢复入口，再重新安装补丁并重启 Plasticity。服务继续使用 `.\start.ps1 -Headless`。正式安装不要传 `--profile`，它只用于测试副本的 Electron 配置隔离。
 
-恢复入口使用 `python main_embed_install.py --restore --backup ".runtime/plasticity-formal-main-original.js"`，需要安装目录写权限（通常需管理员终端或手动确认 Windows UAC）。备份和 manifest 记录原始、补丁 SHA-256；恢复会拒绝覆盖补丁之后的其他修改。Plasticity 更新后应检查新的版本入口并使用新的备份路径。旧 `embedded_install.py` 的 HTML 方案保留为实验脚本，当前不使用。
+恢复入口使用 `python -m installer.main_embed_install --restore --backup ".runtime/plasticity-formal-main-original.js"`，需要安装目录写权限（通常需管理员终端或手动确认 Windows UAC）。备份和 manifest 记录原始、补丁 SHA-256；恢复会拒绝覆盖补丁之后的其他修改。Plasticity 更新后应检查新的版本入口并使用新的备份路径。旧 `installer/embedded_install.py` 的 HTML 方案保留为实验脚本，当前不使用。
 
 另一条路径是配置 `plasticity.cdp_endpoints` 为已有的本机 CDP 地址。检测到调试页面后会出现单独的 CDP 目标和“嵌入面板”按钮，同样使用 iframe，重复安装复用原面板；此路径不修改安装文件。
 
@@ -200,6 +200,19 @@ File:select_plasticity_file
 
 使用 `install-plugin.ps1` 安装或升级入口，替代直接对 PowerShell 请求管理员权限。脚本构建带项目图标和名称的 `Plasticity 模型组件库插件安装.exe`，先显示项目来源、本次更新内容、目标文件、回滚备份和管理员权限的用途，再由这个安装器向 Windows 请求权限。来源为本开源项目，未签名时 Windows 仍会显示未知发布者；不将其标记为 Plasticity 官方发布者。
 
-安装器参数与 `main_embed_install.py` 对应：`-Target`、`-Backup`、`-UpgradeFrom`、`-BaseBackup`，恢复时使用 `-Restore -Backup`。`-Description` 用于填写此次具体更新，例如“更新组件默认布尔置入：独立、合并、减去、相交”。首次安装不传升级参数；升级必须使用与当前入口匹配的已验证备份。取消说明窗口或 UAC 时不执行安装。
+安装器参数与 `installer/main_embed_install.py` 对应：`-Target`、`-Backup`、`-UpgradeFrom`、`-BaseBackup`，恢复时使用 `-Restore -Backup`。`-Description` 用于填写此次具体更新，例如“更新组件默认布尔置入：独立、合并、减去、相交”。首次安装不传升级参数；升级必须使用与当前入口匹配的已验证备份。取消说明窗口或 UAC 时不执行安装。
 
 `-BuildOnly` 只构建安装器；`-Preview` 生成 `.runtime/plugin-installer-preview.png`，不申请权限、不写入 Plasticity。构建使用 Windows 自带 .NET Framework 4 编译器。日常后台运行、Tab 面板、组件保存和置入不需要管理员权限。
+
+## 项目目录
+
+- `main.py`、`start.ps1`：后台启动入口，原有启动命令保持兼容。
+- `backend/`：组件库、原生通信、预览、托盘和后台服务代码。
+- `installer/`：入口补丁、恢复脚本和 Windows 安装器；命令行使用 `python -m installer.main_embed_install`。
+- `plasticity-asset-tool-app/`：Web UI；连续布尔组组件使用紫色细外框与标签。
+- `plasticity-javascript-payloads/`：Plasticity 内嵌面板与原生工作脚本。
+- `legacy/`：已脱离当前启动流程的早期实验代码，仅归档，不作为入口运行。
+- `tests/`：自动测试。
+- `.venv/`：本机 Python 环境；`library/`：本机组件数据；`.runtime/`：运行状态、安装恢复备份和测试产物。三者不上传 GitHub。
+
+旧根目录的 `Lib/`、`Scripts/`、`Include/` 暂时保留，避免中断正在运行的旧后台依赖；新启动优先使用 `.venv/`。旧运行数据和原 `pyvenv.cfg` 已归档到 `.runtime/legacy-data/`，未删除组件或安装备份。

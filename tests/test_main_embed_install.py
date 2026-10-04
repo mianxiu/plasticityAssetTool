@@ -4,7 +4,7 @@ from pathlib import Path
 from unittest.mock import patch
 import subprocess
 import shutil
-from main_embed_install import install, patch_main, restore, upgrade
+from installer.main_embed_install import install, patch_main, restore, upgrade
 
 
 ORIGINAL = b'"use strict";\r\nrequire("./index.compiled.jsc");\r\n'

@@ -8,7 +8,7 @@ import webbrowser
 from ctypes import wintypes as W
 from pathlib import Path
 from urllib.parse import urlencode
-from native_panel import NativePanel
+from .native_panel import NativePanel
 
 
 def parse_hotkey(chord):

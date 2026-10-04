@@ -5,7 +5,7 @@ import tempfile
 import tracemalloc
 import unittest
 import zipfile
-from asset_library import AssetLibrary
+from backend.asset_library import AssetLibrary
 
 
 class LibraryTests(unittest.TestCase):

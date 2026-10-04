@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import Mock, patch
 
-from windows_bridge import WindowsBridge
+from backend.windows_bridge import WindowsBridge
 
 
 class FocusTests(unittest.TestCase):
@@ -91,7 +91,7 @@ class FocusTests(unittest.TestCase):
 
     def test_failure_restores_library_and_sends_no_keys(self):
         bridge = self.bridge(succeeds=False)
-        with patch("windows_bridge.time.monotonic", side_effect=[0, 0, 2]), patch("windows_bridge.time.sleep"):
+        with patch("backend.windows_bridge.time.monotonic", side_effect=[0, 0, 2]), patch("backend.windows_bridge.time.sleep"):
             with self.assertRaisesRegex(RuntimeError, "无法激活"):
                 bridge.shortcut(42, "ctrl+shift+v")
         self.assertEqual(bridge.u.ShowWindowAsync.call_args_list, [unittest.mock.call(7, 6), unittest.mock.call(7, 9)])

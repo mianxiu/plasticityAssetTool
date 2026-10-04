@@ -56,10 +56,10 @@ internal static class PluginInstaller {
     }
     private static int Install(Dictionary<string,object> request) {
         if(!IsAdministrator())throw new InvalidOperationException("安装插件入口需要 Windows 管理员权限。");
-        string root=Text(request,"root"), script=Path.Combine(root,"main_embed_install.py");
+        string root=Text(request,"root"), script=Path.Combine(root,"installer","main_embed_install.py");
         if(!File.Exists(script))throw new FileNotFoundException("找不到组件库安装脚本",script);
         var arguments=(System.Collections.IEnumerable)request["arguments"];
-        var command=new StringBuilder(Quote(script));
+        var command=new StringBuilder("-m installer.main_embed_install");
         foreach(object value in arguments)command.Append(" ").Append(Quote(Convert.ToString(value)));
         var info=new ProcessStartInfo(Text(request,"python"),command.ToString()) {
             WorkingDirectory=root, UseShellExecute=false, CreateNoWindow=true,

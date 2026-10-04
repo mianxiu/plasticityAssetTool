@@ -5,7 +5,7 @@ Set-Location -LiteralPath $PSScriptRoot
 
 $assetPython = $null
 $assetCandidates = @(
-    (Join-Path $PSScriptRoot 'Scripts/python.exe'),
+    (Join-Path $PSScriptRoot '.venv/Scripts/python.exe'),
     (Join-Path $env:USERPROFILE '.cache/codex-runtimes/codex-primary-runtime/dependencies/python/python.exe')
 )
 $assetPythonCommand = Get-Command python.exe -ErrorAction SilentlyContinue
@@ -18,9 +18,10 @@ foreach ($assetCandidate in $assetCandidates) {
 }
 if (-not $assetPython) { throw 'Python 3.10+ is required. Install Python and run: python -m pip install -r requirements.txt' }
 
-# This repository includes an older venv. Its pure-Python Tornado installation
-# can also be used with a newer Python when the original venv interpreter is gone.
-$assetSitePackages = Join-Path $PSScriptRoot 'Lib/site-packages'
+# Prefer the project environment; retain the old dependency directory while
+# an already-running backend may still be using it.
+$assetSitePackages = Join-Path $PSScriptRoot '.venv/Lib/site-packages'
+if (-not (Test-Path -LiteralPath $assetSitePackages)) { $assetSitePackages = Join-Path $PSScriptRoot 'Lib/site-packages' }
 if (Test-Path -LiteralPath (Join-Path $assetSitePackages 'tornado')) {
     $env:PYTHONPATH = "$assetSitePackages;$env:PYTHONPATH"
 }

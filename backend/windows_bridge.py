@@ -5,7 +5,7 @@ import time
 from contextlib import contextmanager
 from ctypes import wintypes as W
 from pathlib import Path
-from model_clipboard import validate_model
+from .model_clipboard import validate_model
 
 FORMAT_NAME = "application/vnd.plasticity.items"
 MAX_BYTES = 64 * 1024 * 1024

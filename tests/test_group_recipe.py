@@ -4,8 +4,8 @@ import unittest
 import shutil
 import subprocess
 from pathlib import Path
-from asset_library import AssetLibrary
-from group_recipe import validate_recipe
+from backend.asset_library import AssetLibrary
+from backend.group_recipe import validate_recipe
 from model_fixture import model_bytes
 
 

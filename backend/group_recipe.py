@@ -1,5 +1,5 @@
 """Ordered solid operations captured from a Plasticity group."""
-from model_clipboard import parse_model
+from .model_clipboard import parse_model
 
 MODES = {"+": "union", "-": "difference", "&": "intersection", "^": "new-body"}
 

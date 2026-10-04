@@ -1,6 +1,6 @@
 import struct
 import unittest
-from model_clipboard import validate_model
+from backend.model_clipboard import validate_model
 from model_fixture import model_bytes
 
 

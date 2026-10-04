@@ -2,9 +2,9 @@
 import argparse
 import json
 from pathlib import Path
-from embedded_install import digest, restore
+from .embedded_install import digest, restore
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parent.parent
 MARKER = '// plasticity-asset-tool:main-embedded'
 
 

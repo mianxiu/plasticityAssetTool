@@ -11,7 +11,7 @@ import math
 import time
 import uuid
 import zlib
-from model_clipboard import parse_model
+from .model_clipboard import parse_model
 
 MAX_MESH_BYTES = 32 * 1024 * 1024
 MAX_VALUES = 2_000_000

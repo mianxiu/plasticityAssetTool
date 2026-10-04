@@ -4,9 +4,9 @@ import json
 import tempfile
 import unittest
 from unittest.mock import AsyncMock, patch
-from asset_service import AssetService
-from main import DEFAULT_SHORTCUTS
-from plasticity_bridge import CdpConnection, local_url
+from backend.asset_service import AssetService
+from backend.main import DEFAULT_SHORTCUTS
+from backend.plasticity_bridge import CdpConnection, local_url
 from model_fixture import model_bytes
 from test_group_recipe import recipe
 

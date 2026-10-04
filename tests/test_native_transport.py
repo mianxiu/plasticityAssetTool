@@ -1,7 +1,7 @@
 import asyncio
 import base64
 import unittest
-from native_transport import NativeTransport
+from backend.native_transport import NativeTransport
 from model_fixture import model_bytes
 from test_group_recipe import recipe
 

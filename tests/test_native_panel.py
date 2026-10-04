@@ -2,7 +2,7 @@ import threading
 import unittest
 from unittest.mock import Mock
 
-from native_panel import NativePanel, panel_bounds
+from backend.native_panel import NativePanel, panel_bounds
 
 
 class PanelTests(unittest.TestCase):

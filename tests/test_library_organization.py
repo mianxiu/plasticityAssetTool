@@ -1,8 +1,8 @@
 import sqlite3
 import tempfile
 import unittest
-from asset_library import AssetLibrary
-from library_launcher import parse_hotkey, LibraryLauncher
+from backend.asset_library import AssetLibrary
+from backend.library_launcher import parse_hotkey, LibraryLauncher
 
 
 class OrganizationTests(unittest.TestCase):

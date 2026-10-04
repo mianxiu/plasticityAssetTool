@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
-from panel_settings import PanelSettings
+from backend.panel_settings import PanelSettings
 from test_service_control import make_application
 
 

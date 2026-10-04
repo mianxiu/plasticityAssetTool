@@ -3,8 +3,8 @@ import tempfile
 from tornado.httpclient import HTTPRequest
 from tornado.testing import AsyncHTTPTestCase, gen_test
 from tornado.websocket import websocket_connect
-from asset_service import AssetService
-from main import Application, DEFAULT_SHORTCUTS
+from backend.asset_service import AssetService
+from backend.main import Application, DEFAULT_SHORTCUTS
 from test_asset_service import FakeDesktop
 from test_geometry_preview import mesh
 import uuid

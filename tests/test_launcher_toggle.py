@@ -1,7 +1,7 @@
 import threading
 import unittest
 from unittest.mock import Mock
-from library_launcher import LibraryLauncher
+from backend.library_launcher import LibraryLauncher
 
 
 class ToggleTests(unittest.TestCase):

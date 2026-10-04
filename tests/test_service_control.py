@@ -4,10 +4,10 @@ import struct
 import tempfile
 import unittest
 from pathlib import Path
-from asset_service import AssetService
-from main import Application, DEFAULT_SHORTCUTS, StaticHandler
+from backend.asset_service import AssetService
+from backend.main import Application, DEFAULT_SHORTCUTS, StaticHandler
 from tornado import web
-from service_tray import icon_bitmap
+from backend.service_tray import icon_bitmap
 from test_asset_service import FakeDesktop
 from model_fixture import model_bytes
 from tornado.testing import AsyncHTTPTestCase

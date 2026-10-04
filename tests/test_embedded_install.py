@@ -1,7 +1,7 @@
 import tempfile
 import unittest
 from pathlib import Path
-from embedded_install import install, patch_html, restore
+from installer.embedded_install import install, patch_html, restore
 
 
 class EmbedInstallTests(unittest.TestCase):

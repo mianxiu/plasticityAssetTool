@@ -5,7 +5,7 @@ import json
 import sqlite3
 import uuid
 import zipfile
-from group_recipe import validate_recipe
+from .group_recipe import validate_recipe
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
