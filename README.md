@@ -211,7 +211,7 @@ File:select_plasticity_file
 - `installer/`：入口补丁、恢复脚本和 Windows 安装器；命令行使用 `python -m installer.main_embed_install`。
 - `plasticity-asset-tool-app/`：Web UI；连续布尔组组件使用紫色细外框与标签。
 - `plasticity-javascript-payloads/`：Plasticity 内嵌面板与原生工作脚本。
-- `legacy/`：已脱离当前启动流程的早期实验代码，仅归档，不作为入口运行。
+- 早期 CDP 与文件浏览实验代码已删除；需要参考时可从 Git 历史提交 `8945623` 的 `legacy/` 目录恢复。
 - `tests/`：自动测试。
 - `.venv/`：本机 Python 环境；`library/`：本机组件数据；`.runtime/`：运行状态、安装恢复备份和测试产物。三者不上传 GitHub。
 

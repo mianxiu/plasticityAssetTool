@@ -222,7 +222,5 @@ plasticityAssetToolCache/
 /pyvenv.cfg
 /program_info_cache.tmp
 /recent_files.json
-/legacy/*.tmp
-/legacy/recent_files.json
 recent_path.db
 readme.rst
