@@ -17,6 +17,7 @@ export function Home() {
   const embedded = window.parent !== window;
   const quickPanel = new URLSearchParams(location.search).has("quick");
   const [floatingPanel, setFloatingPanel] = createSignal(embedded || new URLSearchParams(location.search).get("panel") === "1");
+  const [sidebarMode, setSidebarMode] = createSignal("fixed");
   const pendingHost = new Map();
   const hostOrigin = document.referrer.startsWith("file:") || !document.referrer ? "*" : new URL(document.referrer).origin;
   function hidePanel() {
@@ -189,6 +190,7 @@ export function Home() {
       setClipboardSupported(state.clipboard_supported);
       setNativeTargets(state.native_targets || []);
       setModelEnabled(state.model_enabled !== false);
+      setSidebarMode(state.panel_settings?.sidebar_mode || "fixed");
       if (embedded) window.parent.postMessage({type:"pat:panel-settings",settings:state.panel_settings}, hostOrigin);
       setTargetId(chooseTarget({embedded,preferredTarget,current:targetId(),followActive:followActive(),state}));
       const rows = requestedArchive ? await client.request("library.list", { archived: true, library_id: requestedLibrary }) : state.assets;
@@ -374,8 +376,10 @@ export function Home() {
       <Show when={notice()?.error}><p class="form-error" role="alert">{notice().message}</p></Show><div class="modal-actions"><button type="button" class="secondary" disabled={busy()} onClick={props.onCancel}>取消</button><button type="submit" class="primary" disabled={!ready() || foldersLoading() || !form().name.trim()}>{busy() ? "保存中…" : props.capture ? "保存组件" : "保存修改"}</button></div></form>;
   }
 
-  return <div class={floatingPanel() ? "app-shell component-first floating-panel" : "app-shell component-first"} style={{"--asset-size":`${cardSize()}px`}}>
+  return <div class={floatingPanel() ? "app-shell component-first floating-panel" : "app-shell component-first"} classList={{"sidebar-hover":sidebarMode() === "hover"}} style={{"--asset-size":`${cardSize()}px`}}>
     <aside class="sidebar">
+      <Show when={sidebarMode() === "hover"}><button class="sidebar-hover-trigger" aria-label="展开侧栏" title="悬停展开侧栏">☰</button></Show>
+      <div class="sidebar-content">
       <div class="brand"><Cube /><div><strong>Plasticity</strong><span>COMPONENT LIBRARY</span></div></div>
       <div class="sidebar-label">模型组件库</div>
       <button class={!archived() ? "nav-item active" : "nav-item"} onClick={() => toggleArchive(false)}>◇ 全部组件 <span>{!archived() ? assets().length : ""}</span></button>
@@ -388,6 +392,7 @@ export function Home() {
       <For each={categories()}>{name => <button class={!archived() && category() === name ? "nav-item category active" : "nav-item category"} onClick={() => setCategory(name)}>▦ {name}<span>{assets().filter(asset => asset.category === name).length}</span></button>}</For>
       <button class={archived() ? "nav-item active archive-link" : "nav-item archive-link"} onClick={() => toggleArchive(true)}>▧ 已归档</button>
       <div class="sidebar-bottom"><span class={status() === "connected" ? "status-dot online" : "status-dot"}/><span>{status() === "connected" ? "本地服务已连接" : status() === "connecting" ? "连接服务中…" : "服务断开，正在重连"}</span></div>
+      </div>
     </aside>
 
     <main class="main-content">

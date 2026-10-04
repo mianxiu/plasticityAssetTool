@@ -2,6 +2,7 @@
 .component-first{-webkit-user-select:none;user-select:none}
 .component-first input,.component-first textarea{-webkit-user-select:text;user-select:text}
 .component-first img,.component-first svg{-webkit-user-drag:none}
+.sidebar-content{display:contents}
 .component-first .sidebar{width:156px;padding:10px 6px;gap:0}
 .component-first .brand{margin-bottom:12px;gap:5px}.component-first .brand .cube-icon{width:30px;height:30px}.component-first .brand strong{font-size:17px}.component-first .brand span{display:none}
 .component-first .sidebar-label{font-size:10px;margin:9px 4px 4px}.component-first .nav-item{font-size:12px;padding:5px 4.5px}
@@ -101,6 +102,15 @@ body:has(.component-first){background:#181818}
 .asset-card[data-insert-mode=difference]{--mode-color:#ed6b6b;--mode-tint:#442626}
 .asset-card[data-insert-mode=intersection]{--mode-color:#77a9ed;--mode-tint:#26374d}
 .component-first .asset-card[data-insert-mode],.component-first .asset-card[data-insert-mode]:hover,.component-first .asset-card[data-insert-mode].selected{border:1px solid var(--mode-color);box-shadow:none}
+.component-first.sidebar-hover{position:relative}
+.component-first.sidebar-hover .main-content{margin-left:32px}
+.component-first.sidebar-hover .sidebar{position:absolute;inset:0 auto 0 0;width:32px;height:100%;max-height:100%;min-height:0;z-index:30;overflow:hidden;padding:6px 4px}
+.sidebar-hover .sidebar-content{display:none}
+.sidebar-hover-trigger{width:24px;height:28px;padding:0;color:#aaa;font-size:16px;cursor:pointer}
+.component-first.sidebar-hover .sidebar:hover,.component-first.sidebar-hover .sidebar:has(:focus-visible){width:144px;overflow-y:auto;box-shadow:8px 0 20px #0005}
+.sidebar-hover .sidebar:hover .sidebar-content,.sidebar-hover .sidebar:has(:focus-visible) .sidebar-content{display:flex;flex-direction:column;min-height:100%}
+.sidebar-hover .sidebar:hover .sidebar-hover-trigger,.sidebar-hover .sidebar:has(:focus-visible) .sidebar-hover-trigger{position:absolute;opacity:0;pointer-events:none}
+.sidebar-hover .sidebar .brand>div{display:block}
 .asset-insert-mode{position:absolute;top:6px;right:6px;z-index:2;padding:2px 4px;border:1px solid var(--mode-color);border-radius:4px;background:var(--mode-tint);color:var(--mode-color);font-size:10px;line-height:1.4;pointer-events:none}
 .component-first .asset-format{background:#191919dd;color:#bcbcbc;border-color:#484848}
 .component-first .asset-hover-action{background:#111e;color:#eee}

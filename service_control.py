@@ -35,9 +35,9 @@ class ServiceControl:
             return await asyncio.to_thread(self.app.control_window.open)
         if action == "service.panel_settings":
             async with service.lock:
-                settings = await asyncio.to_thread(service.panel_settings.update, args.get("position"))
+                settings = await asyncio.to_thread(service.panel_settings.update, args.get("position"), args.get("sidebar_mode"))
             await self.app.broadcast({"type": "service_changed"})
-            return {"message": "面板位置已保存", "panel_settings": settings}
+            return {"message": "面板设置已保存", "panel_settings": settings}
         if action == "service.connection":
             if not isinstance(args.get("enabled"), bool):
                 raise ValueError("请指定暂停或恢复连接")
