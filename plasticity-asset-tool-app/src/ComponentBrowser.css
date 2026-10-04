@@ -20,8 +20,6 @@
 .geometry-canvas{width:100%;height:100%;touch-action:none}.geometry-canvas canvas{display:block;width:100%;height:100%}
 .geometry-message{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;margin:0;padding:11px;text-align:center;color:#a9c3df;font-size:13px;background:#171e29}
 .geometry-error{color:#f2b5a8}.geometry-instructions{position:absolute;bottom:10px;left:0;right:0;pointer-events:none;text-align:center;font-size:10px;color:#91a8c2}
-.asset-hover-action{position:absolute;bottom:8px;left:8px;right:8px;padding:3.5px 2px;border-radius:6px;background:#0d131bdd;color:#c6dfff;font-size:11px;opacity:0;transition:opacity .15s;pointer-events:none}
-.asset-preview:hover .asset-hover-action,.asset-preview:focus-visible .asset-hover-action{opacity:1}
 .held-model-preview{position:fixed;z-index:190;width:360px;max-width:calc(100vw - 16px);padding:6px;border:1px solid #8eafd7;border-radius:12px;background:#18212d;box-shadow:0 12px 50px #0009;pointer-events:none;user-select:none}
 .held-model-preview>strong{display:block;font-size:14px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .held-model-preview .geometry-viewer{height:280px;margin:5px 0}
@@ -114,7 +112,6 @@ body:has(.component-first){background:#181818}
 .sidebar-hover .sidebar .brand>div{display:block}
 .asset-insert-mode{position:absolute;top:6px;right:6px;z-index:2;padding:2px 4px;border:1px solid var(--mode-color);border-radius:4px;background:var(--mode-tint);color:var(--mode-color);font-size:10px;line-height:1.4;pointer-events:none}
 .component-first .asset-format{background:#191919dd;color:#bcbcbc;border-color:#484848}
-.component-first .asset-hover-action{background:#111e;color:#eee}
 .component-first .sidebar-label,.component-first .sidebar-bottom,.component-first .nav-item span,.component-first .library-tab span,.component-first .asset-meta,.component-first .card-footer>span,.component-first .section-name span,.component-first .component-note,.component-first .details-panel dt,.component-first .detail-heading,.component-first .browser-display label,.component-first .page-footer{color:#929292}
 .component-first .brand .cube-icon,.component-first .details-panel dd,.component-first .detail-actions,.component-first .browser-location>button,.component-first .browser-display a,.component-first .details-dismiss,.component-first .icon-button,.component-first .search-field>span,.component-first .panel-dismiss,.component-first .model-placeholder{color:#ccc}
 .component-first .sidebar-bottom,.component-first .component-browser-footer,.component-first .component-note{border-color:#383838}
