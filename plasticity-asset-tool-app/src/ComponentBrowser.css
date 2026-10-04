@@ -144,3 +144,8 @@ body:has(.component-first){background:#181818}
 .insert-mode-options input:focus-visible+span{outline:2px solid #ddd;outline-offset:1px}
 .asset-edit-form .modal-actions{gap:6px;margin-top:8px}
 .component-first .details-panel .modal-actions .primary,.component-first .details-panel .modal-actions .secondary{padding:5px 9px;font-size:12px}
+.group-recipe { margin: 0; padding: 6px; border: 1px solid #444; border-radius: 6px; }
+.group-recipe ol { margin: 0; padding-left: 24px; max-height: 220px; overflow-y: auto; }
+.group-recipe li { padding: 3px; }
+.group-recipe li span { overflow-wrap: anywhere; }
+.group-recipe small { float: right; margin-left: 8px; color: #aaa; }

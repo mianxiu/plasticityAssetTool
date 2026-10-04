@@ -8,6 +8,7 @@ from asset_service import AssetService
 from main import DEFAULT_SHORTCUTS
 from plasticity_bridge import CdpConnection, local_url
 from model_fixture import model_bytes
+from test_group_recipe import recipe
 
 class FakeDesktop:
     def __init__(self):
@@ -91,6 +92,19 @@ class ServiceTests(unittest.IsolatedAsyncioTestCase):
         state=await self.service.state()
         self.assertIn('hwnd:43',[row['id'] for row in state['targets']])
         self.assertIn('hwnd:43',state['native_targets'])
+
+    async def test_group_capture_uses_native_recipe_and_saved_recipe_for_insert(self):
+        model=model_bytes(count=2)
+        self.service.native.request=AsyncMock(return_value={'model':model,'recipe':recipe()})
+        saved=await self.call('library.capture',{'name':'组组件','copy_selection':True,'transport':'native','target_id':'hwnd:42','group_signature':'selected-group','preview_mode':'geometry','recipe':{'fake':True}})
+        self.service.native.request.assert_awaited_once_with('hwnd:42','capture-group',signature='selected-group')
+        self.assertEqual(saved['recipe'],recipe())
+        self.service.native.request=AsyncMock(return_value={'started':True})
+        await self.call('asset.insert',{'id':saved['id'],'target_id':'hwnd:42','transport':'native'})
+        self.service.native.request.assert_awaited_once_with('hwnd:42','insert',model,True,'new-body',recipe=recipe())
+        with self.assertRaisesRegex(ValueError,'原生模型直连'):
+            await self.call('asset.insert',{'id':saved['id'],'target_id':'hwnd:42'})
+        self.assertEqual(self.desktop.calls,[])
 
     async def test_follow_active_is_resolved_at_insert_time(self):
         asset=self.service.library.add(model_bytes(),{'name':'follow'})

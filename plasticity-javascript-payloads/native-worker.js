@@ -1,7 +1,7 @@
 function startNativeWorker(win, baseURL, target) {
   const http = require('http'), token = require('crypto').randomUUID();
   const debuggerAPI = win.webContents.debugger, group = 'pat-native-'+token;
-  let editor, paste, operationType, stopped=false, timer, result=null;
+  let editor, paste, operationType, booleanFactory, stopped=false, timer, result=null;
   const call = (method,params) => debuggerAPI.sendCommand(method,params);
   async function discover() {
     if (!debuggerAPI.isAttached()) debuggerAPI.attach('1.3');
@@ -18,6 +18,7 @@ function startNativeWorker(win, baseURL, target) {
         if (value.name==='editor' && value.value?.objectId) editor=value.value.objectId;
         if (value.name==='PasteCommand' && value.value?.objectId) paste=value.value.objectId;
         if (value.name==='OperationType' && value.value?.objectId) operationType=value.value.objectId;
+        if (value.name==='BooleanFactory' && value.value?.objectId) booleanFactory=value.value.objectId;
       }
     }
     if (!editor || !paste) {editor=null;throw new Error('当前版本不支持原生模型传输');}
@@ -36,19 +37,23 @@ function startNativeWorker(win, baseURL, target) {
     if (stopped || win.isDestroyed()) return;
     try {
       if (!editor) await discover();
-      const response=await send({target_id:target,token,result,capabilities:['boolean-placement-v1']});result=null;
+      const response=await send({target_id:target,token,result,capabilities:['boolean-placement-v1','group-recipe-v1']});result=null;
       if (response.job) {
         const job=response.job;
-        if (!/^[a-f0-9]{32}$/.test(job.id) || !['capture','insert'].includes(job.action)) throw new Error('无效模型任务');
+        if (!/^[a-f0-9]{32}$/.test(job.id) || !['capture','insert','inspect-group','capture-group'].includes(job.action)) throw new Error('无效模型任务');
         try {
           // Scope references can expire after a native command/frame lifecycle.
           // Discover afresh before execution; never retry an executed command.
-          editor=null;paste=null;operationType=null;
+          editor=null;paste=null;operationType=null;booleanFactory=null;
           await discover();
-          const declaration=job.action==='capture'
-            ? 'function(){return globalThis.__plasticityAssetTransport.captureSelection(this)}'
-            : 'function(args,PasteCommand,OperationType){return globalThis.__plasticityAssetTransport.insertModel(this,args,PasteCommand,OperationType)}';
-          const args=job.action==='capture'?[]:[{value:{model:job.model,placement:job.placement,insert_mode:job.insert_mode}},{objectId:paste},operationType?{objectId:operationType}:{value:null}];
+          const declarations={
+            capture:'function(){return globalThis.__plasticityAssetTransport.captureSelection(this)}',
+            'inspect-group':'function(){return globalThis.__plasticityAssetTransport.inspectGroup(this)}',
+            'capture-group':'function(signature){return globalThis.__plasticityAssetTransport.captureGroup(this,signature)}',
+            insert:'function(args,PasteCommand,OperationType,BooleanFactory){return globalThis.__plasticityAssetTransport.insertModel(this,args,PasteCommand,OperationType,BooleanFactory)}'
+          };
+          const declaration=declarations[job.action];
+          const args=job.action==='insert'?[{value:{model:job.model,placement:job.placement,insert_mode:job.insert_mode,recipe:job.recipe}},{objectId:paste},operationType?{objectId:operationType}:{value:null},booleanFactory?{objectId:booleanFactory}:{value:null}]:job.action==='capture-group'?[{value:job.signature}]:[];
           if (job.action==='insert') {
             win.show();win.focus();
             await win.webContents.executeJavaScript('(()=>{window.__plasticityAssetToolPanel?.hide();return true})()');

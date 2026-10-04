@@ -2,6 +2,7 @@ import asyncio
 import base64
 import binascii
 import hashlib
+import json
 from pathlib import Path
 from asset_library import AssetLibrary, MAX_PREVIEW_BYTES
 from plasticity_bridge import PlasticityBridge
@@ -72,6 +73,9 @@ class AssetService:
                 return {"dismissed": True}
             if action == "state":
                 return await self.state(args.get("library_id", "default"))
+            if action == "selection.group":
+                if not self.model_enabled: raise ValueError("模型连接已暂停")
+                return await self.native.request(args.get("target_id"), "inspect-group")
             if action == "collection.create":
                 return await asyncio.to_thread(self.library.create_library, args.get("name"))
             if action == "collection.rename":
@@ -93,8 +97,13 @@ class AssetService:
                     await self.bridge.discover()
                     target_id = self.bridge.active_target_id or target_id
                 native = args.get("transport") == "native" and args.get("copy_selection")
+                recipe = None
                 if native:
-                    model = await self.native.request(target_id, "capture")
+                    if args.get("group_signature"):
+                        captured = await self.native.request(target_id, "capture-group", signature=args['group_signature'])
+                        model, recipe = captured['model'], captured['recipe']
+                    else:
+                        model = await self.native.request(target_id, "capture")
                 else:
                     clipboard = self.clipboard()
                 if args.get("copy_selection") and not native:
@@ -118,7 +127,7 @@ class AssetService:
                 target = self.bridge.targets.get(target_id)
                 if target and target.get("path"):
                     source_version = next((p[4:] for p in Path(target["path"]).parts if p.startswith("app-")), "unknown")
-                result = await asyncio.to_thread(self.library.add, model, args, preview, source_version)
+                result = await asyncio.to_thread(self.library.add, model, args | {"recipe": recipe}, preview, source_version)
                 if args.get("auto_preview", True) and preview is None and args.get("preview_mode") != "geometry":
                     result["preview_warning"] = "模型已保存，但未能生成预览。请重新加载内嵌插件，或在编辑组件时上传预览图。"
                 return result
@@ -142,11 +151,12 @@ class AssetService:
                     if args.get("follow_active"):
                         await self.bridge.discover()
                         target_id = self.bridge.active_target_id or target_id
-                    result = await self.native.request(target_id, "insert", model, args.get("placement", True), row["insert_mode"] if args.get("placement", True) else "new-body")
+                    recipe=json.loads(row['recipe_json'])
+                    result = await self.native.request(target_id, "insert", model, args.get("placement", True), row["insert_mode"] if args.get("placement", True) else "new-body", **({'recipe':recipe} if recipe else {}))
                     return {**result, "message": "请在视口定位并确认置入" if args.get("placement", True) else "组件已原位置入"}
                 clipboard = self.clipboard()
                 target_id, placement = args.get("target_id"), args.get("placement", True)
-                if action == "asset.insert" and placement and row["insert_mode"] != "new-body":
+                if action == "asset.insert" and placement and (row["insert_mode"] != "new-body" or json.loads(row['recipe_json']) is not None):
                     raise ValueError("布尔置入需要原生模型直连")
                 if action == "asset.insert":
                     target = self.bridge.target(target_id)

@@ -5,6 +5,7 @@ import binascii
 import time
 import uuid
 from model_clipboard import validate_model, MAX_BYTES
+from group_recipe import validate_recipe
 
 
 class NativeTransport:
@@ -35,14 +36,23 @@ class NativeTransport:
                         if message.startswith('Error: '): message = message[7:]
                         raise ValueError(message[:300])
                     value=result.get('value')
-                    if job['action']=='capture':
+                    if job['action'] in ('capture','capture-group'):
                         encoded=value.get('model') if isinstance(value,dict) else None
                         if not isinstance(encoded,str) or len(encoded)>MAX_BYTES*4//3+4:
                             raise ValueError('原生模型数据无效')
                         try:
-                            value=validate_model(base64.b64decode(encoded,validate=True))
+                            model=validate_model(base64.b64decode(encoded,validate=True))
                         except (binascii.Error,ValueError) as exc:
                             raise ValueError('原生模型数据无效') from exc
+                        value = {'model': model, 'recipe': validate_recipe(value.get('recipe'), model)} if job['action']=='capture-group' else model
+                        if job['action']=='capture-group' and value['recipe'] is None:
+                            raise ValueError('未收到组信息')
+                    elif job['action']=='inspect-group':
+                        if not isinstance(value,dict): raise ValueError('组信息无效')
+                        recipe = validate_recipe(value.get('recipe'))
+                        value = {'recipe': recipe, 'signature': value.get('signature')}
+                        if recipe and (not isinstance(value['signature'],str) or len(value['signature'])>40000):
+                            raise ValueError('组选择标识无效')
                     elif not isinstance(value,dict) or value.get('started') is not True:
                         raise ValueError('原生置入没有启动')
                     job['future'].set_result(value)
@@ -55,14 +65,21 @@ class NativeTransport:
                 return {'id':job_id,'action':job['action'],**job['payload']}
         return None
 
-    async def request(self, target, action, model=None, placement=True, insert_mode="new-body"):
+    async def request(self, target, action, model=None, placement=True, insert_mode="new-body", recipe=None, signature=None):
         if target not in self.connected_targets():
             raise ValueError('目标窗口的原生模型插件未连接，请重新打开已安装插件的 Plasticity')
-        if action not in ('capture','insert'):
+        if action not in ('capture','insert','inspect-group','capture-group'):
             raise ValueError('未知的原生模型操作')
         if any(job['target']==target for job in self.jobs.values()):
             raise ValueError('目标窗口正在处理组件，请稍后重试')
         payload={}
+        if action in ('inspect-group','capture-group') or recipe is not None:
+            if 'group-recipe-v1' not in self.workers[target]['capabilities']:
+                raise ValueError('目标窗口尚未加载组运算插件，请重新打开 Plasticity')
+        if action=='capture-group':
+            if not isinstance(signature,str) or not 1 <= len(signature) <= 40000:
+                raise ValueError('请重新选择组并按 Tab 读取')
+            payload={'signature':signature}
         if action=='insert':
             if insert_mode not in ('new-body','union','difference','intersection'):
                 raise ValueError('无效的默认置入模式')
@@ -71,6 +88,10 @@ class NativeTransport:
             if insert_mode != 'new-body' and 'boolean-placement-v1' not in self.workers[target]['capabilities']:
                 raise ValueError('目标窗口尚未加载布尔置入插件，请重新打开 Plasticity')
             payload={'model':base64.b64encode(validate_model(model)).decode(),'placement':bool(placement),'insert_mode':insert_mode}
+            if recipe is not None:
+                payload['recipe']=validate_recipe(recipe,model)
+                if not placement:
+                    raise ValueError('组组件请使用定位置入，以保持部件顺序和组信息')
         future=asyncio.get_running_loop().create_future()
         job_id=uuid.uuid4().hex
         self.jobs[job_id]={'target':target,'action':action,'payload':payload,'future':future,'sent':False}

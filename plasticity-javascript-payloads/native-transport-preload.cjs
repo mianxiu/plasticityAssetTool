@@ -10,6 +10,51 @@ function requireIdle(editor) {
   const tool = /Paste|Place/.test(name) ? '置入' : /Offset|PushFace/.test(name) ? '偏移' : /Move/.test(name) ? '移动' : /Rotate/.test(name) ? '旋转' : /Scale/.test(name) ? '缩放' : '';
   throw new Error(tool ? `当前${tool}操作尚未结束。请先在视口确认或结束操作，再使用组件库。` : '当前建模操作尚未结束。请先在视口确认或结束操作，再使用组件库。');
 }
+function inspectGroup(editor) {
+  requireIdle(editor);
+  const selected = editor.selection.selected;
+  const ids = Array.from(selected.groupIds || []);
+  if (!ids.length) return {recipe:null};
+  if (ids.length !== 1 || selected.size !== 1 || ids[0] === 0) throw new Error('请只选择一个组件组');
+  const id = ids[0], group = editor.groups.lookupById(id);
+  const keys = Array.from(editor.groups.getChildren(id));
+  if (!keys.length || keys.length > 128) throw new Error('组必须包含 1 至 128 个直接子实体');
+  const parts = keys.map((key,index) => {
+    const item = editor.db.key2item(key);
+    if (item?.constructor?.name !== 'Solid') throw new Error('当前组保存仅支持直接子实体，请移出子组、曲线或曲面');
+    const name = editor.nodes.getName(key) || `部件 ${index+1}`;
+    if (name.length > 120) throw new Error('子部件名称不能超过 120 字符');
+    return {index,name,mode:({'+':'union','-':'difference','&':'intersection','^':'new-body'})[name.trimStart()[0]] || 'new-body'};
+  });
+  const name = editor.nodes.getName(editor.nodes.item2key(group)) || `组 ${id}`;
+  if (name.length > 120) throw new Error('组名称不能超过 120 字符');
+  return {recipe:{version:1,name,parts},signature:JSON.stringify([id,keys,parts,name,keys.map(key=>editor.db.key2item(key).userData.versionId)])};
+}
+function captureGroup(editor, signature) {
+  const inspected = inspectGroup(editor);
+  if (!inspected.recipe || inspected.signature !== signature) throw new Error('组或模型已变化，请重新选择组并按 Tab 读取');
+  const groupId = Array.from(editor.selection.selected.groupIds)[0];
+  const keys = Array.from(editor.groups.getChildren(groupId));
+  const selected = editor.selection.selected, saved = selected.saveToMemento();
+  const chunks = []; let header;
+  try {
+    for (const key of keys) {
+      selected.removeAll(); selected.add(editor.db.key2item(key));
+      const data = NativeBuffer.from(captureSelection(editor).model,'base64');
+      let offset = 56;
+      for (let i=0;i<2;i++) {const n=data.readUInt32LE(offset);offset+=4+n;}
+      if (data.readUInt32LE(offset) !== 1) throw new Error('子部件模型编码不兼容');
+      if (!header) header = NativeBuffer.from(data.subarray(0,offset+4));
+      offset += 4; const start=offset;
+      for (let i=0;i<2;i++) {const n=data.readUInt32LE(offset);offset+=4+n;}
+      chunks.push(data.subarray(start,offset));
+    }
+  } finally {selected.restoreFromMemento(saved);}
+  header.writeUInt32LE(keys.length,header.length-4);
+  const model=NativeBuffer.concat([header,...chunks]);
+  if (model.length > 64*1024*1024) throw new Error('组模型超过 64 MB');
+  return {model:model.toString('base64'),recipe:inspected.recipe};
+}
 function captureSelection(editor) {
   requireIdle(editor);
   if (!editor.selection.selected.size) throw new Error('请先选中要保存的模型');
@@ -30,35 +75,47 @@ function captureSelection(editor) {
   if (!captured?.length || captured.length > 64*1024*1024) throw new Error('没有取得有效的模型数据');
   return {model:captured.toString('base64')};
 }
-async function insertModel(editor, args, PasteCommand, OperationType) {
+async function insertModel(editor, args, PasteCommand, OperationType, BooleanFactory) {
   requireIdle(editor);
-  const mode = args.insert_mode || 'new-body';
+  const recipe = args.recipe;
+  const mode = recipe ? 'new-body' : args.insert_mode || 'new-body';
   if (!['new-body','union','difference','intersection'].includes(mode)) throw new Error('无效的默认置入模式');
   const booleanMode = mode !== 'new-body';
   if (booleanMode && !args.placement) throw new Error('布尔模式需要使用定位置入');
-  const targets = booleanMode ? Array.from(editor.selection.selected.solids || []) : [];
+  const targets = booleanMode || recipe ? Array.from(editor.selection.selected.solids || []) : [];
+  if (recipe) {
+    if (!args.placement) throw new Error('组组件请使用定位置入，以保持部件顺序和组信息');
+    if (recipe.version !== 1 || !Array.isArray(recipe.parts) || !recipe.parts.length || recipe.parts.length>128) throw new Error('组运算数据无效');
+    if (typeof BooleanFactory !== 'function' || !OperationType) throw new Error('当前版本不支持组运算');
+    const first = recipe.parts.find(p=>p.mode !== 'new-body');
+    if (args.placement && !targets.length && first && first.mode !== 'union') throw new Error('组的第一个布尔操作需要目标实体，请先选中目标');
+  }
   if (booleanMode && !targets.length) throw new Error('请先在 Plasticity 选中布尔目标实体，再置入组件');
   const operation = booleanMode ? OperationType?.[{union:'Union',difference:'Difference',intersection:'Intersection'}[mode]] : null;
   if (booleanMode && typeof operation !== 'number') throw new Error('当前版本不支持默认布尔置入，请更新内嵌插件');
   if (typeof args.model !== 'string' || args.model.length > 90*1024*1024 || !/^[A-Za-z0-9+/]*={0,2}$/.test(args.model)) throw new Error('组件模型编码无效');
-  const data = NativeBuffer.from(args.model,'base64');
+  let data = NativeBuffer.from(args.model,'base64');
   if (data.length < 68 || data.length > 64*1024*1024) throw new Error('组件模型长度无效');
   const Command = args.placement ? editor.commands.PasteWithPlacementCommand : PasteCommand;
   if (typeof Command !== 'function') throw new Error('原生置入命令不可用');
   const command = new Command(editor);
   command.remember = false;
-  let configured = !booleanMode, placementFactory;
-  if (booleanMode) {
+  let configured = !booleanMode && !recipe, placementFactory;
+  if (booleanMode || recipe) {
     const register = command.register;
     if (typeof register !== 'function') throw new Error('当前版本不支持默认布尔置入');
     command.register = function(resource, ...rest) {
       if (resource?.constructor?.name === 'PlaceFactory') {
         // Set the native factory before its controls and first pointer update.
         // Targets are snapshots of this window's selected solids only.
-        resource.targets = targets;
-        resource.operationType = operation;
-        resource.keepTools = false;
-        if (resource.operationType !== operation || resource.targets.length !== targets.length) throw new Error('原生布尔置入设置失败');
+        if (recipe) {
+          configureGroupPlacement(editor,command,resource,recipe,args.placement ? targets : [],OperationType,BooleanFactory,!!args.placement);
+        } else {
+          resource.targets = targets;
+          resource.operationType = operation;
+          resource.keepTools = false;
+          if (resource.operationType !== operation || resource.targets.length !== targets.length) throw new Error('原生布尔置入设置失败');
+        }
         configured = true;
         placementFactory = resource;
       }
@@ -129,4 +186,41 @@ async function insertModel(editor, args, PasteCommand, OperationType) {
   },startedReject);
   return started;
 }
-globalThis.__plasticityAssetTransport = Object.freeze({captureSelection,insertModel});
+function configureGroupPlacement(editor,command,factory,recipe,targets,OperationType,BooleanFactory,performBoolean) {
+  // The native command owns the placement and every following factory, so
+  // cancellation/failure rolls back its single transaction and undo restores it.
+  const commit = factory.commit;
+  const booleans=recipe.parts.map(part=>{
+    if (!performBoolean || part.mode === 'new-body') return null;
+    const boolean=new BooleanFactory(editor);command.register(boolean);return boolean;
+  });
+  factory.commit = async function(...args) {
+    if(this.shells.length !== recipe.parts.length) throw new Error('组子部件与置入模型数量不一致');
+    // Native non-boolean placement returns one transformed solid for each
+    // input shell, in model-envelope order. Geometry tests verify this with
+    // unequal bodies and non-commutative operations; names are never keys.
+    const placed = Array.from(await commit.apply(this,args));
+    if (placed.length !== recipe.parts.length || placed.some(v=>v.constructor.name !== 'Solid')) throw new Error('置入部件与保存的组顺序不一致');
+    let accumulator=targets.slice(); const independent=[];
+    for (const part of recipe.parts) {
+      const tool=placed[part.index];
+      editor.nodes.setName(editor.nodes.item2key(tool),part.name);
+      if (!performBoolean || part.mode === 'new-body') {independent.push(tool);continue;}
+      if (!accumulator.length && part.mode === 'union') {accumulator=[tool];continue;}
+      if (!accumulator.length) throw new Error(`部件 ${part.name} 没有可用的布尔目标`);
+      const boolean = booleans[part.index];
+      boolean.targets=accumulator; boolean.tools=[tool]; boolean.keepTools=false;
+      boolean.operationType=OperationType[{union:'Union',difference:'Difference',intersection:'Intersection'}[part.mode]];
+      accumulator=Array.from(await boolean.commit());
+      if (!accumulator.length) throw new Error(`部件 ${part.name} 的布尔结果为空，已撤销本次置入`);
+    }
+    const results=[...accumulator,...independent];
+    const group=editor.groups.create(); editor.nodes.setName(editor.nodes.item2key(group),recipe.name);
+    for (const [index,result] of results.entries()) {
+      const key=editor.nodes.item2key(result);
+      editor.groups.deleteMembership(key); editor.groups.addMembership(key,group,index);
+    }
+    return results;
+  };
+}
+globalThis.__plasticityAssetTransport = Object.freeze({captureSelection,captureGroup,inspectGroup,insertModel});

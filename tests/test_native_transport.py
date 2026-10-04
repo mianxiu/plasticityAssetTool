@@ -3,6 +3,7 @@ import base64
 import unittest
 from native_transport import NativeTransport
 from model_fixture import model_bytes
+from test_group_recipe import recipe
 
 
 class NativeTransportTests(unittest.IsolatedAsyncioTestCase):
@@ -22,6 +23,27 @@ class NativeTransportTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(pending.done())
         self.transport.worker(self.target,self.token,result)
         self.assertEqual(await pending,model)
+
+    async def test_group_capture_and_inspection_keep_metadata_window_bound(self):
+        self.transport.worker(self.target,self.token,capabilities=['group-recipe-v1'])
+        for action,payload,expected in [
+            ('inspect-group',{'recipe':recipe(),'signature':'selection'}, {'recipe':recipe(),'signature':'selection'}),
+            ('capture-group',{'model':base64.b64encode(model_bytes(count=2)).decode(),'recipe':recipe()}, {'model':model_bytes(count=2),'recipe':recipe()}),
+        ]:
+            pending=asyncio.create_task(self.transport.request(self.target,action,signature='selection'))
+            await asyncio.sleep(0)
+            job=self.transport.worker(self.target,self.token,capabilities=['group-recipe-v1'])
+            self.transport.worker(self.target,self.token,{'id':job['id'],'value':payload},capabilities=['group-recipe-v1'])
+            self.assertEqual(await pending,expected)
+
+    async def test_recipe_requires_capability_before_queueing(self):
+        with self.assertRaisesRegex(ValueError,'组运算插件'):
+            await self.transport.request(self.target,'insert',model_bytes(count=2),recipe=recipe())
+        self.assertFalse(self.transport.jobs)
+        self.transport.worker(self.target,self.token,capabilities=['group-recipe-v1'])
+        with self.assertRaisesRegex(ValueError,'定位置入'):
+            await self.transport.request(self.target,'insert',model_bytes(count=2),False,recipe=recipe())
+        self.assertFalse(self.transport.jobs)
 
     async def test_insert_delivered_once_and_rejects_concurrent_command(self):
         model=model_bytes('saved')

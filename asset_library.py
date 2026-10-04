@@ -5,6 +5,7 @@ import json
 import sqlite3
 import uuid
 import zipfile
+from group_recipe import validate_recipe
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -12,7 +13,7 @@ from pathlib import Path
 MAX_MODEL_BYTES = 64 * 1024 * 1024
 MAX_PREVIEW_BYTES = 5 * 1024 * 1024
 METADATA_COLUMNS = """id,name,category,tags,note,created_at,updated_at,
-    source_version,digest,archived,library_id,folder_id,kind,insert_mode,length(model) AS bytes,
+    source_version,digest,archived,library_id,folder_id,kind,insert_mode,recipe_json,length(model) AS bytes,
     (preview IS NOT NULL AND length(preview)>0) AS has_preview,
     EXISTS(SELECT 1 FROM geometry_cache g WHERE g.digest=assets.digest) AS has_geometry,
     EXISTS(SELECT 1 FROM geometry_cache g WHERE g.digest=assets.digest AND g.thumbnail IS NOT NULL) AS has_geometry_preview"""
@@ -34,7 +35,7 @@ class AssetLibrary:
                 db.execute("ALTER TABLE assets ADD COLUMN updated_at TEXT NOT NULL DEFAULT ''")
                 db.execute("UPDATE assets SET updated_at=created_at")
             columns = {row["name"] for row in db.execute("PRAGMA table_info(assets)")}
-            for name, declaration in [("library_id", "TEXT NOT NULL DEFAULT 'default'"), ("folder_id", "TEXT"), ("kind", "TEXT NOT NULL DEFAULT 'unknown'"), ("insert_mode", "TEXT NOT NULL DEFAULT 'new-body'")]:
+            for name, declaration in [("library_id", "TEXT NOT NULL DEFAULT 'default'"), ("folder_id", "TEXT"), ("kind", "TEXT NOT NULL DEFAULT 'unknown'"), ("insert_mode", "TEXT NOT NULL DEFAULT 'new-body'"), ("recipe_json", "TEXT NOT NULL DEFAULT 'null'")]:
                 if name not in columns:
                     db.execute(f"ALTER TABLE assets ADD COLUMN {name} {declaration}")
             db.execute("CREATE TABLE IF NOT EXISTS libraries (id TEXT PRIMARY KEY,name TEXT NOT NULL,created_at TEXT NOT NULL)")
@@ -57,7 +58,7 @@ class AssetLibrary:
     def metadata(row):
         return {key: row[key] for key in (
             "id", "name", "category", "tags", "note", "created_at", "updated_at", "source_version", "digest", "archived", "library_id", "folder_id", "kind", "insert_mode"
-        )} | {"bytes": row["bytes"] if "bytes" in row.keys() else len(row["model"]),
+        )} | {"recipe": json.loads(row["recipe_json"]), "bytes": row["bytes"] if "bytes" in row.keys() else len(row["model"]),
               "has_preview": bool(row["has_preview"] if "has_preview" in row.keys() else row["preview"]),
               "has_geometry": bool(row["has_geometry"]) if "has_geometry" in row.keys() else False,
               "has_geometry_preview": bool(row["has_geometry_preview"]) if "has_geometry_preview" in row.keys() else False}
@@ -183,6 +184,7 @@ class AssetLibrary:
 
     def add(self, model, fields, preview=None, source_version="unknown"):
         location = self.organization(fields)
+        recipe = validate_recipe(fields.get("recipe"), model)
         fields = self.validate_fields(fields)
         if not isinstance(model, bytes) or not 1 <= len(model) <= MAX_MODEL_BYTES:
             raise ValueError("模型数据为空或超过 64 MB")
@@ -193,11 +195,11 @@ class AssetLibrary:
         timestamp = datetime.now(timezone.utc).isoformat()
         with self.connect() as db:
             db.execute("""INSERT INTO assets
-                (id,name,category,tags,note,created_at,updated_at,source_version,digest,model,preview,library_id,folder_id,kind,insert_mode)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", (
+                (id,name,category,tags,note,created_at,updated_at,source_version,digest,model,preview,library_id,folder_id,kind,insert_mode,recipe_json)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", (
                 asset_id, fields["name"], fields["category"], fields["tags"], fields["note"],
                 timestamp, timestamp, source_version,
-                hashlib.sha256(model).hexdigest(), model, preview, *location, fields["insert_mode"],
+                hashlib.sha256(model).hexdigest(), model, preview, *location, fields["insert_mode"], json.dumps(recipe,ensure_ascii=False),
             ))
         return self.details(asset_id)
 
@@ -240,7 +242,7 @@ class AssetLibrary:
                 if len(entries) > 3 or len({e.filename for e in entries}) != len(entries):
                     raise ValueError("组件包包含多余或重复文件")
                 for entry in entries:
-                    limit = {"manifest.json": 8192, "model.bin": MAX_MODEL_BYTES, "preview.jpg": MAX_PREVIEW_BYTES}.get(entry.filename)
+                    limit = {"manifest.json": 65536, "model.bin": MAX_MODEL_BYTES, "preview.jpg": MAX_PREVIEW_BYTES}.get(entry.filename)
                     if limit is None or entry.file_size > limit:
                         raise ValueError("组件包格式无效或文件过大")
                 manifest = json.loads(archive.read("manifest.json"))
