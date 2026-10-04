@@ -206,6 +206,8 @@ File:select_plasticity_file
 
 ## 项目目录
 
+Curve 预览直接读取内核中的 `WireBody`：直线读取端点，圆弧和样条按相对误差自适应采样，按原边分组绘制，避免把独立曲线连接起来。边的采样参数使用原生归一化的 0–1 区间。缩略图与详情沿用正交视图，无需截图或改变建模文档。已用本机保存的两条闭合轮廓验证预览与缩略图生成，并测试闭合圆、振荡曲线、坐标校验及复杂度限制。安装更新备份为 `.runtime/plasticity-formal-main-before-curve-preview.js`，已有窗口下次启动加载新转换器。
+
 - `main.py`、`start.ps1`：后台启动入口，原有启动命令保持兼容。
 - `backend/`：组件库、原生通信、预览、托盘和后台服务代码。
 - `installer/`：入口补丁、恢复脚本和 Windows 安装器；命令行使用 `python -m installer.main_embed_install`。

@@ -3,6 +3,9 @@ import hashlib
 import tempfile
 import unittest
 import uuid
+import shutil
+import subprocess
+from pathlib import Path
 from backend.asset_library import AssetLibrary
 from backend.geometry_preview import GeometryPreview, validate_mesh
 from model_fixture import model_bytes
@@ -14,6 +17,12 @@ def mesh():
 
 
 class GeometryTests(unittest.IsolatedAsyncioTestCase):
+    @unittest.skipUnless(shutil.which('node'), 'Node.js required')
+    def test_native_curve_sampling(self):
+        root = Path(__file__).resolve().parent.parent
+        subprocess.run(['node', str(root / 'tests/test_curve_preview.js')],
+            cwd=root, check=True, capture_output=True, timeout=10)
+
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
         self.library = AssetLibrary(self.directory.name)
