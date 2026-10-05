@@ -64,6 +64,18 @@ class ServiceControlTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(ValueError):
             await self.app.dispatch('service.focus',{'target_id':'missing'})
 
+    async def test_plugin_version_setting_is_persistent_and_visible_in_status(self):
+        updated = await self.app.dispatch('service.plugin_settings', {'allow_unverified_versions': True})
+        self.assertTrue(updated['allow_unverified_versions'])
+        state = await self.app.dispatch('service.status', {})
+        self.assertTrue(state['plugin_manager']['allow_unverified_versions'])
+        from backend.plugin_manager import PluginManager
+        self.assertTrue(PluginManager(self.app.control.plugins.root).allow_unverified_versions)
+        with self.assertRaises(ValueError):
+            await self.app.dispatch('service.plugin_settings', {'allow_unverified_versions': 'true'})
+        updated = await self.app.dispatch('service.plugin_settings', {'allow_unverified_versions': False})
+        self.assertFalse(updated['allow_unverified_versions'])
+
     async def test_quit_refuses_while_installer_waits_for_user(self):
         event = asyncio.Event()
         self.app.control.plugins.task = asyncio.create_task(event.wait())

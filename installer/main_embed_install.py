@@ -181,13 +181,13 @@ def upgrade(target, previous_backup, backup, base_backup=None):
     return manifest
 
 
-def validate_managed(target, expected_sha256):
+def validate_managed(target, expected_sha256, allow_unverified_version=False, restoring=False):
     from .discovery import inspect_directory, assert_closed, SUPPORTED_VERSIONS
     target = Path(target).resolve()
     if len(target.parents) < 5:
         raise ValueError('后台安装缺少有效目标入口')
     row = inspect_directory(target.parents[4])
-    if Path(row['target']) != target or row['version'] not in SUPPORTED_VERSIONS:
+    if Path(row['target']) != target or (row['version'] not in SUPPORTED_VERSIONS and not allow_unverified_version and not restoring):
         raise ValueError('此版本尚未验证自动安装')
     if not expected_sha256 or digest(target.read_bytes()) != expected_sha256:
         raise ValueError('入口在检测后发生变化，请重新检测')
@@ -204,11 +204,12 @@ if __name__ == '__main__':
     parser.add_argument('--base-backup',help='多次升级时使用的最初未修改入口备份')
     parser.add_argument('--managed', action='store_true', help='后台管理安装：重新检查版本、进程及入口摘要')
     parser.add_argument('--expected-sha256')
+    parser.add_argument('--allow-unverified-version', action='store_true', help='Explicitly opt in to testing an unverified Plasticity version')
     args = parser.parse_args()
     if args.managed:
         if not args.target:
             raise ValueError('后台安装缺少目标入口')
-        validate_managed(args.target, args.expected_sha256)
+        validate_managed(args.target, args.expected_sha256, args.allow_unverified_version, args.restore)
     if args.restore:
         restore(args.backup)
         print('已恢复原始 main 入口')

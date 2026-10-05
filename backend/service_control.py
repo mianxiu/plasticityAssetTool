@@ -39,11 +39,14 @@ class ServiceControl:
         if action == "service.open_control":
             return await asyncio.to_thread(self.app.control_window.open)
         if action == "service.plugin_detect":
-            if self.plugins.task and not self.plugins.task.done():
-                return self.plugins.snapshot()
-            return await asyncio.to_thread(self.plugins.scan, args.get('path'))
+            async with self.plugins.lock:
+                if self.plugins.task and not self.plugins.task.done():
+                    return self.plugins.snapshot()
+                return await asyncio.to_thread(self.plugins.scan, args.get('path'))
         if action == "service.plugin_install":
             return await self.plugins.start(args.get('id'), args.get('operation'))
+        if action == "service.plugin_settings":
+            return await self.plugins.update_settings(args.get('allow_unverified_versions'))
         if action == "service.panel_settings":
             async with service.lock:
                 settings = await asyncio.to_thread(service.panel_settings.update, args.get("position"), args.get("sidebar_mode"), args.get("card_size"))

@@ -23,10 +23,42 @@ class PluginManager:
         self.job = None
         self.task = None
         self.lock = asyncio.Lock()
+        self.settings_path = self.root / '.runtime/plugin-settings.json'
+        self.allow_unverified_versions = False
+        try:
+            settings = json.loads(self.settings_path.read_text(encoding='utf-8'))
+            self.allow_unverified_versions = settings.get('allow_unverified_versions') is True
+        except (OSError, ValueError, AttributeError):
+            pass
 
     def snapshot(self):
         return {'installations': list(self.records.values()), 'job': self.job,
+                'allow_unverified_versions': self.allow_unverified_versions,
                 'supported_versions': sorted(discovery.SUPPORTED_VERSIONS)}
+
+    async def update_settings(self, enabled):
+        if type(enabled) is not bool:
+            raise ValueError('请指定是否允许测试其他版本')
+        async with self.lock:
+            if self.task and not self.task.done():
+                raise ValueError('插件安装正在进行，请等待当前操作完成')
+            def save():
+                self.settings_path.parent.mkdir(parents=True, exist_ok=True)
+                temporary = self.settings_path.with_suffix('.tmp')
+                temporary.write_text(json.dumps({'allow_unverified_versions': enabled}), encoding='utf-8')
+                temporary.replace(self.settings_path)
+            await asyncio.to_thread(save)
+            self.allow_unverified_versions = enabled
+            for row in self.records.values():
+                self.permissions(row)
+            return self.snapshot()
+
+    def permissions(self, row):
+        row['experimental'] = not row['supported'] and self.allow_unverified_versions
+        allowed = row['supported'] or row['experimental']
+        row['can_install'] = allowed and not row['running'] and not row['installed']
+        row['can_update'] = allowed and not row['running'] and row['state'] == 'update'
+        row['can_restore'] = not row['running'] and bool(row.get('previous_backup') and row.get('base_backup'))
 
     def backups(self, target):
         runtime = self.root / '.runtime'
@@ -65,9 +97,7 @@ class PluginManager:
                                       f'http://127.0.0.1:{config["server"]["http_port"]}/?embedded=1',
                                       config['keymap'].get('show_panel_event_key_code', 'Tab'))
                 row.update(state='current' if current == expected else 'update', previous_backup=str(previous[1]), base_backup=str(base[1]))
-        row['can_install'] = row['supported'] and not row['running'] and not row['installed']
-        row['can_update'] = row['supported'] and not row['running'] and row['state'] == 'update'
-        row['can_restore'] = row['supported'] and not row['running'] and bool(previous and base)
+        self.permissions(row)
         return row
 
     def scan(self, custom=None):
@@ -111,6 +141,8 @@ class PluginManager:
                 backup.write_bytes(base)
                 backup.with_suffix('.manifest.json').write_text(json.dumps({'target': row['target'], 'original_sha256': digest(base), 'patched_sha256': row['sha256']}, indent=2), encoding='utf-8')
             args = ['--target', row['target'], '--backup', str(backup), '--expected-sha256', row['sha256'], '--managed']
+            if row['experimental'] and action != 'restore':
+                args += ['--allow-unverified-version']
             if action == 'update':
                 args += ['--upgrade-from', row['previous_backup'], '--base-backup', row['base_backup']]
             if action == 'restore':

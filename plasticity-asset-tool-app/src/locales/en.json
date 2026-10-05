@@ -267,5 +267,9 @@
   "继续安装流程": "Continue installation",
   "操作失败": "Operation failed",
   "工具版本": "Tool version",
-  "原生模型连接": "Native model connection"
+  "原生模型连接": "Native model connection",
+  "允许测试其他版本": "Allow testing other versions",
+  "其他版本尚未验证兼容性；安装仍会校验入口并保留恢复备份。设置自动保存。": "Compatibility with other versions is unverified. Entry checks and recovery backups remain enabled. This setting is saved automatically.",
+  "未验证版本": "Unverified version",
+  "此版本尚未实机验证，继续将按测试模式安装。": "This version has not been tested in Plasticity. Continuing installs in experimental mode."
 }

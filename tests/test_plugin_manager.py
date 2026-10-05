@@ -46,7 +46,8 @@ class PluginManagerTests(unittest.IsolatedAsyncioTestCase):
         arguments = request['arguments']
         value = lambda key: arguments[arguments.index(key) + 1]
         with patch('installer.discovery.running_processes', return_value=self.processes):
-            validate_managed(value('--target'), value('--expected-sha256'))
+            validate_managed(value('--target'), value('--expected-sha256'),
+                             '--allow-unverified-version' in arguments, '--restore' in arguments)
         with patch('installer.main_embed_install.ROOT', self.root):
             if '--restore' in arguments:
                 restore(value('--backup'))
@@ -104,6 +105,64 @@ class PluginManagerTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(ValueError):
             await self.manager.start(row['id'], 'install')
 
+    async def test_opt_in_persists_and_other_version_installs_updates_and_restores(self):
+        folder, target = fixture(self.root, '26.2.0')
+        self.manager.scan()
+        state = await self.manager.update_settings(True)
+        row = next(r for r in state['installations'] if r['version'] == '26.2.0')
+        self.assertTrue(row['experimental'])
+        self.assertFalse(row['supported'])
+        self.assertTrue(row['can_install'])
+        restarted = PluginManager(self.root)
+        self.assertTrue(restarted.snapshot()['allow_unverified_versions'])
+        await self.manager.start(row['id'], 'install')
+        await self.manager.task
+        self.assertEqual(self.manager.job['state'], 'complete', self.manager.job)
+        script = self.root / 'plasticity-javascript-payloads/init.js'
+        script.write_text(script.read_text(encoding='utf-8') + '\n// updated', encoding='utf-8')
+        row = self.manager.inspect(folder, [])
+        self.assertTrue(row['can_update'])
+        await self.manager.start(row['id'], 'update')
+        await self.manager.task
+        self.assertEqual(self.manager.job['state'], 'complete', self.manager.job)
+        await self.manager.update_settings(False)
+        row = self.manager.inspect(folder, [])
+        self.assertFalse(row['experimental'])
+        self.assertTrue(row['can_restore'])
+        await self.manager.start(row['id'], 'restore')
+        await self.manager.task
+        self.assertEqual(self.manager.job['state'], 'complete', self.manager.job)
+        self.assertEqual(target.read_bytes(), ORIGINAL)
+        self.assertFalse(self.manager.inspect(folder, [])['can_install'])
+        self.assertFalse(PluginManager(self.root).allow_unverified_versions)
+
+    async def test_opt_in_keeps_process_and_entry_guards(self):
+        folder, target = fixture(self.root, '26.2.0')
+        await self.manager.update_settings(True)
+        self.processes = [{'Id': 42, 'Path': str(folder / 'Plasticity.exe')}]
+        row = self.manager.scan()['installations'][-1]
+        self.assertFalse(row['can_install'])
+        with self.assertRaises(ValueError):
+            await self.manager.start(row['id'], 'install')
+        self.assertEqual(target.read_bytes(), ORIGINAL)
+        target.write_text('unexpected entry', encoding='utf-8')
+        with self.assertRaisesRegex(ValueError, 'main'):
+            self.manager.inspect(folder, [])
+
+    async def test_settings_validate_boolean_and_reject_changes_during_install(self):
+        for invalid in (None, 'true', 1, {}, []):
+            with self.assertRaises(ValueError):
+                await self.manager.update_settings(invalid)
+        event = asyncio.Event()
+        self.manager.task = asyncio.create_task(event.wait())
+        try:
+            with self.assertRaisesRegex(ValueError, '正在进行'):
+                await self.manager.update_settings(True)
+            self.assertFalse(self.manager.allow_unverified_versions)
+        finally:
+            event.set()
+            await self.manager.task
+
     async def test_cancelled_uac_preserves_original_and_cleans_request(self):
         self.manager.runner = lambda request: 1223
         row = self.row()
@@ -158,6 +217,12 @@ class PluginManagerTests(unittest.IsolatedAsyncioTestCase):
             other, entry = fixture(self.root, '26.2.0')
             with self.assertRaisesRegex(ValueError, '尚未验证'):
                 validate_managed(entry, digest(ORIGINAL))
+            validate_managed(entry, digest(ORIGINAL), allow_unverified_version=True)
+            with self.assertRaisesRegex(ValueError, '发生变化'):
+                validate_managed(entry, '0' * 64, allow_unverified_version=True)
+        with patch('installer.discovery.running_processes', return_value=[{'Id': 43, 'Path': str(other / 'Plasticity.exe')}]):
+            with self.assertRaisesRegex(ValueError, '正在运行'):
+                validate_managed(entry, digest(ORIGINAL), allow_unverified_version=True)
         with patch('installer.discovery.running_processes', return_value=[{'Id': 42, 'Path': str(self.folder / 'Plasticity.exe')} ]):
             with self.assertRaisesRegex(ValueError, '正在运行'):
                 validate_managed(self.target, digest(ORIGINAL))
