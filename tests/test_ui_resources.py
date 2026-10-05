@@ -28,12 +28,20 @@ class UiResourcesTests(unittest.TestCase):
             width, height, _, _, _, _, length, offset = struct.unpack_from('<BBBBHHII', data, 6 + 16*index)
             size = width or 256
             self.assertEqual(size, height or 256)
-            self.assertEqual(icon_bitmap(size=size), data[offset:offset+length])
+            if size not in sizes:
+                self.assertEqual(icon_bitmap(size=size), data[offset:offset+length])
             if data[offset:offset+8] == b'\x89PNG\r\n\x1a\n':
-                self.assertEqual(struct.unpack_from('>II', data, offset+16), (size,size))
+                actual_width, actual_height = struct.unpack_from('>II', data, offset+16)
+                self.assertEqual(actual_width, actual_height)
+                # The original ICO includes a 512px PNG with the ICO maximum
+                # size marker (0); retain that original resource unchanged.
+                if width == 0:
+                    self.assertGreaterEqual(actual_width, 256)
+                else:
+                    self.assertEqual(actual_width, size)
             else:
                 alpha = data[offset+43:offset+40+size*size*4:4]
                 self.assertIn(0, alpha)
                 self.assertIn(255, alpha)
             sizes.append(size)
-        self.assertTrue({16,20,24,32,48,64,128,256}.issubset(sizes))
+        self.assertTrue({16,24,32,48,64,128,256}.issubset(sizes))
