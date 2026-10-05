@@ -1,3 +1,4 @@
+import {installUiUpdates, takeUiReloadState, saveUiReloadState} from "./uiUpdates.mjs";
 import {t, locale} from "./i18n";
 import {supportsBoolean,componentMode} from "./componentModes.mjs";
 import {VirtualAssetGrid} from "./VirtualAssetGrid";
@@ -16,6 +17,9 @@ export function Cube(props) {
 }
 
 export function Home() {
+  const restoredUi = takeUiReloadState();
+  const restored = (name, fallback) => typeof restoredUi[name] === typeof fallback ? restoredUi[name] : fallback;
+  let stopUiUpdates = () => {};
   const api = location.origin;
   const wsUrl = (import.meta.env.DEV ? "http://127.0.0.1:15150" : api).replace(/^http/, "ws") + "/websocket";
   const embedded = window.parent !== window;
@@ -49,12 +53,12 @@ export function Home() {
   const [connectionLost, setConnectionLost] = createSignal(false);
   const [assets, setAssets] = createSignal([]);
   const [libraries, setLibraries] = createSignal([]);
-  const [libraryId, setLibraryId] = createSignal("default");
+  const [libraryId, setLibraryId] = createSignal(restored("libraryId", "default"));
   const [folders, setFolders] = createSignal([]);
   const [formFolders, setFormFolders] = createSignal([]);
   const [foldersLoading, setFoldersLoading] = createSignal(false);
-  const [folderId, setFolderId] = createSignal(null);
-  const [kind, setKind] = createSignal("all");
+  const [folderId, setFolderId] = createSignal(typeof restoredUi.folderId === "string" ? restoredUi.folderId : null);
+  const [kind, setKind] = createSignal(restored("kind", "all"));
   const [organizationDialog, setOrganizationDialog] = createSignal(null);
   const [organizationName, setOrganizationName] = createSignal("");
   const [targets, setTargets] = createSignal([]);
@@ -64,9 +68,9 @@ export function Home() {
   const [clipboardSupported, setClipboardSupported] = createSignal(false);
   const [nativeTargets, setNativeTargets] = createSignal([]);
   const [modelEnabled,setModelEnabled] = createSignal(true);
-  const [query, setQuery] = createSignal("");
-  const [category, setCategory] = createSignal("全部组件");
-  const [archived, setArchived] = createSignal(false);
+  const [query, setQuery] = createSignal(restored("query", ""));
+  const [category, setCategory] = createSignal(restored("category", "全部组件"));
+  const [archived, setArchived] = createSignal(restored("archived", false));
   const [selectedId, setSelectedId] = createSignal("");
   const [detailsOpen, setDetailsOpen] = createSignal(false);
   const [heldPreview, setHeldPreview] = createSignal(null);
@@ -98,7 +102,7 @@ export function Home() {
     catch(error) {showNotice("大小设置未保存：" + error.message, true);}
     finally {if (version === cardSizeVersion) cardSizePending = false;}
   }
-  const [sortMode, setSortMode] = createSignal("recent");
+  const [sortMode, setSortMode] = createSignal(restored("sortMode", "recent"));
   const [exportMode, setExportMode] = createSignal(false);
   const [exportSelection, setExportSelection] = createSignal(new Set());
   const [exporting, setExporting] = createSignal(false);
@@ -444,6 +448,14 @@ export function Home() {
   }
 
   onMount(() => {
+    stopUiUpdates = installUiUpdates({
+      canReload: () => panelVisible && status() === "connected" && !busy() && !dialog() && !organizationDialog() &&
+        !detailsOpen() && !heldPreview() && !connectionSettings() && !exportMode() && !exporting() &&
+        !cardSizePending && !previewPending() && !pendingHost.size && !client.pending.size &&
+        !previewClient.pending.size && !connectionClient.pending.size && !notice()?.error,
+      beforeReload: () => saveUiReloadState({libraryId:libraryId(),folderId:folderId(),kind:kind(),query:query(),
+        category:category(),archived:archived(),sortMode:sortMode()}),
+    });
     client.connect(); previewClient.connect(); connectionClient.connect();
     poll = setInterval(() => { if (panelVisible && ready()) {refresh().catch(() => {});refreshConnection().catch(() => {});} }, 10000);
     window.addEventListener("keydown",onSearchKey);
@@ -456,7 +468,7 @@ export function Home() {
     window.addEventListener("pointercancel", closeHeldPreview, true);
     window.addEventListener("blur", closeHeldPreview);
   });
-  onCleanup(() => { clearInterval(poll); clearTimeout(cardSizeTimer); clearTimeout(shownTimer); client.disconnect(); previewClient.disconnect(); connectionClient.disconnect(); previewJobs.stop(); window.removeEventListener("keydown",onSearchKey);window.removeEventListener("message",hostMessage);
+  onCleanup(() => { stopUiUpdates(); clearInterval(poll); clearTimeout(cardSizeTimer); clearTimeout(shownTimer); client.disconnect(); previewClient.disconnect(); connectionClient.disconnect(); previewJobs.stop(); window.removeEventListener("keydown",onSearchKey);window.removeEventListener("message",hostMessage);
     window.removeEventListener("pointerup", previewPointerUp, true);
     window.removeEventListener("pointercancel", closeHeldPreview, true);
     window.removeEventListener("blur", closeHeldPreview);

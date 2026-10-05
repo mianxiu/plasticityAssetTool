@@ -1,3 +1,4 @@
+import {installUiUpdates} from "./uiUpdates.mjs";
 import {t, locale, setLocale} from "./i18n";
 import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { Cube } from "./Home";
@@ -18,7 +19,7 @@ export function ControlCenter() {
   const pluginPending=()=>plugins()?.job?.state === "waiting";
   const pluginLabels={"not-installed":()=>t("未安装"),current:()=>t("已是最新版"),update:()=>t("可更新"),"backup-missing":()=>t("已安装，但缺少可验证备份")};
   const operationLabels={install:()=>t("安装插件"),update:()=>t("更新插件"),restore:()=>t("恢复原始入口")};
-  let timer, loading=false, disposed=false;
+  let timer, loading=false, disposed=false, stopUiUpdates=()=>{};
   async function refresh() {
     if (loading || quitting()) return;
     loading=true;
@@ -66,8 +67,8 @@ export function ControlCenter() {
   const enabled=()=>state()?.model_enabled !== false;
   const elapsed=()=>{const minutes=Math.floor((state()?.uptime_seconds || 0)/60);return minutes<60 ? t("{p0} 分钟",{p0:minutes}) : t("{p0} 小时 {p1} 分钟",{p0:Math.floor(minutes/60),p1:minutes%60});};
   const previousTitle=document.title;
-  onMount(()=>{document.title="Plasticity Asset Tool — Control Center";refresh().then(()=>{if(state()?.plugin_manager)detectPlugins();});timer=setInterval(refresh,3000);});
-  onCleanup(()=>{disposed=true;clearInterval(timer);document.title=previousTitle;});
+  onMount(()=>{stopUiUpdates=installUiUpdates({canReload:()=>online() && !busy() && !detecting() && !pluginPending() && !confirmPlugin() && !confirmQuit() && !quitting() && !installPath().trim()});document.title="Plasticity Asset Tool — Control Center";refresh().then(()=>{if(state()?.plugin_manager)detectPlugins();});timer=setInterval(refresh,3000);});
+  onCleanup(()=>{stopUiUpdates();disposed=true;clearInterval(timer);document.title=previousTitle;});
   return <div class="control-shell">
     <aside class="control-sidebar">
       <div class="brand" title="Plasticity Asset Tool"><Cube/><strong>Plasticity Asset Tool</strong></div>
