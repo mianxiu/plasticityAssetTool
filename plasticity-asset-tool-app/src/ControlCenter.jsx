@@ -77,16 +77,16 @@ export function ControlCenter() {
       <div class="control-sidebar-bottom"><span class={`status-dot ${online() ? "live" : "offline"}`}/>{quitting() ? t("后台已退出") : online() ? t("本地服务运行中") : loaded() ? t("服务未连接") : t("正在连接")}</div>
     </aside>
     <main class="control-main">
-      <header class="control-heading"><div><span class="control-eyebrow">{t("后台服务")}</span><h1>{t("控制中心")}</h1><p>{t("查看模型连接，管理组件库的运行状态。")}</p><small class="control-version">{t("工具版本")} · {state()?.app_version ? `v${state().app_version}` : "—"}<Show when={state()?.app_version && !online()}> · {t("服务离线")}</Show></small></div><div class="control-actions"><button class="secondary-button" disabled={!online() || busy()} onClick={()=>command("service.open_control")}>{t("打开独立窗口")}</button><a class="primary-button" href="/">{t("打开组件库 ↗")}</a></div></header>
+      <header class="control-heading"><div><h1 title={t("查看模型连接，管理组件库的运行状态。")}>{t("控制中心")}</h1><small class="control-version">{t("工具版本")} · {state()?.app_version ? `v${state().app_version}` : "—"}<Show when={state()?.app_version && !online()}> · {t("服务离线")}</Show></small></div><div class="control-actions"><button class="secondary-button" disabled={!online() || busy()} onClick={()=>command("service.open_control")}>{t("打开独立窗口")}</button><a class="primary-button" href="/">{t("打开组件库 ↗")}</a></div></header>
       <Show when={loaded() && (!online() || !enabled())}><section class="connection-alert" role="alert"><span class="connection-alert-icon" aria-hidden="true">!</span><div><strong>{quitting() ? t("后台服务已停止") : !online() ? t("后台连接已断开") : t("模型连接已停止")}</strong><p>{!online() ? t("组件置入和保存暂不可用。请重新启动后台服务。") : t("组件置入、自动复制和模型操作已停用；恢复连接后可继续使用。")}</p></div><Show when={online()}><button class="secondary-button" disabled={busy()} onClick={()=>command("service.connection",{enabled:true})}>{t("恢复模型连接")}</button></Show></section></Show>
       <Show when={notice()}><div class="control-banner" role="status">{notice()}</div></Show>
       <div class="control-stats">
         <section class="control-card"><span class="control-card-label">{t("本地服务")}</span><strong><span class={`status-dot ${online() ? "live" : "offline"}`}/>{quitting() ? t("已退出") : online() ? t("运行中") : loaded() ? t("未连接") : t("连接中")}</strong><small>{online() ? t("已运行 {p0}",{p0:elapsed()}) : t("服务就绪后自动连接")}</small></section>
-        <section class="control-card"><span class="control-card-label">{t("Plasticity 窗口")}</span><strong>{online() ? state()?.targets.length || 0 : "—"}<em>{t("个可用窗口")}</em></strong><small>{enabled() ? t("原生剪贴板模式") : t("模型操作已暂停")}</small></section>
+        <section class="control-card"><span class="control-card-label">{t("Plasticity 窗口")}</span><strong>{online() ? state()?.targets.length || 0 : "—"}<em>{t("个可用窗口")}</em></strong><small>{enabled() ? t("原生模型连接") : t("模型操作已暂停")}</small></section>
         <section class="control-card"><span class="control-card-label">{t("模型组件")}</span><strong>{online() ? state()?.component_count || 0 : "—"}<em>{t("个组件")}</em></strong><small>{state()?.libraries.length || 0}{t(" 个组件库 · 数据保存在本机")}</small></section>
       </div>
       <section class="control-section plugin-section">
-        <div class="control-section-heading"><div><h2>{t("插件安装")}</h2><p>{t("检测版本和目录，安装后重新启动 Plasticity 即可使用 Tab 面板。")}</p></div><button class="secondary-button" disabled={!online() || detecting() || pluginPending()} onClick={()=>detectPlugins()}>{detecting() ? t("正在检测…") : t("检测安装")}</button></div>
+        <div class="control-section-heading"><div><h2 title={t("检测版本和目录，安装后重新启动 Plasticity 即可使用 Tab 面板。")}>{t("插件安装")} <span class="control-help" aria-label={t("检测版本和目录，安装后重新启动 Plasticity 即可使用 Tab 面板。")}>?</span></h2></div><button class="secondary-button" disabled={!online() || detecting() || pluginPending()} onClick={()=>detectPlugins()}>{detecting() ? t("正在检测…") : t("检测安装")}</button></div>
         <Show when={plugins()} fallback={<p>{t("请重启后台，启用插件安装管理")}</p>}>
           <p class="plugin-supported">{t("支持自动安装：")}{plugins()?.supported_versions?.join(", ")}</p>
           <div class="plugin-directory"><input aria-label={t("Plasticity 安装目录")} placeholder={t("其他目录：输入 Plasticity 安装目录完整路径")} value={installPath()} onInput={event=>setInstallPath(event.currentTarget.value)} /><button class="secondary-button" disabled={!online() || detecting() || pluginPending() || !installPath().trim()} onClick={()=>detectPlugins(true)}>{t("检测目录")}</button></div>
@@ -97,8 +97,8 @@ export function ControlCenter() {
         </Show>
       </section>
       <section class="control-section">
-        <div class="control-section-heading"><div><h2>{t("模型连接")}</h2><p>{enabled() ? t("打开模型窗口即可使用内嵌组件库。") : t("连接已暂停；浏览和整理组件仍然可用。")}</p></div><button class="secondary-button" onClick={refresh} disabled={!online() || busy()}>{t("↻ 刷新窗口")}</button></div>
-        <Show when={online() && state()?.targets.length} fallback={<div class="control-empty"><Cube/><strong>{online() ? t("尚未发现 Plasticity 模型窗口") : t("等待服务连接")}</strong><p>{t("打开 Plasticity 后，这里会显示可用窗口。")}</p></div>}>
+        <div class="control-section-heading"><div><h2 title={enabled() ? t("打开模型窗口即可使用内嵌组件库。") : t("连接已暂停；浏览和整理组件仍然可用。")}>{t("模型连接")}</h2></div><button class="secondary-button" onClick={refresh} disabled={!online() || busy()}>{t("↻ 刷新窗口")}</button></div>
+        <Show when={online() && state()?.targets.length} fallback={<div class="control-empty" title={t("打开 Plasticity 后，这里会显示可用窗口。")}><Cube/><strong>{online() ? t("尚未发现 Plasticity 模型窗口") : t("等待服务连接")}</strong></div>}>
           <div class="model-window-list"><For each={state()?.targets}>{target=><article class="model-window-row"><Cube/><div><strong>{target.title}</strong><small>{target.mode === "desktop" ? t("原生模型窗口") : t("调试接口")} · {enabled() ? t("可进行模型操作") : t("模型操作暂停")}</small></div><button class="secondary-button" disabled={busy() || target.mode !== "desktop"} onClick={()=>command("service.focus",{target_id:target.id})}>{t("切换到窗口 ↗")}</button></article>}</For></div>
         </Show>
       </section>
@@ -109,7 +109,7 @@ export function ControlCenter() {
         <h2>{t("左侧导航")}</h2><div class="control-position-options" role="group" aria-label={t("左侧导航")}><For each={[["fixed",t("固定展开")],["hover",t("悬停展开")]]}>{item=><button class="secondary-button" aria-pressed={(state()?.panel_settings?.sidebar_mode || "fixed") === item[0]} disabled={!online() || busy()} onClick={()=>command("service.panel_settings",{sidebar_mode:item[0]})}>{item[1]}</button>}</For></div>
       </section>
       <section class="control-section control-management">
-        <div><h2>{t("连接与运行")}</h2><p>{t("托盘图标始终保留后台入口，双击可打开此控制中心。")}</p><small>{online() ? t("{p0} 个面板连接",{p0:state()?.panel_clients || 0}) : t("服务离线")}</small><Show when={online() && !state()?.tray_available}><p class="control-warning">{t("托盘暂不可用：")}{state()?.tray_error || t("正在初始化")}</p></Show></div>
+        <div><h2 title={t("托盘图标始终保留后台入口，双击可打开此控制中心。")}>{t("连接与运行")}</h2><small>{online() ? t("{p0} 个面板连接",{p0:state()?.panel_clients || 0}) : t("服务离线")}</small><Show when={online() && !state()?.tray_available}><p class="control-warning">{t("托盘暂不可用：")}{state()?.tray_error || t("正在初始化")}</p></Show></div>
         <div class="control-actions"><button class="secondary-button" disabled={!online() || busy()} onClick={()=>command("service.connection",{enabled:!enabled()})}>{enabled() ? t("暂停模型连接") : t("恢复模型连接")}</button><button class="control-quit" disabled={!online() || busy()} onClick={()=>setConfirmQuit(true)}>{t("退出后台服务")}</button></div>
       </section>
       <section class="control-section control-panel-settings"><h2>{t("语言")}</h2><div class="control-position-options" role="group" aria-label={t("语言")}><For each={[["zh-CN",t("中文")],["en","English"]]}>{item=><button class="secondary-button" aria-pressed={locale() === item[0]} onClick={()=>setLocale(item[0])}>{item[1]}</button>}</For></div></section>
