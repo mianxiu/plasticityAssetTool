@@ -1,26 +1,15 @@
 Plasticity Asset Tool
 Copyright (c) 2024 mianxiu
-SPDX-License-Identifier: GPL-3.0-only
+SPDX-License-Identifier: MIT
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License version 3 as
-published by the Free Software Foundation.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program. If not, see <https://www.gnu.org/licenses/>.
-
+This project is licensed under the MIT License. See LICENSE for the full terms.
 Source: https://github.com/mianxiu/plasticityAssetTool
 
-Versions released under MIT before this license change retain that
-permission. Third-party components retain their respective licenses.
+Third-party components retain their respective copyrights and licenses.
 The license of this tool does not determine the license of user models.
+Previously distributed copies retain the licenses under which they were provided.
 
 This is an independent third-party tool, not an official Plasticity product.
 Explicit official authorization for its injection approach has not been obtained.
 See DISCLAIMER.md for integration risks and license boundaries. That notice
-adds no restrictions to the rights granted under GPLv3.
+adds no restrictions to the rights granted under the MIT License.

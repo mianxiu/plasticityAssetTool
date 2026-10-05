@@ -54,10 +54,10 @@ def build(python_runtime, dependencies):
         '安装前自行保存并关闭对应 Plasticity 窗口，再在安装窗口确认 Windows 权限请求。\n'
         '用户组件保存在 library/，运行日志及插件恢复备份保存在 .runtime/。\n'
         '更新前请保留这两个目录。EXE 必须与整个发布目录一起使用。\n'
-        '许可证：GPL-3.0-only，完整条款见 LICENSE，项目声明见 NOTICE。\n'
+        '许可证：MIT，完整条款见 LICENSE，项目声明见 NOTICE。\n'
         '第三方声明与使用风险见 DISCLAIMER.md；本工具非官方产品，尚未取得对注入方式的明确官方授权。\n'
         '安装前确认所需权限，备份文档与组件库，并先在独立测试文档中验证。\n'
-        '第三方组件保留各自的许可证；用户模型数据不因使用本工具而采用 GPL。\n'
+        '第三方组件保留各自的许可证；用户模型数据不因使用本工具而采用 MIT。\n'
         '源码：https://github.com/mianxiu/plasticityAssetTool\n', encoding='utf-8-sig')
     releases = ROOT / '.runtime/releases'
     releases.mkdir(exist_ok=True)
