@@ -30,11 +30,14 @@ class Pick {constructor(editor){this.editor=editor;}async execute(){await new Pr
   const voidEditor={...editor,executor:{isBusy:false},exec(command){command.execute().catch(()=>{});}};
   assert.equal(Buffer.from((await api.captureWithBasePoint(voidEditor,Pick)).model,'base64').readDoubleLE(0),12);
   assert.equal(systemWrites,0);assert.equal(editor.clipboard.copy,copy);
+  const delayedEditor={...editor,executor:{isBusy:false},exec(command){this.executor.activeCommand=command;command.execute().finally(()=>setTimeout(()=>{restored=0;this.executor.activeCommand=null;},15)).catch(()=>{});}};
+  await api.captureWithBasePoint(delayedEditor,Pick);
+  assert.equal(delayedEditor.executor.activeCommand,null);assert.equal(restored,1,'Restore selection after native executor cleanup');
   const realTimeout=sandbox.setTimeout;
   sandbox.setTimeout=(fn,ms)=>setTimeout(fn,ms===120000 ? 1 : ms);
   let cancelPicker;
   class Waiting {execute(){return new Promise((_,reject)=>{cancelPicker=()=>reject(Error('cancelled'));});}}
-  const timedEditor={...editor,executor:{isBusy:false,cancelActiveCommand(){cancelPicker();}},exec(command){this.executor.activeCommand=command;command.execute().catch(()=>{});}};
+  const timedEditor={...editor,executor:{isBusy:false,cancelActiveCommand(){cancelPicker();this.activeCommand=null;}},exec(command){this.executor.activeCommand=command;command.execute().catch(()=>{});}};
   const waiting=api.captureWithBasePoint(timedEditor,Waiting);
   assert.throws(()=>api.captureSelection(editor),/尚未结束/,'Other model operations are locked during the picker');
   await assert.rejects(waiting,/cancelled|超时/);
@@ -42,17 +45,20 @@ class Pick {constructor(editor){this.editor=editor;}async execute(){await new Pr
   sandbox.setTimeout=realTimeout;
   class Solid {constructor(name){this.name=name;this.userData={versionId:1};}}
   const bodies=[new Solid('+ A'),new Solid('- B')];
-  const groupSelected={groupIds:[2],size:1,saveToMemento(){return {size:this.size,groupIds:this.groupIds,body:this.body};},restoreFromMemento(value){Object.assign(this,value);},removeAll(){this.size=0;this.groupIds=[];},add(body){this.size=1;this.body=body;}};
+  const groupSelected={groupIds:[2],size:1,solids:[],saveToMemento(){return {size:this.size,groupIds:this.groupIds,body:this.body,solids:this.solids};},restoreFromMemento(value){Object.assign(this,value);},removeAll(){this.size=0;this.groupIds=[];this.solids=[];},add(body){this.solids.push(body);this.size=this.solids.length;this.body=body;}};
   const block=value=>{const size=Buffer.alloc(4);size.writeUInt32LE(value.length);return Buffer.concat([size,value]);};
   const oneBody=name=>{const count=Buffer.alloc(4);count.writeUInt32LE(1);return Buffer.concat([model.subarray(0,56),block(Buffer.from('')),block(Buffer.from('[]')),count,block(Buffer.from('geometry-'+name)),block(Buffer.from(JSON.stringify({name})))]);};
   const groupEditor={executor:{isBusy:false},selection:{selected:groupSelected},groups:{lookupById:()=>({id:2}),getChildren:()=>[10,11]},db:{key2item:key=>bodies[key-10]},nodes:{item2key:()=>512,getName:key=>key===512?'group':bodies[key-10].name},clipboard:{copy(point){const data=oneBody(groupSelected.body?.name || 'group');if(point)data.writeDoubleLE(point.x,0);clipboard.writeBuffer('application/vnd.plasticity.items',data);}},exec:editor.exec};
   const signature=api.inspectGroup(groupEditor).signature;
   const originalGroup=api.captureGroup(groupEditor,signature);
-  const pickedGroup=await api.captureGroupWithBasePoint(groupEditor,signature,Pick);
+  class GroupPick extends Pick {async execute(){assert.equal(this.editor.selection.selected.groupIds.length,0);assert.equal(this.editor.selection.selected.size,2);await super.execute();}}
+  const pickedGroup=await api.captureGroupWithBasePoint(groupEditor,signature,GroupPick);
   const groupData=Buffer.from(pickedGroup.model,'base64');
   assert.equal(groupData.readDoubleLE(0),12);
   assert.deepEqual(groupData.subarray(56),Buffer.from(originalGroup.model,'base64').subarray(56),'All child geometry and order remain unchanged');
   assert.deepEqual(pickedGroup.recipe,originalGroup.recipe);
   assert.equal(groupSelected.groupIds[0],2);assert.equal(systemWrites,0);
+  await assert.rejects(api.captureGroupWithBasePoint(groupEditor,signature,Cancel),/cancelled/);
+  assert.equal(groupSelected.groupIds[0],2);assert.equal(groupSelected.size,1);assert.equal(groupSelected.solids.length,0);
   console.log('Native base point capture: arguments, void executor, cancellation and clipboard isolation verified');
 })().catch(error=>{console.error(error);process.exitCode=1;});

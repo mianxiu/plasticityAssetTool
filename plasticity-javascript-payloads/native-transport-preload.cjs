@@ -210,13 +210,29 @@ async function captureWithBasePoint(editor, CopyWithPlacementCommand) {
     clearTimeout(timer);
     expired = true;
     if(clipboard.copy === copyHook) clipboard.copy = originalCopy;
+    // execute() finishing precedes the native executor's selection cleanup.
+    // Restore after that cleanup so group validation sees an idle executor.
+    for(let attempt=0;editor.executor.activeCommand === command && attempt<100;attempt++) {
+      await new Promise(resolve=>setTimeout(resolve,10));
+    }
     if(selectionMemento !== undefined) selected.restoreFromMemento(selectionMemento);
     transportBusy = false;
+    if(editor.executor.activeCommand === command) throw new Error('基点命令尚未结束，未保存组件');
   }
 }
 async function captureGroupWithBasePoint(editor, signature, CopyWithPlacementCommand) {
   const group = captureGroup(editor,signature);
-  const captured = await captureWithBasePoint(editor,CopyWithPlacementCommand);
+  const selected = editor.selection.selected, saved = selected.saveToMemento();
+  const groupId = Array.from(selected.groupIds)[0];
+  let captured;
+  try {
+    // Native Copy with Placement consumes selected geometry, not group IDs.
+    // Expand only for picking; keep the separately encoded recipe ordering.
+    const children = Array.from(editor.groups.getChildren(groupId));
+    selected.removeAll();
+    for (const key of children) selected.add(editor.db.key2item(key));
+    captured = await captureWithBasePoint(editor,CopyWithPlacementCommand);
+  } finally {selected.restoreFromMemento(saved);}
   if(inspectGroup(editor).signature !== signature) throw new Error('组或模型已变化，未保存组件');
   // Preserve ordered bodies and opaque native placement bytes as a unit.
   const data=NativeBuffer.from(group.model,'base64');
