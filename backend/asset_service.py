@@ -118,8 +118,15 @@ class AssetService:
                     if args.get("group_signature"):
                         captured = await self.native.request(target_id, "capture-group", signature=args['group_signature'])
                         model, recipe = captured['model'], captured['recipe']
+                        args = args | {'kind': 'solid'}
                     else:
-                        model = await self.native.request(target_id, "capture")
+                        capabilities = self.native.workers.get(target_id, {}).get('capabilities', [])
+                        if 'selection-kind-v1' in capabilities:
+                            captured = await self.native.request(target_id, "capture", with_metadata=True)
+                            model = captured['model']
+                            args = args | {'kind': captured['kind']}
+                        else:
+                            model = await self.native.request(target_id, "capture")
                 else:
                     clipboard = self.clipboard()
                 if args.get("copy_selection") and not native:
@@ -167,12 +174,14 @@ class AssetService:
                     if args.get("follow_active"):
                         await self.bridge.discover()
                         target_id = self.bridge.active_target_id or target_id
-                    recipe=json.loads(row['recipe_json'])
-                    result = await self.native.request(target_id, "insert", model, args.get("placement", True), row["insert_mode"] if args.get("placement", True) else "new-body", **({'recipe':recipe} if recipe else {}))
+                    supported = row['kind'] not in ('curve', 'mixed')
+                    recipe=json.loads(row['recipe_json']) if supported else None
+                    mode = row["insert_mode"] if supported and args.get("placement", True) else "new-body"
+                    result = await self.native.request(target_id, "insert", model, args.get("placement", True), mode, **({'recipe':recipe} if recipe else {}))
                     return {**result, "message": "请在视口定位并确认置入" if args.get("placement", True) else "组件已原位置入"}
                 clipboard = self.clipboard()
                 target_id, placement = args.get("target_id"), args.get("placement", True)
-                if action == "asset.insert" and placement and (row["insert_mode"] != "new-body" or json.loads(row['recipe_json']) is not None):
+                if action == "asset.insert" and placement and row['kind'] not in ('curve', 'mixed') and (row["insert_mode"] != "new-body" or json.loads(row['recipe_json']) is not None):
                     raise ValueError("布尔置入需要原生模型直连")
                 if action == "asset.insert":
                     target = self.bridge.target(target_id)

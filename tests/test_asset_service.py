@@ -41,6 +41,20 @@ class FakeDesktop:
             self.number += 1
 
 class ServiceTests(unittest.IsolatedAsyncioTestCase):
+    async def test_native_mixed_capture_overrides_manual_kind_and_disables_whole_model_boolean(self):
+        self.service.native.worker('hwnd:42','a'*36,capabilities=['selection-kind-v1'])
+        model=model_bytes(count=2)
+        self.service.native.request=AsyncMock(return_value={'model':model,'kind':'mixed'})
+        asset=await self.call('library.capture',{'name':'Mixed','kind':'solid','copy_selection':True,'transport':'native','target_id':'hwnd:42','preview_mode':'geometry','insert_mode':'difference'})
+        self.assertEqual(asset['kind'],'mixed')
+        self.assertEqual(asset['insert_mode'],'new-body')
+        self.service.native.request.assert_awaited_once_with('hwnd:42','capture',with_metadata=True)
+        # Older cached records must also be protected when inserting.
+        with self.service.library.connect() as db:
+            db.execute("UPDATE assets SET insert_mode='difference' WHERE id=?",(asset['id'],))
+        self.service.native.request=AsyncMock(return_value={'started':True})
+        await self.call('asset.insert',{'id':asset['id'],'transport':'native','target_id':'hwnd:42'})
+        self.service.native.request.assert_awaited_once_with('hwnd:42','insert',model,True,'new-body')
     async def asyncSetUp(self):
         self.directory = tempfile.TemporaryDirectory()
         self.desktop = FakeDesktop()

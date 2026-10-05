@@ -11,6 +11,12 @@ class Command {execute(){assert(clipboard.availableFormats().includes('applicati
 const editor={executor:{isBusy:false},selection:{selected:{size:1}},commands:{PasteWithPlacementCommand:Command},clipboard:{copy(){clipboard.writeBuffer('application/vnd.plasticity.items',model);}},exec(cmd){const result=cmd.execute();assert.equal(clipboard.readBuffer,originalRead);return result;}};
 (async()=>{
  assert.equal(api.captureSelection(editor).model,model.toString('base64'));
+ for (const [solids,curves,kind] of [[2,0,'solid'],[0,2,'curve'],[1,1,'mixed']]) {
+   const selected={size:solids+curves,solids:new Set(Array.from({length:solids},()=>({}))),curves:new Set(Array.from({length:curves},()=>({})))};
+   const result=api.captureSelection({...editor,selection:{selected}});
+   assert.equal(result.kind,kind);assert.equal(result.counts.solids,solids);assert.equal(result.counts.curves,curves);
+ }
+ assert.equal(api.captureSelection({...editor,selection:{selected:{size:2,solids:new Set([{}]),curves:new Set()}}}).kind,'unknown');
  assert.equal(clipboard.writeBuffer,originalWrite);
  assert.equal((await api.insertModel(editor,{model:model.toString('base64'),placement:true},Command)).started,true);
  assert.equal(clipboard.availableFormats,originalFormats);assert.equal(clipboard.has,originalHas);

@@ -24,6 +24,17 @@ class NativeTransportTests(unittest.IsolatedAsyncioTestCase):
         self.transport.worker(self.target,self.token,result)
         self.assertEqual(await pending,model)
 
+    async def test_capture_kind_metadata_and_legacy_fallback(self):
+        model=model_bytes(count=2)
+        for reported, expected in [('mixed','mixed'),('curve','curve'),(None,'unknown')]:
+            pending=asyncio.create_task(self.transport.request(self.target,'capture',with_metadata=True))
+            await asyncio.sleep(0)
+            job=self.transport.worker(self.target,self.token)
+            value={'model':base64.b64encode(model).decode()}
+            if reported: value['kind']=reported
+            self.transport.worker(self.target,self.token,{'id':job['id'],'value':value})
+            self.assertEqual(await pending,{'model':model,'kind':expected})
+
     async def test_group_capture_and_inspection_keep_metadata_window_bound(self):
         self.transport.worker(self.target,self.token,capabilities=['group-recipe-v1'])
         for action,payload,expected in [

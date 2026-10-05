@@ -133,6 +133,10 @@ function captureGroup(editor, signature) {
 function captureSelection(editor) {
   requireIdle(editor);
   if (!editor.selection.selected.size) throw new Error('请先选中要保存的模型');
+  const selected = editor.selection.selected;
+  const solids = Array.from(selected.solids || []).length;
+  const curves = Array.from(selected.curves || []).length;
+  const kind = solids + curves !== selected.size ? 'unknown' : solids && curves ? 'mixed' : curves ? 'curve' : solids ? 'solid' : 'unknown';
   const original = transportClipboard.writeBuffer;
   let captured, writes = 0;
   transportBusy = true;
@@ -148,7 +152,7 @@ function captureSelection(editor) {
     transportBusy = false;
   }
   if (!captured?.length || captured.length > 64*1024*1024) throw new Error('没有取得有效的模型数据');
-  return {model:captured.toString('base64')};
+  return {model:captured.toString('base64'),kind,counts:{solids,curves}};
 }
 async function insertModel(editor, args, PasteCommand, OperationType, BooleanFactory) {
   requireIdle(editor);

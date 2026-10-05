@@ -46,7 +46,13 @@ class NativeTransport:
                             model=validate_model(base64.b64decode(encoded,validate=True))
                         except (binascii.Error,ValueError) as exc:
                             raise ValueError('原生模型数据无效') from exc
-                        value = {'model': model, 'recipe': validate_recipe(value.get('recipe'), model)} if job['action']=='capture-group' else model
+                        if job['action'] == 'capture' and job.get('with_metadata'):
+                            kind = value.get('kind', 'unknown')
+                            if kind not in ('solid', 'curve', 'mixed', 'unknown'):
+                                raise ValueError('原生选择类型无效')
+                            value = {'model': model, 'kind': kind}
+                        else:
+                            value = {'model': model, 'recipe': validate_recipe(value.get('recipe'), model)} if job['action']=='capture-group' else model
                         if job['action']=='capture-group' and value['recipe'] is None:
                             raise ValueError('未收到组信息')
                     elif job['action']=='inspect-group':
@@ -86,7 +92,7 @@ class NativeTransport:
             pass
         return self.worker(target, token, capabilities=capabilities)
 
-    async def request(self, target, action, model=None, placement=True, insert_mode="new-body", recipe=None, signature=None):
+    async def request(self, target, action, model=None, placement=True, insert_mode="new-body", recipe=None, signature=None, with_metadata=False):
         if target not in self.connected_targets():
             raise ValueError('目标窗口的原生模型插件未连接，请重新打开已安装插件的 Plasticity')
         if action not in ('capture','insert','inspect-group','capture-group'):
@@ -115,7 +121,7 @@ class NativeTransport:
                     raise ValueError('组组件请使用定位置入，以保持部件顺序和组信息')
         future=asyncio.get_running_loop().create_future()
         job_id=uuid.uuid4().hex
-        self.jobs[job_id]={'target':target,'action':action,'payload':payload,'future':future,'sent':False}
+        self.jobs[job_id]={'target':target,'action':action,'payload':payload,'future':future,'sent':False,'with_metadata':with_metadata}
         if target in self.notifications:
             self.notifications[target].set()
         try:

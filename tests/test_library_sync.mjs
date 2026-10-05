@@ -1,6 +1,13 @@
 import assert from 'node:assert/strict';
 import {gridWindow} from '../plasticity-asset-tool-app/src/virtualGrid.mjs';
 import {mergeLibrary} from '../plasticity-asset-tool-app/src/librarySync.mjs';
+import {supportsBoolean,componentMode} from '../plasticity-asset-tool-app/src/componentModes.mjs';
+for (const kind of ['curve','mixed']) {
+  assert.equal(supportsBoolean({kind}),false);
+  assert.equal(componentMode({kind,insert_mode:'difference',recipe:{parts:[]}}),'new-body');
+}
+assert.equal(componentMode({kind:'solid',insert_mode:'union'}),'union');
+assert.equal(componentMode({kind:'solid',recipe:{parts:[]}}),'sequence');
 for (const count of [0,100,1000,5000]) {
   for (const width of [80,360,1000]) {
     const first = gridWindow({count,width,size:184,top:0,viewport:700});

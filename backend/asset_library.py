@@ -171,7 +171,7 @@ class AssetLibrary:
 
     def model_row(self, asset_id):
         with self.connect() as db:
-            row = db.execute("SELECT id,digest,model,archived,insert_mode,recipe_json FROM assets WHERE id=?", (asset_id,)).fetchone()
+            row = db.execute("SELECT id,digest,model,archived,kind,insert_mode,recipe_json FROM assets WHERE id=?", (asset_id,)).fetchone()
         if row is None:
             raise ValueError("组件不存在，请刷新组件库")
         return row
@@ -214,6 +214,10 @@ class AssetLibrary:
         location = self.organization(fields)
         recipe = validate_recipe(fields.get("recipe"), model)
         fields = self.validate_fields(fields)
+        if location[2] in ('curve', 'mixed'):
+            if recipe:
+                raise ValueError('连续布尔组仅支持实体组件')
+            fields['insert_mode'] = 'new-body'
         if not isinstance(model, bytes) or not 1 <= len(model) <= MAX_MODEL_BYTES:
             raise ValueError("模型数据为空或超过 64 MB")
         self.validate_preview(preview)
@@ -237,6 +241,10 @@ class AssetLibrary:
         update_preview = "preview" in fields
         preview = self.validate_preview(fields.get("preview")) if update_preview else None
         fields = self.validate_fields(current | fields)
+        if location[2] in ('curve', 'mixed'):
+            if current.get('recipe'):
+                raise ValueError('连续布尔组仅支持实体组件')
+            fields['insert_mode'] = 'new-body'
         with self.connect() as db:
             db.execute("UPDATE assets SET name=?,category=?,tags=?,note=?,updated_at=?,library_id=?,folder_id=?,kind=?,insert_mode=? WHERE id=?", (
                 fields["name"], fields["category"], fields["tags"], fields["note"], datetime.now(timezone.utc).isoformat(), *location, fields["insert_mode"], asset_id,

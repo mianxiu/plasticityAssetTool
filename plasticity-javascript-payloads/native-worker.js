@@ -38,7 +38,7 @@ function startNativeWorker(win, baseURL, target) {
     let delay=750;
     try {
       if (!editor) await discover();
-      const response=await send({target_id:target,token,result,wait_ms:2000,capabilities:['boolean-placement-v1','group-recipe-v1']});result=null;
+      const response=await send({target_id:target,token,result,wait_ms:2000,capabilities:['boolean-placement-v1','group-recipe-v1','selection-kind-v1']});result=null;
       delay=response.wait_supported ? 10 : 750;
       if (response.job) {
         const job=response.job;
