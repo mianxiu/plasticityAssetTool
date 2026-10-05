@@ -9,12 +9,10 @@ import "./ComponentBrowser.css";
 const GeometryPreview = lazy(() => import('./GeometryPreview').then(module => ({default:module.GeometryPreview})));
 import { geometryCache } from "./geometryCache.mjs";
 import { chooseTarget } from './targetSelection';
+import applicationIcon from './assets/favicon.ico';
 
 export function Cube(props) {
-  return <svg viewBox="0 0 80 80" fill="none" aria-hidden="true" class={props.class || "cube-icon"}>
-    <path d="M40 9 68 25v31L40 72 12 56V25L40 9Z" fill="currentColor" fill-opacity=".08" stroke="currentColor" stroke-width="1.5"/>
-    <path d="m12 25 28 16 28-16M40 41v31M26 17l28 16v31" stroke="currentColor" stroke-width="1.5"/>
-  </svg>;
+  return <img src={applicationIcon} alt="" aria-hidden="true" draggable="false" class={props.class || "cube-icon"} style={{"object-fit": "contain", "flex-shrink": 0}} />;
 }
 
 export function Home() {

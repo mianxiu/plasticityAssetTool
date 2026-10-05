@@ -253,7 +253,7 @@ Plasticity 视口加载完成后，插件确认本地后台身份，再预加载
 Tab 内嵌面板外框为 1px，直接引用 Plasticity 原生 `--accent-500` 主题变量，切换 Appearance 的 Accent Color 时自动同步，无需轮询。默认主题使用 Plasticity 自带的绿色回退值。插件更新回滚备份为 `.runtime/plasticity-formal-main-before-accent-border.js`；已有窗口下次启动加载更新。
 
 
-界面与启动入口：统一使用侧栏品牌的浅蓝色线框立方体 `favicon.ico`，包含 16、20、24、32、40、48、64、96、128、192、256 像素版本；托盘、网页、后台窗口、Windows EXE 和插件安装器使用同一资源，并保留按 DPI 加载图标的机制。暂停状态在托盘菜单和悬停文字中显示。图标由 `packaging/build_icon.py` 生成（仅构建时需要 Pillow）。英文启动文件为 `PlasticityAssetTool.exe`，插件安装器为 `.runtime/PlasticityAssetTool.PluginInstaller.exe`，发布包说明文件为 `Readme.txt`。后台窗口默认 960×720，保留普通边框、缩放和滚动。
+界面与启动入口：统一使用项目之前的 `favicon.ico`，包含 16、24、32、48、64、96、128、256 像素版本；侧栏品牌和无预览占位图不再绘制线框立方体，直接使用同一 ICO。托盘、网页、后台窗口、Windows EXE 和插件安装器使用同一资源，并保留按 DPI 加载图标的机制。暂停状态在托盘菜单和悬停文字中显示。英文启动文件为 `PlasticityAssetTool.exe`，插件安装器为 `.runtime/PlasticityAssetTool.PluginInstaller.exe`，发布包说明文件为 `Readme.txt`。后台窗口默认 960×720，保留普通边框、缩放和滚动。
 
 控制中心新增语言切换（中文 / English），组件库、编辑表单和控制中心的界面文案支持即时切换。语言偏好保存在当前浏览器的本机存储，并在同一后台地址下的页面间同步；Edge 控制窗口、普通浏览器和 Plasticity 内嵌页使用不同浏览器存储时，各自保留语言设置。组件名称、库名称、标签和备注保持原文。翻译字典位于 `plasticity-asset-tool-app/src/locales/`，后端及 Plasticity 内核返回的错误暂保留原始语言。
 
