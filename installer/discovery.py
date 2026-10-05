@@ -12,7 +12,7 @@ ENTRY = Path('resources/app/.webpack/main/index.js')
 def running_processes():
     if os.name != 'nt':
         return []
-    command = '[Console]::OutputEncoding=[System.Text.UTF8Encoding]::new(); Get-Process -Name Plasticity -ErrorAction SilentlyContinue | Select-Object Id,Path | ConvertTo-Json -Compress'
+    command = '[Console]::OutputEncoding=[System.Text.UTF8Encoding]::new(); $ErrorActionPreference="Stop"; Get-Process -ErrorAction Stop | Where-Object {$_.ProcessName -eq "Plasticity"} | Select-Object Id,Path | ConvertTo-Json -Compress'
     powershell = str(Path(os.environ.get('SystemRoot', r'C:\Windows')) / 'System32/WindowsPowerShell/v1.0/powershell.exe')
     try:
         result = subprocess.run([powershell, '-NoProfile', '-NonInteractive', '-Command', command],

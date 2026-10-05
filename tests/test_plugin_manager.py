@@ -3,6 +3,7 @@ import json
 import shutil
 import tempfile
 import threading
+from types import SimpleNamespace
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -226,6 +227,16 @@ class PluginManagerTests(unittest.IsolatedAsyncioTestCase):
         with patch('installer.discovery.running_processes', return_value=[{'Id': 42, 'Path': str(self.folder / 'Plasticity.exe')} ]):
             with self.assertRaisesRegex(ValueError, '正在运行'):
                 validate_managed(self.target, digest(ORIGINAL))
+
+    def test_process_discovery_accepts_no_matches_and_fails_on_query_errors(self):
+        with patch('installer.discovery.os.name', 'nt'), patch('installer.discovery.subprocess.CREATE_NO_WINDOW', 0, create=True), patch('installer.discovery.subprocess.run', return_value=SimpleNamespace(returncode=0, stdout='')) as run:
+            self.assertEqual(discovery.running_processes(), [])
+            command = run.call_args.args[0][-1]
+            self.assertIn('Where-Object', command)
+            self.assertNotIn('Get-Process -Name', command)
+            run.return_value = SimpleNamespace(returncode=1, stdout='')
+            with self.assertRaisesRegex(RuntimeError, '运行状态'):
+                discovery.running_processes()
 
     async def test_launch_failure_returns_failed_status(self):
         def fail(request):
