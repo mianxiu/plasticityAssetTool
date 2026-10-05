@@ -265,5 +265,6 @@
   "将修改此版本的内嵌入口，并自动保存可恢复备份。": "Update this version's embedded entry and automatically save a recovery backup.",
   "请先自行保存并关闭该版本所有窗口；继续后在安装窗口确认 Windows 权限。": "Save and close all windows of this version first; then confirm Windows permission in the installer.",
   "继续安装流程": "Continue installation",
-  "操作失败": "Operation failed"
+  "操作失败": "Operation failed",
+  "工具版本": "Tool version"
 }

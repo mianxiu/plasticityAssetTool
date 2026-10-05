@@ -3,6 +3,7 @@ import asyncio
 import os
 import time
 from .plugin_manager import PluginManager
+from .version import APP_NAME, APP_VERSION
 
 
 class ServiceControl:
@@ -17,7 +18,8 @@ class ServiceControl:
         async with service.lock:
             targets = await service.bridge.discover()
         libraries = await asyncio.to_thread(service.library.libraries)
-        return {"running": True, "pid": os.getpid(), "uptime_seconds": int(time.monotonic()-self.started),
+        return {"running": True, "app_name": APP_NAME, "app_version": APP_VERSION,
+                "pid": os.getpid(), "uptime_seconds": int(time.monotonic()-self.started),
                 "model_enabled": service.model_enabled, "clipboard_supported": service.desktop is not None,
                 "targets": targets, "active_target_id": service.bridge.active_target_id, "panel_clients": len(self.app.clients),
                 "component_count": sum(row["count"] for row in libraries), "libraries": libraries,

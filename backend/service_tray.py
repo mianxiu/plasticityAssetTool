@@ -5,9 +5,23 @@ import struct
 import threading
 from pathlib import Path
 from ctypes import wintypes as W
+from .version import APP_NAME, APP_VERSION
 
 
 ICON_PATH = Path(__file__).resolve().parents[1] / "plasticity-asset-tool-app/src/assets/favicon.ico"
+
+
+def tray_menu_items(state):
+    return [
+        (3, 0, f'{APP_NAME} · v{APP_VERSION}'),
+        (0x800, 0, None),
+        (0, 1, '打开控制中心'), (0, 2, '查看模型组件库'),
+        (0x800, 0, None),
+        (3, 0, f"Plasticity 窗口：{len(state.get('targets', []))} · 组件：{state.get('component_count', 0)}"),
+        (0, 3, '刷新连接状态'),
+        (0, 4, '恢复模型连接' if not state.get('model_enabled', True) else '暂停模型连接'),
+        (0x800, 0, None), (0, 9, '退出组件库后台服务'),
+    ]
 
 
 def icon_bitmap(paused=False, size=32):
@@ -113,14 +127,14 @@ class ServiceTray:
                 state = dict(self.state)
             paused = not state.get('model_enabled',True)
             notification.icon = icons[0]
-            notification.tip = f"Plasticity 组件库 · {'连接暂停' if paused else '服务运行中'}\n{len(state.get('targets',[]))} 个窗口 · {state.get('component_count',0)} 个组件"[:127]
+            notification.tip = f"Plasticity 组件库 v{APP_VERSION} · {'连接暂停' if paused else '服务运行中'}\n{len(state.get('targets',[]))} 个窗口 · {state.get('component_count',0)} 个组件"[:127]
             return shell.Shell_NotifyIconW(operation,ctypes.byref(notification))
         def menu():
             with self.lock:
                 state = dict(self.state)
             popup = u.CreatePopupMenu()
             try:
-                for flags,item,label in [(0,1,'打开控制中心'),(0,2,'查看模型组件库'),(0x800,0,None),(3,0,f"Plasticity 窗口：{len(state.get('targets',[]))} · 组件：{state.get('component_count',0)}"),(0,3,'刷新连接状态'),(0,4,'恢复模型连接' if not state.get('model_enabled',True) else '暂停模型连接'),(0x800,0,None),(0,9,'退出组件库后台服务')]:
+                for flags,item,label in tray_menu_items(state):
                     u.AppendMenuW(popup,flags,item,label)
                 point = W.POINT()
                 u.GetCursorPos(ctypes.byref(point))

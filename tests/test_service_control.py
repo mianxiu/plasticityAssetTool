@@ -7,7 +7,8 @@ from pathlib import Path
 from backend.asset_service import AssetService
 from backend.main import Application, DEFAULT_SHORTCUTS, StaticHandler
 from tornado import web
-from backend.service_tray import icon_bitmap
+from backend.service_tray import icon_bitmap, tray_menu_items
+from backend.version import APP_NAME, APP_VERSION
 from test_asset_service import FakeDesktop
 from model_fixture import model_bytes
 from tornado.testing import AsyncHTTPTestCase
@@ -81,6 +82,16 @@ class ServiceControlTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(active),40+32*32*4+128)
         self.assertEqual(active,paused)
 
+    async def test_service_and_tray_show_the_same_application_version(self):
+        state=await self.app.dispatch('service.status',{})
+        self.assertEqual(state['app_name'],APP_NAME)
+        self.assertEqual(state['app_version'],APP_VERSION)
+        for enabled in [True,False]:
+            menu=tray_menu_items(state | {'model_enabled':enabled})
+            self.assertEqual(menu[0],(3,0,f'{APP_NAME} · v{state["app_version"]}'))
+            self.assertEqual([item for flags,item,_ in menu if flags==0],[1,2,3,4,9])
+            self.assertIn((0,4,'暂停模型连接' if enabled else '恢复模型连接'),menu)
+
 
 class ServiceHttpTests(AsyncHTTPTestCase):
     def get_app(self):
@@ -95,6 +106,7 @@ class ServiceHttpTests(AsyncHTTPTestCase):
         response=self.fetch('/api/service')
         self.assertEqual(response.code,200)
         self.assertTrue(json.loads(response.body)['running'])
+        self.assertEqual(json.loads(response.body)['app_version'],APP_VERSION)
         self.assertEqual(self.fetch('/api/service',headers={'Origin':'https://example.com'}).code,403)
         def post(body,headers=None):
             return self.fetch('/api/service',method='POST',body=json.dumps(body),headers=headers or {'Content-Type':'application/json'})

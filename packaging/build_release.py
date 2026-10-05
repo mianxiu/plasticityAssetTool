@@ -10,6 +10,8 @@ import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+from backend.version import APP_VERSION
 
 
 def build(python_runtime, dependencies):
@@ -45,6 +47,7 @@ def build(python_runtime, dependencies):
             shutil.copytree(path, site / path.name, ignore=excluded)
     # Model stores and status/settings are created locally on first launch.
     (stage / 'Readme.txt').write_text(
+        f'Plasticity Asset Tool v{APP_VERSION}\n'
         '解压整个目录，双击 PlasticityAssetTool.exe。无需另外安装 Python 或 Node.js。\n'
         '后台由托盘控制退出；重复打开复用已有实例。\n'
         '在后台控制中心的“插件安装”检测 Plasticity 版本和目录，选择安装或更新内嵌插件。\n'
