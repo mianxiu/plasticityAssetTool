@@ -155,6 +155,20 @@ class AssetLibrary:
             raise ValueError("组件不存在，请刷新组件库")
         return row
 
+    def model_row(self, asset_id):
+        with self.connect() as db:
+            row = db.execute("SELECT id,digest,model,archived,insert_mode,recipe_json FROM assets WHERE id=?", (asset_id,)).fetchone()
+        if row is None:
+            raise ValueError("组件不存在，请刷新组件库")
+        return row
+
+    def digest(self, asset_id):
+        with self.connect() as db:
+            row = db.execute("SELECT digest FROM assets WHERE id=?", (asset_id,)).fetchone()
+        if row is None:
+            raise ValueError("组件不存在，请刷新组件库")
+        return row["digest"]
+
     def preview(self, asset_id):
         with self.connect() as db:
             row = db.execute("SELECT preview FROM assets WHERE id=?", (asset_id,)).fetchone()

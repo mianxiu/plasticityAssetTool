@@ -40,17 +40,27 @@ class AssetService:
                 self.desktop_error = str(exc)
         self.bridge = PlasticityBridge(config, self.desktop)
         self.lock = asyncio.Lock()
+        self.geometry.can_dispatch = lambda: not self.lock.locked() and not self.native.jobs
         self.launcher = None
         self.model_enabled = True
 
     async def state(self, library_id="default"):
-        targets, assets, libraries, folders = await asyncio.gather(
-            self.bridge.discover(), asyncio.to_thread(self.library.list, False, library_id),
+        library, connection = await asyncio.gather(self.library_state(library_id), self.connection_state())
+        return {**library, **connection}
+
+    async def library_state(self, library_id="default", archived=False):
+        assets, libraries, folders = await asyncio.gather(
+            asyncio.to_thread(self.library.list, archived, library_id),
             asyncio.to_thread(self.library.libraries), asyncio.to_thread(self.library.folders, library_id))
+        return {"assets": assets, "libraries": libraries, "folders": folders,
+                "launcher": self.launcher.snapshot() if self.launcher else {"registered": False}}
+
+    async def connection_state(self):
+        targets = await self.bridge.discover()
         native_targets = self.native.connected_targets()
         listed = {target['id'] for target in targets}
         targets += [{'id':target, 'hwnd':int(target[5:]), 'title':'Plasticity · '+target[5:], 'mode':'native'} for target in native_targets if target not in listed]
-        return {"native_targets": self.native.connected_targets(), "geometry_targets": self.geometry.connected_targets(), "model_enabled": self.model_enabled, "assets": assets, "libraries": libraries, "folders": folders, "launcher": self.launcher.snapshot() if self.launcher else {"registered": False, "message": "Ctrl+K 搜索"}, "targets": targets, "active_target_id": self.bridge.active_target_id, "connection_note": self.desktop_error or self.bridge.last_error, "clipboard_supported": self.desktop is not None}
+        return {"native_targets": self.native.connected_targets(), "geometry_targets": self.geometry.connected_targets(), "model_enabled": self.model_enabled, "launcher": self.launcher.snapshot() if self.launcher else {"registered": False, "message": "Ctrl+K 搜索"}, "targets": targets, "active_target_id": self.bridge.active_target_id, "connection_note": self.desktop_error or self.bridge.last_error, "clipboard_supported": self.desktop is not None}
 
     def clipboard(self):
         if not self.desktop:
@@ -60,6 +70,10 @@ class AssetService:
     async def dispatch(self, action, args, base_url):
         if not isinstance(args, dict):
             raise ValueError("参数必须是对象")
+        if action == "library.state":
+            return await self.library_state(args.get("library_id", "default"), bool(args.get("archived", False)))
+        if action == "connection.state":
+            return await self.connection_state()
         if action == "asset.geometry":
             if not self.model_enabled and not self.geometry.cached(args.get("id")):
                 raise ValueError("模型连接已暂停，请在托盘控制中心恢复")
@@ -142,7 +156,7 @@ class AssetService:
                 await asyncio.to_thread(self.library.archive, args.get("id"), action == "library.archive")
                 return {"ok": True}
             if action in ("asset.copy", "asset.insert"):
-                row = await asyncio.to_thread(self.library.get, args.get("id"))
+                row = await asyncio.to_thread(self.library.model_row, args.get("id"))
                 if row["archived"]:
                     raise ValueError("请先恢复归档组件")
                 model = validate_model(bytes(row["model"]))

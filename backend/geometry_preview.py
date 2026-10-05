@@ -67,28 +67,29 @@ class GeometryPreview:
         self.workers = {}
         self.jobs = {}
         self.inflight = {}
+        self.can_dispatch = lambda: True
 
     def connected_targets(self):
         now = time.monotonic()
         return [target for target, worker in self.workers.items() if now - worker["seen"] < 5]
 
     def cached(self, asset_id):
-        row = self.library.get(asset_id)
+        digest = self.library.digest(asset_id)
         with self.library.connect() as db:
-            cached = db.execute("SELECT mesh FROM geometry_cache WHERE digest=?", (row["digest"],)).fetchone()
+            cached = db.execute("SELECT mesh FROM geometry_cache WHERE digest=?", (digest,)).fetchone()
         return json.loads(zlib.decompress(cached["mesh"])) if cached else None
 
     def thumbnail(self, asset_id):
-        row = self.library.get(asset_id)
+        digest = self.library.digest(asset_id)
         with self.library.connect() as db:
-            cached = db.execute("SELECT thumbnail FROM geometry_cache WHERE digest=?", (row["digest"],)).fetchone()
+            cached = db.execute("SELECT thumbnail FROM geometry_cache WHERE digest=?", (digest,)).fetchone()
         if not cached or not cached["thumbnail"]:
             raise ValueError("组件没有几何预览图")
         return cached["thumbnail"]
 
     def save_thumbnail(self, asset_id, digest, preview):
         self.library.validate_preview(preview)
-        if preview is None or self.library.get(asset_id)["digest"] != digest:
+        if preview is None or self.library.digest(asset_id) != digest:
             raise ValueError("几何预览与组件不匹配")
         with self.library.connect() as db:
             if not db.execute("UPDATE geometry_cache SET thumbnail=? WHERE digest=?", (preview, digest)).rowcount:
@@ -118,6 +119,8 @@ class GeometryPreview:
                     job["future"].set_result(mesh)
                 except ValueError as error:
                     job["future"].set_exception(error)
+        if not self.can_dispatch():
+            return None
         for job_id, job in self.jobs.items():
             if job["target"] == target and not job["sent"] and not job["future"].done():
                 job["sent"] = True
@@ -126,10 +129,10 @@ class GeometryPreview:
         return None
 
     async def generate(self, asset_id, target=None):
-        row = await asyncio.to_thread(self.library.get, asset_id)
         cached = await asyncio.to_thread(self.cached, asset_id)
         if cached:
             return cached
+        row = await asyncio.to_thread(self.library.model_row, asset_id)
         model = bytes(row["model"])
         if hashlib.sha256(model).hexdigest() != row["digest"]:
             raise ValueError("组件数据校验失败，已阻止生成预览")

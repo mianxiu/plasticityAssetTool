@@ -1,3 +1,4 @@
+import { previewQueue } from "./previewQueue.mjs";
 import { createMemo, createSignal, lazy, For, onCleanup, onMount, Show } from "solid-js";
 import { WebsocketClient } from "./Websocketclient";
 import "./ComponentBrowser.css";
@@ -29,7 +30,7 @@ export function Home() {
   function hostMessage(event) {
     if (!embedded || event.source !== window.parent) return;
     if (event.data?.type === "pat:hidden") panelVisible = false;
-    if (event.data?.type === "pat:shown") { panelVisible = true; if (preferredTarget) setTargetId(preferredTarget); refresh().catch(error => showNotice(error.message, true)); focusSearch(); }
+    if (event.data?.type === "pat:shown") { panelVisible = true; refreshConnection().catch(() => {}); if (preferredTarget) setTargetId(preferredTarget); refresh().catch(error => showNotice(error.message, true)); focusSearch(); }
     if (event.data?.type === "pat:prepared") pendingHost.get(event.data.id)?.(event.data);
   }
   function prepareHost(preview = false) {
@@ -136,8 +137,8 @@ export function Home() {
   const ready = () => status() === "connected" && !busy();
   const canInsert = () => ready() && modelEnabled() && nativeTargets().includes(targetId()) && !archived();
   const setField = (key, value) => setForm(current => ({ ...current, [key]: value }));
-  const [previewRevision, setPreviewRevision] = createSignal(0);
-  const previewUrl = asset => `${api}/api/assets/${asset.id}/${asset.has_preview ? 'preview' : 'geometry/preview'}?v=${encodeURIComponent(asset.updated_at || asset.created_at)}&render=${previewRevision()}`;
+  const [previewRevision, setPreviewRevision] = createSignal({});
+  const previewUrl = asset => `${api}/api/assets/${asset.id}/${asset.has_preview ? 'preview' : 'geometry/preview'}?v=${encodeURIComponent(asset.updated_at || asset.created_at)}&render=${previewRevision()[asset.digest] || 0}`;
   const meshRequests = new Map();
   const meshCache = geometryCache();
   async function loadGeometry(asset, thumbnailRequired = false, refreshThumbnail = false) {
@@ -148,7 +149,7 @@ export function Home() {
       const response = await fetch(`${api}/api/assets/${asset.id}/geometry`);
       if(response.ok) mesh = await response.json();
       else {
-        const generated=await client.request('asset.geometry',{id:asset.id,target_id:preferredTarget || targetId() || undefined});
+        const generated=await previewClient.request('asset.geometry',{id:asset.id,target_id:preferredTarget || targetId() || undefined});
         mesh=generated.mesh;
       }
       meshCache.set(asset.digest,mesh);
@@ -157,8 +158,8 @@ export function Home() {
         try {
           const {renderThumbnail} = await import('./GeometryPreview');
           const preview=renderThumbnail(mesh);
-          await client.request('asset.geometry.thumbnail',{id:asset.id,digest:asset.digest,preview});
-          setPreviewRevision(value=>value+1);
+          await previewClient.request('asset.geometry.thumbnail',{id:asset.id,digest:asset.digest,preview});
+          setPreviewRevision(value=>({...value,[asset.digest]:(value[asset.digest] || 0)+1}));
           setAssets(rows=>rows.map(row=>row.digest===asset.digest?{...row,has_geometry:true,has_geometry_preview:true}:row));
         }catch(error){
           if(thumbnailRequired)throw new Error('网格已保存，但缩略图生成失败：'+error.message);
@@ -171,17 +172,19 @@ export function Home() {
     request.then(()=>meshRequests.delete(asset.digest),()=>meshRequests.delete(asset.digest));
     return request;
   }
-  async function generatePreviews() {
-    if(!ready())return;
-    const rows=filtered();
-    if(!rows.length){showNotice('当前没有需要生成预览的组件');return;}
-    setBusy(true);
-    let completed=0;
-    try {
-      for(const asset of rows){showNotice(`正在生成预览 ${completed+1}/${rows.length}：${asset.name}`);await loadGeometry(asset,true,true);completed++;}
-      showNotice(`已生成 ${completed} 个组件的几何预览`);
-    }catch(error){showNotice(`已完成 ${completed} 个。${error.message}`,true);}
-    finally{setBusy(false);}
+  const [previewPending, setPreviewPending] = createSignal(0);
+  let previewConnected = false;
+  const previewClient = new WebsocketClient(wsUrl, value => {previewConnected = value === "connected";}, () => {});
+  const previewJobs = previewQueue({
+    available: () => ready() && previewConnected && modelEnabled(),
+    run: asset => loadGeometry(asset, true, !!asset.forceThumbnail),
+    changed: setPreviewPending,
+    failed: error => showNotice("模型已保存，预览失败："+error.message, true),
+  });
+  function generatePreviews() {
+    if (!ready()) return;
+    try { for (const asset of filtered()) previewJobs.add({...asset, forceThumbnail:true}); }
+    catch (error) { showNotice(error.message, true); }
   }
   const showNotice = (message, error = false) => setNotice({ message, error });
 
@@ -191,6 +194,7 @@ export function Home() {
     if (value === "connected") setConnectionLost(false);
   }, event => {
     if (["connected","library_changed","service_changed"].includes(event.type)) refresh().catch(error => showNotice(error.message, true));
+    if (event.type === "service_changed") refreshConnection().catch(() => {});
     if (event.type === "launcher_error") showNotice(event.message, true);
     if (event.type === "quick_launch") {
       if (event.target_id && targets().some(item => item.id === event.target_id)) setTargetId(event.target_id);
@@ -198,28 +202,51 @@ export function Home() {
     }
   });
 
+  let connectionPending = false;
+  const connectionClient = new WebsocketClient(wsUrl, value => {
+    if (value === "connected") refreshConnection().catch(() => {});
+  }, () => {});
+  async function refreshConnection() {
+    if (connectionPending) return;
+    connectionPending = true;
+    try {
+      let state;
+      try { state = await connectionClient.request("connection.state"); }
+      catch (error) {
+        if (!error.message.startsWith("未知操作")) throw error;
+        state = await connectionClient.request("state", {library_id:libraryId()});
+      }
+      setTargets(state.targets);
+      setNote(state.connection_note);
+      setClipboardSupported(state.clipboard_supported);
+      setNativeTargets(state.native_targets || []);
+      setModelEnabled(state.model_enabled !== false);
+      setTargetId(chooseTarget({embedded,preferredTarget,current:targetId(),followActive:followActive(),state}));
+    } finally { connectionPending = false; }
+  }
+
   async function refresh() {
     if (!ready() || refreshPending) { refreshQueued = true; return; }
     refreshPending = true;
     try {
       const requestedLibrary = libraryId();
       const requestedArchive = archived();
-      const state = await client.request("state", { library_id: requestedLibrary });
+      let state;
+      try { state = await client.request("library.state", {library_id:requestedLibrary, archived:requestedArchive}); }
+      catch (error) {
+        if (!error.message.startsWith("未知操作")) throw error;
+        state = await client.request("state", {library_id:requestedLibrary});
+        if (requestedArchive) state.assets = await client.request("library.list", {library_id:requestedLibrary, archived:true});
+      }
       if (requestedLibrary !== libraryId() || requestedArchive !== archived()) { refreshQueued = true; return; }
       setLibraries(state.libraries || []);
       setFolders(state.folders || []);
       if (quickPanel) setFloatingPanel(!!state.launcher?.frameless);
       if (folderId() && !state.folders?.some(item => item.id === folderId())) setFolderId(null);
-      setTargets(state.targets);
-      setNote(state.connection_note);
-      setClipboardSupported(state.clipboard_supported);
-      setNativeTargets(state.native_targets || []);
-      setModelEnabled(state.model_enabled !== false);
       setSidebarMode(state.panel_settings?.sidebar_mode || "fixed");
       if (!cardSizePending) setCardSize(state.panel_settings?.card_size || 184);
       if (embedded) window.parent.postMessage({type:"pat:panel-settings",settings:state.panel_settings}, hostOrigin);
-      setTargetId(chooseTarget({embedded,preferredTarget,current:targetId(),followActive:followActive(),state}));
-      const rows = requestedArchive ? await client.request("library.list", { archived: true, library_id: requestedLibrary }) : state.assets;
+      const rows = state.assets;
       if (requestedLibrary !== libraryId() || requestedArchive !== archived()) { refreshQueued = true; return; }
       setAssets(previous => {
         const current = new Map(previous.map(row => [row.id,row]));
@@ -344,11 +371,8 @@ export function Home() {
       if (result.preview_warning) showNotice(result.preview_warning);
       if (capturing && embedded) window.parent.postMessage({type:"pat:show"}, hostOrigin);
       if (generateGeometry) {
-        setBusy(true);
-        showNotice('组件已保存，正在生成几何预览…');
-        try {await loadGeometry(result,true);showNotice('组件及几何预览已保存');}
-        catch(error){showNotice('组件已保存。'+error.message,true);}
-        finally{setBusy(false);}
+        try { previewJobs.add(result); }
+        catch (error) { showNotice("组件已保存。"+error.message, true); }
       }
     }
   }
@@ -385,8 +409,8 @@ export function Home() {
   }
 
   onMount(() => {
-    client.connect();
-    poll = setInterval(() => { if (panelVisible && ready()) refresh().catch(() => {}); }, 10000);
+    client.connect(); previewClient.connect(); connectionClient.connect();
+    poll = setInterval(() => { if (panelVisible && ready()) {refresh().catch(() => {});refreshConnection().catch(() => {});} }, 10000);
     window.addEventListener("keydown",onSearchKey);
     window.addEventListener("message",hostMessage);
     if (embedded) window.parent.postMessage({type:"pat:ready"}, hostOrigin);
@@ -397,7 +421,7 @@ export function Home() {
     window.addEventListener("pointercancel", closeHeldPreview, true);
     window.addEventListener("blur", closeHeldPreview);
   });
-  onCleanup(() => { clearInterval(poll); clearTimeout(cardSizeTimer); client.disconnect(); window.removeEventListener("keydown",onSearchKey);window.removeEventListener("message",hostMessage);
+  onCleanup(() => { clearInterval(poll); clearTimeout(cardSizeTimer); client.disconnect(); previewClient.disconnect(); connectionClient.disconnect(); previewJobs.stop(); window.removeEventListener("keydown",onSearchKey);window.removeEventListener("message",hostMessage);
     window.removeEventListener("pointerup", previewPointerUp, true);
     window.removeEventListener("pointercancel", closeHeldPreview, true);
     window.removeEventListener("blur", closeHeldPreview);
@@ -439,14 +463,14 @@ export function Home() {
       <Show when={connectionLost() || (status() === "connected" && !modelEnabled())}><section class="connection-alert" role="alert"><span class="connection-alert-icon" aria-hidden="true">!</span><div><strong>{connectionLost() ? "后台连接已断开" : "模型连接已停止"}</strong><p>{connectionLost() ? "组件置入和保存暂不可用。请启动后台服务，连接恢复后可继续使用。" : "组件置入、自动复制和模型操作已停用。请在控制中心恢复模型连接。"}</p></div><Show when={status() === "connected"}><a href="/?control=1" target="_blank" rel="noopener noreferrer">打开控制中心</a></Show></section></Show>
       <Show when={ready() && modelEnabled() && !!target() && !nativeTargets().includes(targetId())}><section class="connection-alert" role="alert"><span class="connection-alert-icon" aria-hidden="true">!</span><div><strong>原生模型插件未连接</strong><p>请重新打开已安装插件的 Plasticity。直连恢复后，即可保存选中模型和置入组件。</p></div></section></Show><header class="page-header"><div><div class="eyebrow">YOUR REUSABLE GEOMETRY</div><h1>{archived() ? "已归档" : "模型组件库"}</h1><p>保存一次，随时置入。在 Plasticity 里继续创作。</p></div>
         <label class="search-field"><span>⌕</span><input ref={searchInput} aria-label="搜索组件" placeholder="搜索此库" value={query()} onInput={event => setQuery(event.currentTarget.value)} onKeyDown={event => { if(event.key === "Enter" && filtered().length && canInsert()) {event.preventDefault();insert(filtered()[0]);} }}/></label>
-        <div class="header-actions"><button class="secondary connection-settings-toggle" aria-label="连接与分组设置" aria-expanded={connectionSettings()} onClick={()=>setConnectionSettings(!connectionSettings())}>⚙</button><button class="secondary" disabled={!ready() || !modelEnabled()} onClick={generatePreviews}>生成预览</button><button class="secondary" disabled={!ready()} onClick={() => importInput.click()}>↓ 导入组件包</button><button class="primary" disabled={!ready() || !clipboardSupported()} onClick={openCapture}>＋ 保存组件</button><Show when={floatingPanel()}><button class="panel-dismiss" aria-label="收起面板" title="收起面板" disabled={!ready()} onClick={hidePanel}>×</button></Show></div>
+        <div class="header-actions"><button class="secondary connection-settings-toggle" aria-label="连接与分组设置" aria-expanded={connectionSettings()} onClick={()=>setConnectionSettings(!connectionSettings())}>⚙</button><button class="secondary" disabled={!ready() || !modelEnabled()} onClick={generatePreviews} title={previewPending() ? "预览在后台生成，仍可保存和置入" : "生成几何预览"}>{previewPending() ? `预览中 · ${previewPending()}` : "生成预览"}</button><button class="secondary" disabled={!ready()} onClick={() => importInput.click()}>↓ 导入组件包</button><button class="primary" disabled={!ready() || !clipboardSupported()} onClick={openCapture}>＋ 保存组件</button><Show when={floatingPanel()}><button class="panel-dismiss" aria-label="收起面板" title="收起面板" disabled={!ready()} onClick={hidePanel}>×</button></Show></div>
       </header>
       <input ref={importInput} class="hidden-input" type="file" accept=".patasset" onChange={importPackage}/>
 
       <Show when={connectionSettings()}><section class="target-bar" aria-label="目标窗口"><div class="target-label"><span class="small-square">↗</span><div><strong>置入目标</strong><span>{nativeTargets().includes(targetId()) ? "原生模型直连 · 不占用剪贴板" : "原生模型插件未连接"}</span></div></div>
         <select aria-label="Plasticity 目标窗口" onChange={event => {setTargetId(event.currentTarget.value);setFollowActive(false);}} disabled={busy() || (embedded && !!preferredTarget)}><option value="" selected={!targetId()}>{targets().length ? "请选择 Plasticity 窗口" : "未发现 Plasticity 窗口"}</option><For each={targets()}>{item => <option value={item.id} selected={targetId() === item.id}>{item.title} · {item.mode === "cdp" ? "CDP" : "原生"} · {item.target_id?.slice(0, 6) || item.hwnd}</option>}</For></select>
-        <Show when={!embedded}><button class="secondary" disabled={!ready()} aria-pressed={followActive()} onClick={() => {setFollowActive(!followActive());refresh().catch(error => showNotice(error.message,true));}}>{followActive() ? "跟随激活窗口" : "固定所选窗口"}</button></Show>
-        <button class="icon-button" aria-label="刷新窗口" disabled={!ready()} onClick={() => refresh().catch(error => showNotice(error.message, true))}>↻</button>
+        <Show when={!embedded}><button class="secondary" disabled={!ready()} aria-pressed={followActive()} onClick={() => {setFollowActive(!followActive());refreshConnection().catch(error => showNotice(error.message,true));}}>{followActive() ? "跟随激活窗口" : "固定所选窗口"}</button></Show>
+        <button class="icon-button" aria-label="刷新窗口" disabled={!ready()} onClick={() => refreshConnection().catch(error => showNotice(error.message, true))}>↻</button>
         <Show when={target()?.mode === "cdp"}><button class="secondary" disabled={!ready()} onClick={() => operate("target.embed", { target_id: targetId() }, "面板已嵌入")}>嵌入面板</button></Show>
         <Show when={embedded}><button class="secondary" onClick={hidePanel}>收起</button></Show>
       </section>

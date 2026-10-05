@@ -4,7 +4,7 @@ import base64
 import binascii
 import time
 import uuid
-from .model_clipboard import validate_model, MAX_BYTES
+from .model_clipboard import validate_model, encoded_model, MAX_BYTES
 from .group_recipe import validate_recipe
 
 
@@ -108,7 +108,7 @@ class NativeTransport:
                 raise ValueError('布尔模式需要使用定位置入')
             if insert_mode != 'new-body' and 'boolean-placement-v1' not in self.workers[target]['capabilities']:
                 raise ValueError('目标窗口尚未加载布尔置入插件，请重新打开 Plasticity')
-            payload={'model':base64.b64encode(validate_model(model)).decode(),'placement':bool(placement),'insert_mode':insert_mode}
+            payload={'model':encoded_model(model),'placement':bool(placement),'insert_mode':insert_mode}
             if recipe is not None:
                 payload['recipe']=validate_recipe(recipe,model)
                 if not placement:

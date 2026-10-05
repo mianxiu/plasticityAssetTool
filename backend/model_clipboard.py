@@ -6,11 +6,16 @@ Unknown encodings are rejected rather than sent to the native paste command.
 import json
 import math
 import struct
+import base64
+import hashlib
+import threading
+import copy
+from collections import OrderedDict
 
 MAX_BYTES = 64 * 1024 * 1024
 
 
-def parse_model(data):
+def _parse_model(data):
     def invalid():
         return ValueError("数据不是完整的 Plasticity 模型，已阻止置入。请在 Plasticity 中重新复制模型")
 
@@ -67,6 +72,47 @@ def parse_model(data):
     return bodies
 
 
+_CACHE_LIMIT = 32 * 1024 * 1024
+_cache = OrderedDict()
+_cache_bytes = 0
+_cache_lock = threading.RLock()
+
+
+def prepared_model(data):
+    global _cache_bytes
+    if not isinstance(data, bytes) or not 68 <= len(data) <= MAX_BYTES:
+        _parse_model(data)
+    digest = hashlib.sha256(data).digest()
+    with _cache_lock:
+        cached = _cache.get(digest)
+        if cached and cached[0][0] == data:
+            _cache.move_to_end(digest)
+            return cached[0]
+        parts = _parse_model(data)
+        entry = [data, parts, None]
+        # Conservatively account for Python JSON objects, not just body bytes.
+        cost = 8 * len(data) + (len(data) * 4 // 3 + 4) + sum(len(body) for body, _ in parts) + 1024 * len(parts)
+        if cost <= _CACHE_LIMIT:
+            while _cache and (_cache_bytes + cost > _CACHE_LIMIT or len(_cache) >= 16):
+                _, old = _cache.popitem(last=False)
+                _cache_bytes -= old[1]
+            _cache[digest] = (entry, cost)
+            _cache_bytes += cost
+        return entry
+
+
+def parse_model(data):
+    return [(body, copy.deepcopy(meta)) for body, meta in prepared_model(data)[1]]
+
+
+def encoded_model(data):
+    with _cache_lock:
+        entry = prepared_model(data)
+        if entry[2] is None:
+            entry[2] = base64.b64encode(data).decode('ascii')
+        return entry[2]
+
+
 def validate_model(data):
-    parse_model(data)
+    prepared_model(data)
     return data

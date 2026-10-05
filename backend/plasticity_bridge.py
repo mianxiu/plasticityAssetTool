@@ -2,6 +2,7 @@
 import asyncio
 import base64
 import json
+import time
 from pathlib import Path
 from urllib.parse import urlparse, quote
 from tornado.httpclient import AsyncHTTPClient, HTTPRequest
@@ -61,9 +62,27 @@ class PlasticityBridge:
         self.targets = {}
         self.last_error = ""
         self.active_target_id = None
+        self._scan_time = float("-inf")
+        self._scan_lock = asyncio.Lock()
 
     async def discover(self):
-        desktop = await asyncio.to_thread(self.desktop.windows) if self.desktop else []
+        async with self._scan_lock:
+            # HWND liveness is cheap and must stay fresh; cache only CDP discovery.
+            desktop = await asyncio.to_thread(self.desktop.windows) if self.desktop else []
+            cdp = {key: value for key, value in self.targets.items() if value.get("mode") == "cdp"}
+            self.targets = {**cdp, **{item["id"]: item for item in desktop}}
+            hwnd = await asyncio.to_thread(self.desktop.active_window) if self.desktop and hasattr(self.desktop, "active_window") else None
+            active = f"hwnd:{hwnd}" if hwnd else None
+            if time.monotonic() - self._scan_time >= 0.75:
+                await self._discover(desktop)
+                self._scan_time = time.monotonic()
+            if active in self.targets:
+                self.active_target_id = active
+            if self.active_target_id not in self.targets:
+                self.active_target_id = None
+            return list(self.targets.values())
+
+    async def _discover(self, desktop):
         endpoints = self.config.get("plasticity", {}).get("cdp_endpoints", ["http://127.0.0.1:9223"])
         client, cdp = AsyncHTTPClient(), []
         for endpoint in endpoints:

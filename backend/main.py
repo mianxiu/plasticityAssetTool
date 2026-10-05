@@ -211,7 +211,7 @@ class Application(web.Application):
         if action.startswith("service."):
             return await self.control.dispatch(action,args)
         result = await self.service.dispatch(action,args,self.settings["base_url"])
-        if action == "state":
+        if action in ("state", "library.state"):
             result["panel_settings"] = self.service.panel_settings.snapshot()
         return result
 
