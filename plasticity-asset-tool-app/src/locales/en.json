@@ -271,5 +271,13 @@
   "允许测试其他版本": "Allow testing other versions",
   "其他版本尚未验证兼容性；安装仍会校验入口并保留恢复备份。设置自动保存。": "Compatibility with other versions is unverified. Entry checks and recovery backups remain enabled. This setting is saved automatically.",
   "未验证版本": "Unverified version",
-  "此版本尚未实机验证，继续将按测试模式安装。": "This version has not been tested in Plasticity. Continuing installs in experimental mode."
+  "此版本尚未实机验证，继续将按测试模式安装。": "This version has not been tested in Plasticity. Continuing installs in experimental mode.",
+  "组件基点": "Component base point",
+  "世界原点": "World origin",
+  "视口拾取": "Pick in viewport",
+  "重设世界原点": "Reset to world origin",
+  "重新拾取基点": "Pick base point again",
+  "保留剪贴板中的原生基点": "Preserve the native clipboard base point",
+  "组件基点已更新": "Component base point updated",
+  "视口拾取使用原生捕捉，确认后保存，Esc 取消。编辑基点时请先选中原组件或参考模型；参考点使用原模型所在的世界坐标。": "Use native snapping to pick the base point. Confirm to save; Esc cancels. When editing, select the original component or a reference model first. Pick in the original model world coordinates."
 }

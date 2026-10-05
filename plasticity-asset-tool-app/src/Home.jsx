@@ -342,7 +342,7 @@ export function Home() {
     setBusy(true);
     setNotice(null);
     try {
-      if (embedded && (action === "asset.insert" || action === "target.command" || (action === "library.capture" && (args.copy_selection || args.auto_preview)))) {
+      if (embedded && (action === "asset.insert" || action === "target.command" || action === "library.rebase" || (action === "library.capture" && (args.copy_selection || args.auto_preview)))) {
         const preview = await prepareHost(false);
         if (preview) args = {...args,preview};
       }
@@ -397,7 +397,7 @@ export function Home() {
       return;
     }
     const result = await operate(capturing ? "library.capture" : "library.update", {
-      ...form(), id: selectedId(), target_id: capturing && form().recipe ? form().capture_target || preferredTarget || targetId() : targetId(), copy_selection: copySelection(), auto_preview:autoPreview(), preview_mode:'geometry', transport:"native",
+      ...form(), base_mode:capturing && copySelection() ? form().base_mode || "world" : "world", id: selectedId(), target_id: capturing && form().recipe ? form().capture_target || preferredTarget || targetId() : targetId(), copy_selection: copySelection(), auto_preview:autoPreview(), preview_mode:'geometry', transport:"native",
       follow_active:!embedded && followActive() && !form().recipe,
     }, capturing ? "组件已保存，可重复置入" : "组件信息已更新");
     if (result) {
@@ -413,6 +413,11 @@ export function Home() {
         catch (error) { showNotice("组件已保存。"+error.message, true); }
       }
     }
+  }
+  async function rebaseAsset(mode) {
+    const result=await operate("library.rebase",{id:selectedId(),target_id:embedded ? preferredTarget || targetId() : targetId(),base_mode:mode},"组件基点已更新");
+    if(embedded) window.parent.postMessage({type:"pat:show"},hostOrigin);
+    if(result) await refresh();
   }
   async function readPreview(event) {
     const file = event.target.files?.[0];
@@ -481,6 +486,7 @@ export function Home() {
       <label>{t("分组")}<select aria-label={t("组件所属分组")} disabled={foldersLoading()} onChange={event => setField("folder_id",event.currentTarget.value || null)}><option value="" selected={!form().folder_id}>{foldersLoading() ? t("正在加载分组…") : t("库根目录")}</option><For each={formFolders()}>{item => <option value={item.id} selected={form().folder_id === item.id}>{folderLabel(item.id,formFolders())}</option>}</For></select></label>
       <div class="form-row"><label>{t("分类")}<input maxlength="80" placeholder={t("未分类")} list="asset-categories" value={form().category} onInput={event => setField("category", event.currentTarget.value)}/></label><label>{t("标签")}<input maxlength="300" placeholder={t("螺栓，紧固件")} value={form().tags} onInput={event => setField("tags", event.currentTarget.value)}/></label></div><datalist id="asset-categories"><For each={categories()}>{name => <option value={name}/>}</For></datalist><label>{t("备注")}<textarea maxlength="2000" rows="3" placeholder={t("尺寸、用途或使用说明")} value={form().note} onInput={event => setField("note", event.currentTarget.value)}/></label>
       <Show when={props.capture}><label class="check-label" title={copySelection() ? t("直接读取选中模型，不占用系统剪贴板。") : t("从剪贴板保存，请先手动复制模型。")}><input type="checkbox" checked={copySelection()} disabled={busy() || !target() || !modelEnabled() || !!form().recipe} onChange={event => setCopySelection(event.currentTarget.checked)}/><span>{form().recipe ? t("直接保存选中的组") : t("直接保存选中的部件")}</span></label></Show>
+      <fieldset class="insert-mode-picker" title={t("视口拾取使用原生捕捉，确认后保存，Esc 取消。编辑基点时请先选中原组件或参考模型；参考点使用原模型所在的世界坐标。") }><legend>{t("组件基点")}</legend><Show when={props.capture} fallback={<div class="insert-mode-options"><button type="button" class="secondary" disabled={busy() || !target() || !modelEnabled()} onClick={()=>rebaseAsset("world")}>{t("重设世界原点")}</button><button type="button" class="secondary" disabled={busy() || !target() || !modelEnabled()} onClick={()=>rebaseAsset("pick")}>{t("重新拾取基点")}</button></div>}><Show when={copySelection()} fallback={<span>{t("保留剪贴板中的原生基点")}</span>}><div class="insert-mode-options"><For each={[["world","世界原点"],["pick","视口拾取"]]}>{item=><label><input type="radio" name="base_mode" value={item[0]} checked={(form().base_mode || "world") === item[0]} disabled={busy()} onChange={()=>setField("base_mode",item[0])}/><span>{t(item[1])}</span></label>}</For></div></Show></Show></fieldset>
       <label class="preview-picker">{t("预览图（可选）")}<input type="file" accept="image/jpeg" onChange={readPreview}/></label>
       <Show when={props.capture}><label class="check-label" title={t("从模型生成正交缩略图和三维预览，需要连接 Plasticity；上传的预览图优先使用。")}><input type="checkbox" checked={autoPreview()} disabled={busy()} onChange={event=>setAutoPreview(event.currentTarget.checked)}/><span>{t("自动生成几何预览")}</span></label></Show>
       <Show when={form().preview || (!props.capture && form().preview === undefined && selected()?.has_preview)}><div class="preview-editor"><img class="form-preview" src={form().preview || previewUrl(selected())} alt={t("组件预览")}/><button type="button" class="secondary" disabled={busy()} onClick={() => setField("preview", "")}>{t("移除预览图")}</button></div></Show>

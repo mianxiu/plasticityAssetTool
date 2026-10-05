@@ -58,7 +58,7 @@ class WSHandler(websocket.WebSocketHandler):
             result = await self.application.dispatch(request["action"], request.get("args", {}))
             if self.ws_connection:
                 await self.write_message({"type": "response", "id": request_id, "ok": True, "data": result})
-            if request["action"] in ("library.capture", "library.update", "library.archive", "library.restore", "collection.create", "collection.rename", "folder.create", "folder.rename", "asset.geometry.thumbnail"):
+            if request["action"] in ("library.capture", "library.update", "library.rebase", "library.archive", "library.restore", "collection.create", "collection.rename", "folder.create", "folder.rename", "asset.geometry.thumbnail"):
                 await self.application.broadcast({"type": "library_changed"})
         except Exception as exc:
             if not isinstance(exc, (ValueError, RuntimeError)):
@@ -266,7 +266,7 @@ class Application(web.Application):
         if action == "library.changes":
             return await self.changed_library_state(args)
         result = await self.service.dispatch(action,args,self.settings["base_url"])
-        if action in ("library.capture", "library.update"):
+        if action in ("library.capture", "library.update", "library.rebase"):
             self.record_library_change(result["id"])
         elif action in ("library.archive", "library.restore", "asset.geometry.thumbnail"):
             self.record_library_change(args.get("id"))

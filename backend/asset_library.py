@@ -260,6 +260,23 @@ class AssetLibrary:
         with self.connect() as db:
             db.execute("UPDATE assets SET archived=? WHERE id=?", (int(archived), asset_id))
 
+    def rebase(self, asset_id, expected_digest, model):
+        from .model_clipboard import validate_model
+        validate_model(model)
+        new_digest = hashlib.sha256(model).hexdigest()
+        with self.connect() as db:
+            current = db.execute('SELECT model,digest,archived FROM assets WHERE id=?', (asset_id,)).fetchone()
+            if current is None or current['archived'] or current['digest'] != expected_digest:
+                raise ValueError('组件在拾取期间已变化，未修改基点，请重试')
+            if bytes(current['model'])[56:] != model[56:]:
+                raise ValueError('基点修改不能改变模型几何或子部件信息')
+            db.execute('UPDATE assets SET model=?,digest=?,updated_at=? WHERE id=?',
+                       (model,new_digest,datetime.now(timezone.utc).isoformat(),asset_id))
+            # Placement changes leave tessellation and thumbnail geometry intact.
+            db.execute('INSERT OR IGNORE INTO geometry_cache(digest,mesh,thumbnail) SELECT ?,mesh,thumbnail FROM geometry_cache WHERE digest=?',
+                       (new_digest,expected_digest))
+        return self.details(asset_id)
+
     def export(self, asset_id):
         row = self.get(asset_id)
         output = io.BytesIO()

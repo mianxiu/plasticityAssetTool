@@ -154,6 +154,75 @@ function captureSelection(editor) {
   if (!captured?.length || captured.length > 64*1024*1024) throw new Error('没有取得有效的模型数据');
   return {model:captured.toString('base64'),kind,counts:{solids,curves}};
 }
+async function captureWithBasePoint(editor, CopyWithPlacementCommand) {
+  requireIdle(editor);
+  if (!editor.selection.selected.size) throw new Error('请先选中原组件或参考模型，再拾取基点');
+  if (typeof CopyWithPlacementCommand !== 'function') throw new Error('当前版本不支持原生基点拾取');
+  const clipboard = editor.clipboard, originalCopy = clipboard.copy;
+  let captured, calls = 0, timer, expired = false;
+  // Intercept the synchronous encoding call only, not the system clipboard
+  // throughout the interactive point picker. Forward native placement arguments.
+  const copyHook = function(...args) {
+    if(expired) throw new Error('基点拾取已结束');
+    if (++calls !== 1) throw new Error('原生基点复制接口不兼容');
+    const originalWrite = transportClipboard.writeBuffer;
+    let writes = 0;
+    transportClipboard.writeBuffer = (format, data) => {
+      if (format !== modelFormat || ++writes !== 1) throw new Error('原生基点模型格式不支持');
+      captured = NativeBuffer.from(data);
+    };
+    try {
+      const result = originalCopy.apply(this,args);
+      if (result?.then) throw new Error('原生基点编码接口不兼容');
+      return result;
+    } finally {transportClipboard.writeBuffer = originalWrite;}
+  };
+  const selected=editor.selection.selected;
+  const solids=Array.from(selected.solids || []).length, curves=Array.from(selected.curves || []).length;
+  const kind=solids+curves !== selected.size ? 'unknown' : solids && curves ? 'mixed' : curves ? 'curve' : solids ? 'solid' : 'unknown';
+  const command = new CopyWithPlacementCommand(editor);
+  command.remember = false;
+  const selectionMemento = selected.saveToMemento?.();
+  let resolveFinished, rejectFinished;
+  const finished = new Promise((resolve,reject)=>{resolveFinished=resolve;rejectFinished=reject;});
+  const execute=command.execute;
+  if(typeof execute !== 'function') throw new Error('原生基点命令接口不兼容');
+  command.execute = async function(...args) {
+    try {const value=await execute.apply(this,args);resolveFinished(value);return value;}
+    catch(error) {rejectFinished(error);throw error;}
+  };
+  clipboard.copy = copyHook;
+  transportBusy = true;
+  try {
+    const deadline = new Promise((_,reject)=>{timer=setTimeout(async()=>{
+      expired = true;
+      if(editor.executor.activeCommand === command) {
+        try {await editor.executor.cancelActiveCommand();} catch {}
+      }
+      reject(new Error('基点拾取超时，未保存组件'));
+    },120000);});
+    const launched=editor.exec(command);
+    Promise.resolve(launched).catch(rejectFinished);
+    await Promise.race([finished,deadline]);
+    if (!captured || captured.length < 68 || captured.length > 64*1024*1024) throw new Error('基点拾取已取消，未保存组件');
+    return {model:captured.toString('base64'),kind,counts:{solids,curves}};
+  } finally {
+    clearTimeout(timer);
+    expired = true;
+    if(clipboard.copy === copyHook) clipboard.copy = originalCopy;
+    if(selectionMemento !== undefined) selected.restoreFromMemento(selectionMemento);
+    transportBusy = false;
+  }
+}
+async function captureGroupWithBasePoint(editor, signature, CopyWithPlacementCommand) {
+  const group = captureGroup(editor,signature);
+  const captured = await captureWithBasePoint(editor,CopyWithPlacementCommand);
+  if(inspectGroup(editor).signature !== signature) throw new Error('组或模型已变化，未保存组件');
+  // Preserve ordered bodies and opaque native placement bytes as a unit.
+  const data=NativeBuffer.from(group.model,'base64');
+  NativeBuffer.from(captured.model,'base64').copy(data,0,0,56);
+  return {...group,model:data.toString('base64')};
+}
 async function insertModel(editor, args, PasteCommand, OperationType, BooleanFactory) {
   requireIdle(editor);
   const recipe = args.recipe;
@@ -354,4 +423,4 @@ function configureGroupPlacement(editor,command,factory,recipe,targets,Operation
     return results;
   };
 }
-globalThis.__plasticityAssetTransport = Object.freeze({captureSelection,captureGroup,inspectGroup,insertModel,calculationStatus});
+globalThis.__plasticityAssetTransport = Object.freeze({captureSelection,captureWithBasePoint,captureGroupWithBasePoint,captureGroup,inspectGroup,insertModel,calculationStatus});

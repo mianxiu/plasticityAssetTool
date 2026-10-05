@@ -109,7 +109,7 @@ class NativeTransport:
             return None
         return self.worker(target, token, capabilities=capabilities)
 
-    async def request(self, target, action, model=None, placement=True, insert_mode="new-body", recipe=None, signature=None, with_metadata=False):
+    async def request(self, target, action, model=None, placement=True, insert_mode="new-body", recipe=None, signature=None, with_metadata=False, base_mode=None):
         if target not in self.connected_targets():
             raise ValueError('目标窗口的原生模型插件未连接，请重新打开已安装插件的 Plasticity')
         if action not in ('capture','insert','inspect-group','capture-group'):
@@ -119,6 +119,11 @@ class NativeTransport:
                 raise ValueError('上次原生操作结果尚未确认，已阻止重复投递；请检查视口并等待连接回执')
             raise ValueError('目标窗口正在处理组件，请稍后重试')
         payload={}
+        if base_mode is not None:
+            if action not in ('capture','capture-group') or base_mode not in ('world','pick'):
+                raise ValueError('无效的组件基点模式')
+            if base_mode == 'pick' and 'base-point-v1' not in self.workers[target]['capabilities']:
+                raise ValueError('目标窗口尚未加载基点插件，请更新插件并重新打开 Plasticity')
         if action in ('inspect-group','capture-group') or recipe is not None:
             if 'group-recipe-v1' not in self.workers[target]['capabilities']:
                 raise ValueError('目标窗口尚未加载组运算插件，请重新打开 Plasticity')
@@ -126,6 +131,8 @@ class NativeTransport:
             if not isinstance(signature,str) or not 1 <= len(signature) <= 40000:
                 raise ValueError('请重新选择组并按 Tab 读取')
             payload={'signature':signature}
+        if base_mode is not None:
+            payload['base_mode'] = base_mode
         if action=='insert':
             if insert_mode not in ('new-body','union','difference','intersection'):
                 raise ValueError('无效的默认置入模式')
@@ -145,7 +152,7 @@ class NativeTransport:
         if target in self.notifications:
             self.notifications[target].set()
         try:
-            return await asyncio.wait_for(asyncio.shield(future),self.request_timeout)
+            return await asyncio.wait_for(asyncio.shield(future),140 if base_mode == 'pick' else self.request_timeout)
         except asyncio.TimeoutError as exc:
             raise ValueError('原生模型操作超时；请检查目标窗口的状态后再操作，勿重复置入') from exc
         finally:

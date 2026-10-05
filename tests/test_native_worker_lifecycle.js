@@ -11,7 +11,7 @@ function worker(target) {
     if(method==='Runtime.getProperties') {
       if(params.objectId==='fn')return {internalProperties:[{name:'[[Scopes]]',value:{objectId:'scopes'}}]};
       if(params.objectId==='scopes')return {result:[{value:{objectId:'closure',description:'Closure'}}]};
-      return {result:['editor','PasteCommand','OperationType','BooleanFactory'].map(name=>({name,value:{objectId:name}}))};
+      return {result:['editor','PasteCommand','CopyWithPlacementCommand','OperationType','BooleanFactory'].map(name=>({name,value:{objectId:name}}))};
     }
     if(method==='Runtime.callFunctionOn'){calls.push(params);return {result:{value:{started:true}}};}
     return {};
@@ -26,9 +26,10 @@ function worker(target) {
       response.emit('data',JSON.stringify({job,wait_supported:true}));response.emit('end');
     }});return req;
   }};
-  const context={URL,Buffer,require:name=>name==='http'?http:require(name),setTimeout:fn=>{timers.push(fn);return fn;},clearTimeout:fn=>{const i=timers.indexOf(fn);if(i>=0)timers.splice(i,1);}};
+  const intervals=new Set();
+  const context={setInterval(fn){intervals.add(fn);return fn;},clearInterval(fn){intervals.delete(fn);},URL,Buffer,require:name=>name==='http'?http:require(name),setTimeout:fn=>{timers.push(fn);return fn;},clearTimeout:fn=>{const i=timers.indexOf(fn);if(i>=0)timers.splice(i,1);}};
   vm.runInNewContext(source,context);context.startNativeWorker(win,'http://127.0.0.1:15150',target);
-  return {requests,calls,async tick(){assert(timers.length);timers.shift()();await flush();},navigate(){webContents.emit('did-start-navigation',{},'url',false,true);},detach(){attached=false;debuggerAPI.emit('detach');},destroy(){destroyed=true;webContents.emit('destroyed');},onHide(fn){hideHook=fn;}};
+  return {requests,calls,intervals,async tick(){assert(timers.length);timers.shift()();await flush();},navigate(){webContents.emit('did-start-navigation',{},'url',false,true);},detach(){attached=false;debuggerAPI.emit('detach');},destroy(){destroyed=true;webContents.emit('destroyed');},onHide(fn){hideHook=fn;}};
 }
 const job=id=>({id:id.repeat(32),action:'insert',model:'payload',placement:true});
 (async()=>{
@@ -53,6 +54,12 @@ const job=id=>({id:id.repeat(32),action:'insert',model:'payload',placement:true}
       assert.equal(current.requests[1].data.result,null);current.destroy();
     }
   }
+  const pointWorker=worker('hwnd:46');await flush();
+  assert(pointWorker.requests[0].data.capabilities.includes('base-point-v1'));
+  pointWorker.requests[0].reply({id:'e'.repeat(32),action:'capture',base_mode:'pick'});await flush();
+  assert.equal(pointWorker.calls[0].arguments[0].value,true);
+  assert.equal(pointWorker.calls[0].arguments[1].objectId,'CopyWithPlacementCommand');
+  assert.equal(pointWorker.intervals.size,0,'Interactive heartbeat is cleaned after the command');pointWorker.destroy();
   const changedDuringHide=worker('hwnd:45');await flush();
   changedDuringHide.onHide(()=>changedDuringHide.navigate());
   changedDuringHide.requests[0].reply(job('d'));await flush();

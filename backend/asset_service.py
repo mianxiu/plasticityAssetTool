@@ -81,7 +81,7 @@ class AssetService:
         if action == "asset.geometry.thumbnail":
             return await asyncio.to_thread(self.geometry.save_thumbnail, args.get("id"), args.get("digest"), decode_preview(args.get("preview")))
         async with self.lock:
-            if not self.model_enabled and (action.startswith("asset.") or action == "target.command" or (action == "library.capture" and args.get("copy_selection"))):
+            if not self.model_enabled and (action.startswith("asset.") or action in ("target.command", "library.rebase") or (action == "library.capture" and args.get("copy_selection"))):
                 raise ValueError("模型连接已暂停，请在托盘控制中心恢复")
             if action == "panel.dismiss":
                 if self.launcher and self.launcher.panel:
@@ -115,20 +115,26 @@ class AssetService:
                     if not target_id:
                         raise ValueError('没有可用的激活 Plasticity 窗口，请激活目标窗口或选择固定目标')
                 native = args.get("transport") == "native" and args.get("copy_selection")
+                base_mode = args.get('base_mode', 'world')
+                if base_mode not in ('world', 'pick'):
+                    raise ValueError('无效的组件基点模式')
+                if base_mode == 'pick' and not native:
+                    raise ValueError('基点拾取需要直接保存选中的模型')
+                base_options = {'base_mode': 'pick'} if base_mode == 'pick' else {}
                 recipe = None
                 if native:
                     if args.get("group_signature"):
-                        captured = await self.native.request(target_id, "capture-group", signature=args['group_signature'])
+                        captured = await self.native.request(target_id, "capture-group", signature=args['group_signature'], **base_options)
                         model, recipe = captured['model'], captured['recipe']
                         args = args | {'kind': 'solid'}
                     else:
                         capabilities = self.native.workers.get(target_id, {}).get('capabilities', [])
                         if 'selection-kind-v1' in capabilities:
-                            captured = await self.native.request(target_id, "capture", with_metadata=True)
+                            captured = await self.native.request(target_id, "capture", with_metadata=True, **base_options)
                             model = captured['model']
                             args = args | {'kind': captured['kind']}
                         else:
-                            model = await self.native.request(target_id, "capture")
+                            model = await self.native.request(target_id, "capture", **base_options)
                 else:
                     clipboard = self.clipboard()
                 if args.get("copy_selection") and not native:
@@ -156,6 +162,18 @@ class AssetService:
                 if args.get("auto_preview", True) and preview is None and args.get("preview_mode") != "geometry":
                     result["preview_warning"] = "模型已保存，但未能生成预览。请重新加载内嵌插件，或在编辑组件时上传预览图。"
                 return result
+            if action == 'library.rebase':
+                if args.get('base_mode') not in ('world', 'pick'):
+                    raise ValueError('请选择世界原点或视口拾取')
+                original = await asyncio.to_thread(self.library.model_row, args.get('id'))
+                model = validate_model(bytes(original['model']))
+                if original['archived'] or hashlib.sha256(model).hexdigest() != original['digest']:
+                    raise ValueError('组件已归档或数据校验失败，未修改基点')
+                # Native copy is the authority for the placement envelope; do
+                # not guess coordinate order, units or quaternion conventions.
+                reference = await self.native.request(args.get('target_id'), 'capture', base_mode=args['base_mode'])
+                updated = validate_model(reference[:56] + model[56:])
+                return await asyncio.to_thread(self.library.rebase, original['id'], original['digest'], updated)
             if action == "library.update":
                 fields = dict(args)
                 if "preview" in fields:
