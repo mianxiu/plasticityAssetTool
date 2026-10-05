@@ -15,6 +15,7 @@
 | `preview.jpg` | `.patasset` 内可选的手动预览图片 | JPEG 展示图，不含可编辑模型 |
 | 自动几何网格和缩略图 | 数据库中的可重建预览缓存 | 由连接的 Plasticity 内核生成；不包含在导出的组件包内 |
 | `PlasticityAssetTool.exe` | Windows 启动入口 | 与完整发布目录一起使用，不能只复制 EXE |
+| `PluginInstaller.exe` | 发布包自带的插件安装器 | 从后台控制中心“插件安装”启动，确认目标及 Windows 权限 |
 | `PlasticityAssetTool-windows-x64.zip` | 程序发布包，含启动器、运行时、插件和界面 | 解压运行，不包含个人组件数据库 |
 | `.zip.sha256` | 程序发布 ZIP 的完整性校验值 | 比较文件 SHA-256；不是数字签名或模型文件 |
 | `config.json`、运行状态 `.json` | 后台配置、面板设置或实例信息 | 不通过组件包入口导入 |

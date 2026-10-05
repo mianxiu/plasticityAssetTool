@@ -6,6 +6,7 @@ Windows 上的 Plasticity 模型组件库：保存选中对象，浏览组件，
 
 - [文件格式说明](File-Formats.md)：组件包、批量包、数据库、预览与程序发布包有什么区别。
 - [导入、导出与备份](Import-and-Export.md)：单个组件、多选、分类及整库导出，迁移和恢复方法。
+- [插件安装](Plugin-Installation.md)：自动检测版本与目录，安装、更新及恢复原始入口。
 - [项目源码与安装说明](https://github.com/mianxiu/plasticityAssetTool)
 
 这些文件既可在主仓库的 `docs/wiki/` 阅读，也可作为 GitHub Wiki 页面发布。Wiki 使用独立 Git 仓库；主仓库推送不会自动更新 Wiki。

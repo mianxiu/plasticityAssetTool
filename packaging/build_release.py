@@ -18,8 +18,11 @@ def build(python_runtime, dependencies):
         raise ValueError('需要完整 Windows Python 运行时及 Tornado 依赖目录')
     subprocess.run(['powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass',
         '-File', str(ROOT / 'build-launcher.ps1')], cwd=ROOT, check=True)
+    subprocess.run(['powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass',
+        '-File', str(ROOT / 'install-plugin.ps1'), '-BuildOnly'], cwd=ROOT, check=True)
     stage = ROOT / '.runtime/release-staging' / uuid.uuid4().hex / 'PlasticityAssetTool'
     stage.mkdir(parents=True)
+    shutil.copy2(ROOT / '.runtime/PlasticityAssetTool.PluginInstaller.exe', stage / 'PluginInstaller.exe')
     for name in ['main.py', 'start.ps1', 'config.json', 'LICENSE', 'requirements.txt',
                  'install-plugin.ps1', 'PlasticityAssetTool.exe']:
         shutil.copy2(ROOT / name, stage / name)
@@ -44,7 +47,8 @@ def build(python_runtime, dependencies):
     (stage / 'Readme.txt').write_text(
         '解压整个目录，双击 PlasticityAssetTool.exe。无需另外安装 Python 或 Node.js。\n'
         '后台由托盘控制退出；重复打开复用已有实例。\n'
-        '在 Plasticity 内使用 Tab，需要先按项目说明安装内嵌插件。\n'
+        '在后台控制中心的“插件安装”检测 Plasticity 版本和目录，选择安装或更新内嵌插件。\n'
+        '安装前自行保存并关闭对应 Plasticity 窗口，再在安装窗口确认 Windows 权限请求。\n'
         '用户组件保存在 library/，运行日志及插件恢复备份保存在 .runtime/。\n'
         '更新前请保留这两个目录。EXE 必须与整个发布目录一起使用。\n'
         '源码：https://github.com/mianxiu/plasticityAssetTool\n', encoding='utf-8-sig')

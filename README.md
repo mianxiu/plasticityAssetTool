@@ -21,6 +21,8 @@ Windows 上的 Plasticity 模型组件库。直接保存选中模型，点击组
 
 ## 启动
 
+发布包可解压后运行 `PlasticityAssetTool.exe`。控制中心新增“插件安装”：自动检测常见目录、Windows 安装记录及运行进程，也可输入其他安装目录；提供安装、更新及恢复原始入口，保留校验过的回滚备份。目前自动安装仅开放已实测的 Plasticity 26.1.3，运行中的对应版本会禁用安装操作；需自行保存并关闭窗口后重新检测。管理员权限仍需在 Windows 安装窗口由用户确认。完整流程见 [插件安装说明](docs/wiki/Plugin-Installation.md)。旧后台需通过托盘退出后重新启动，才能加载该入口。
+
 在项目目录的 PowerShell 中运行：
 
 ```powershell

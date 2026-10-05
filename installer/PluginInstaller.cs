@@ -8,6 +8,7 @@ using System.Reflection;
 using System.Security.Principal;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Web.Script.Serialization;
 using System.Windows.Forms;
 
@@ -54,7 +55,7 @@ internal static class PluginInstaller {
         form.ActiveControl=proceed;
         return form;
     }
-    private static int Install(Dictionary<string,object> request) {
+    private static int InstallCore(Dictionary<string,object> request) {
         if(!IsAdministrator())throw new InvalidOperationException("安装插件入口需要 Windows 管理员权限。");
         string root=Text(request,"root"), script=Path.Combine(root,"installer","main_embed_install.py");
         if(!File.Exists(script))throw new FileNotFoundException("找不到组件库安装脚本",script);
@@ -71,6 +72,20 @@ internal static class PluginInstaller {
             process.WaitForExit();
             File.WriteAllText(Text(request,"result"),output,Encoding.UTF8);
             return process.ExitCode;
+        }
+    }
+    private static int Install(Dictionary<string,object> request) {
+        string identity;
+        using(var hash=System.Security.Cryptography.SHA256.Create()) {
+            identity=BitConverter.ToString(hash.ComputeHash(Encoding.UTF8.GetBytes(Path.GetFullPath(Text(request,"target")).ToUpperInvariant()))).Replace("-","");
+        }
+        using(var mutex=new Mutex(false,"Local\\PlasticityAssetPluginInstall-"+identity)) {
+            bool owned=false;
+            try {
+                try {owned=mutex.WaitOne(0);} catch(AbandonedMutexException) {owned=true;}
+                if(!owned)throw new InvalidOperationException("另一个安装器正在修改此版本，请等待它完成。");
+                return InstallCore(request);
+            } finally {if(owned)mutex.ReleaseMutex();}
         }
     }
     [STAThread]

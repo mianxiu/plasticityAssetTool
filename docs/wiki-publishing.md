@@ -13,8 +13,8 @@ GitHub 官方说明：公开仓库可在 Free 套餐使用 Wiki；私有仓库 W
 1. 在仓库 Settings → General → Features 启用 Wiki；若 GitHub 提示升级，需先满足私有仓库的功能条件。
 2. 在仓库 Wiki 页面创建首个 `Home` 页面。GitHub 要求先创建页面，才能克隆 Wiki Git 仓库。[创建与编辑 Wiki](https://docs.github.com/en/communities/documenting-your-project-with-wikis/adding-or-editing-wiki-pages)
 3. 克隆 `https://github.com/mianxiu/plasticityAssetTool.wiki.git` 到单独目录。
-4. 将 `docs/wiki/` 中的 `Home.md`、`File-Formats.md`、`Import-and-Export.md` 和 `_Sidebar.md` 复制到 Wiki 仓库，保留其他已有页面。
-5. 将文档内部链接目标 `Home.md`、`File-Formats.md`、`Import-and-Export.md` 改为无后缀的 Wiki 页面名；主仓库源文件保留 `.md` 相对链接。
+4. 将 `docs/wiki/` 中的页面和 `_Sidebar.md` 复制到 Wiki 仓库，保留其他已有页面。
+5. 将文档内部的本地页面链接改为无 `.md` 后缀的 Wiki 页面名；主仓库源文件保留 `.md` 相对链接。
 6. 在 Wiki 仓库提交并推送，检查首页、侧栏及页面链接。
 
 启用前可直接阅读主仓库中的文档，内容与准备发布到 Wiki 的版本一致。此流程不需要改变仓库可见性，也不上传模型库、运行缓存或安装备份。

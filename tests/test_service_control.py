@@ -63,6 +63,18 @@ class ServiceControlTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(ValueError):
             await self.app.dispatch('service.focus',{'target_id':'missing'})
 
+    async def test_quit_refuses_while_installer_waits_for_user(self):
+        event = asyncio.Event()
+        self.app.control.plugins.task = asyncio.create_task(event.wait())
+        try:
+            with self.assertRaisesRegex(ValueError, '安装正在进行'):
+                await self.app.dispatch('service.quit', {})
+            self.assertFalse(self.app.stop_event.is_set())
+            self.assertTrue(self.service.model_enabled)
+        finally:
+            event.set()
+            await self.app.control.plugins.task
+
     def test_tray_uses_shared_ico_without_replacing_brand_for_status(self):
         active,paused=icon_bitmap(),icon_bitmap(True)
         self.assertEqual(struct.unpack_from('<IiiHH',active),(40,32,64,1,32))
@@ -91,6 +103,9 @@ class ServiceHttpTests(AsyncHTTPTestCase):
         self.assertEqual(post({'action':'service.connection','args':{'enabled':False}},headers={'Origin':'https://example.com'}).code,403)
         self.assertEqual(post({'action':'service.connection','args':{'enabled':False}}).code,200)
         self.assertFalse(json.loads(self.fetch('/api/service').body)['model_enabled'])
+        self.assertEqual(post({'action':'service.plugin_install','args':{'id':'unknown','operation':'install'}}).code,400)
+        self.assertEqual(post({'action':'service.plugin_detect','args':{}},headers={'Origin':'https://example.com'}).code,403)
+        self.assertEqual(post({'action':'service.plugin_install','args':{'id':[],'operation':'install'}}).code,400)
 
 
 class HtmlCacheTests(AsyncHTTPTestCase):
