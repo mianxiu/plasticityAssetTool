@@ -17,6 +17,8 @@ METADATA_COLUMNS = """id,name,category,tags,note,created_at,updated_at,
     (preview IS NOT NULL AND length(preview)>0) AS has_preview,
     EXISTS(SELECT 1 FROM geometry_cache g WHERE g.digest=assets.digest) AS has_geometry,
     EXISTS(SELECT 1 FROM geometry_cache g WHERE g.digest=assets.digest AND g.thumbnail IS NOT NULL) AS has_geometry_preview"""
+INDEX_COLUMNS = METADATA_COLUMNS.replace("length(model) AS bytes", "model_bytes AS bytes").replace(
+    "(preview IS NOT NULL AND length(preview)>0) AS has_preview", "has_preview").replace("assets.digest", "asset_metadata.digest")
 
 
 class AssetLibrary:
@@ -43,6 +45,18 @@ class AssetLibrary:
             db.execute("INSERT OR IGNORE INTO libraries VALUES ('default','默认库',?)", (datetime.now(timezone.utc).isoformat(),))
             db.execute("CREATE INDEX IF NOT EXISTS assets_library_archive ON assets(library_id,archived)")
             db.execute("CREATE TABLE IF NOT EXISTS geometry_cache (digest TEXT PRIMARY KEY,mesh BLOB NOT NULL,thumbnail BLOB)")
+            # Keep browsing records off the large BLOB rows. Triggers maintain
+            # this rebuildable projection atomically, including direct SQL edits.
+            fields = "id,name,category,tags,note,created_at,updated_at,source_version,digest,archived,library_id,folder_id,kind,insert_mode,recipe_json"
+            projection = fields + ",length(model) AS model_bytes,(preview IS NOT NULL AND length(preview)>0) AS has_preview"
+            db.execute(f"CREATE TABLE IF NOT EXISTS asset_metadata AS SELECT {projection} FROM assets WHERE 0")
+            db.execute("CREATE UNIQUE INDEX IF NOT EXISTS asset_metadata_id ON asset_metadata(id)")
+            db.execute("CREATE INDEX IF NOT EXISTS asset_metadata_library ON asset_metadata(library_id,archived,created_at)")
+            db.execute(f"INSERT INTO asset_metadata SELECT {projection} FROM assets WHERE NOT EXISTS (SELECT 1 FROM asset_metadata m WHERE m.id=assets.id)")
+            values = ",".join("new." + field for field in fields.split(",")) + ",length(new.model),(new.preview IS NOT NULL AND length(new.preview)>0)"
+            for event in ("INSERT", "UPDATE"):
+                db.execute(f"CREATE TRIGGER IF NOT EXISTS asset_metadata_{event.lower()} AFTER {event} ON assets BEGIN INSERT OR REPLACE INTO asset_metadata VALUES ({values}); END")
+            db.execute("CREATE TRIGGER IF NOT EXISTS asset_metadata_delete AFTER DELETE ON assets BEGIN DELETE FROM asset_metadata WHERE id=old.id; END")
 
     @contextmanager
     def connect(self):
@@ -67,7 +81,7 @@ class AssetLibrary:
         self.require_library(library_id)
         with self.connect() as db:
             return [self.metadata(row) for row in db.execute(
-                f"SELECT {METADATA_COLUMNS} FROM assets WHERE archived=? AND library_id=? ORDER BY created_at DESC", (int(archived), library_id)
+                f"SELECT {INDEX_COLUMNS} FROM asset_metadata WHERE archived=? AND library_id=? ORDER BY created_at DESC", (int(archived), library_id)
             )]
 
     def require_library(self, library_id):
@@ -137,7 +151,7 @@ class AssetLibrary:
 
     def details(self, asset_id):
         with self.connect() as db:
-            row = db.execute(f"SELECT {METADATA_COLUMNS} FROM assets WHERE id=?", (asset_id,)).fetchone()
+            row = db.execute(f"SELECT {INDEX_COLUMNS} FROM asset_metadata WHERE id=?", (asset_id,)).fetchone()
         if row is None:
             raise ValueError("组件不存在，请刷新组件库")
         return self.metadata(row)
@@ -164,7 +178,7 @@ class AssetLibrary:
 
     def digest(self, asset_id):
         with self.connect() as db:
-            row = db.execute("SELECT digest FROM assets WHERE id=?", (asset_id,)).fetchone()
+            row = db.execute("SELECT digest FROM asset_metadata WHERE id=?", (asset_id,)).fetchone()
         if row is None:
             raise ValueError("组件不存在，请刷新组件库")
         return row["digest"]

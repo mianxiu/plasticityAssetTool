@@ -4,6 +4,8 @@ import subprocess
 import tempfile
 import unittest
 import zlib
+import sqlite3
+from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import patch
 
@@ -33,6 +35,30 @@ class PerformanceTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(await self.service.geometry.generate(asset['id']), mesh())
             self.assertEqual(self.service.geometry.thumbnail(asset['id']), b'\xff\xd8image')
             self.service.geometry.save_thumbnail(asset['id'], asset['digest'], b'\xff\xd8new')
+
+    def test_listing_index_is_atomic_and_never_reads_asset_blob_rows(self):
+        library = self.service.library
+        asset = library.add(model_bytes(), {'name':'before'})
+        library.update(asset['id'], {'name':'after'})
+        with library.connect() as db:
+            db.execute('UPDATE assets SET model=?,preview=? WHERE id=?', (b'changed bytes', b'\xff\xd8image', asset['id']))
+        connect = library.connect
+        @contextmanager
+        def without_asset_rows():
+            with connect() as db:
+                db.set_authorizer(lambda action, table, column, *_: sqlite3.SQLITE_DENY
+                                  if action == sqlite3.SQLITE_READ and table == 'assets' else sqlite3.SQLITE_OK)
+                yield db
+        with patch.object(library, 'connect', without_asset_rows):
+            row = library.list()[0]
+            self.assertEqual(library.details(asset['id']),row)
+            self.assertEqual(library.digest(asset['id']),asset['digest'])
+        self.assertEqual(row['name'],'after')
+        self.assertEqual(row['bytes'],len(b'changed bytes'))
+        self.assertTrue(row['has_preview'])
+        with connect() as db:
+            db.execute('DELETE FROM assets WHERE id=?',(asset['id'],))
+            self.assertIsNone(db.execute('SELECT id FROM asset_metadata WHERE id=?',(asset['id'],)).fetchone())
 
     async def test_library_refresh_does_not_wait_for_model_lock_or_discovery(self):
         async with self.service.lock:
@@ -87,4 +113,8 @@ class PerformanceTests(unittest.IsolatedAsyncioTestCase):
 
     def test_background_preview_queue(self):
         subprocess.run(['node', 'tests/test_preview_queue.mjs'], cwd=Path(__file__).resolve().parent.parent,
+                       check=True, capture_output=True, timeout=10)
+
+    def test_virtual_grid_and_incremental_merge(self):
+        subprocess.run(['node', 'tests/test_library_sync.mjs'], cwd=Path(__file__).resolve().parent.parent,
                        check=True, capture_output=True, timeout=10)

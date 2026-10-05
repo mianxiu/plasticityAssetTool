@@ -1,3 +1,5 @@
+import {VirtualAssetGrid} from "./VirtualAssetGrid";
+import {mergeLibrary} from "./librarySync.mjs";
 import { previewQueue } from "./previewQueue.mjs";
 import { createMemo, createSignal, lazy, For, onCleanup, onMount, Show } from "solid-js";
 import { WebsocketClient } from "./Websocketclient";
@@ -30,7 +32,7 @@ export function Home() {
   function hostMessage(event) {
     if (!embedded || event.source !== window.parent) return;
     if (event.data?.type === "pat:hidden") panelVisible = false;
-    if (event.data?.type === "pat:shown") { panelVisible = true; refreshConnection().catch(() => {}); if (preferredTarget) setTargetId(preferredTarget); refresh().catch(error => showNotice(error.message, true)); focusSearch(); }
+    if (event.data?.type === "pat:shown") { panelVisible = true; refreshConnection().catch(() => {}); if (preferredTarget) setTargetId(preferredTarget); window.dispatchEvent(new Event("pat:layout")); clearTimeout(shownTimer); shownTimer = setTimeout(() => refresh().catch(error => showNotice(error.message,true)), 150); focusSearch(); }
     if (event.data?.type === "pat:prepared") pendingHost.get(event.data.id)?.(event.data);
   }
   function prepareHost(preview = false) {
@@ -108,6 +110,7 @@ export function Home() {
   let poll;
   let refreshPending = false;
   let refreshQueued = false;
+  let libraryCursor = null, cursorView = null, libraryLoaded = false, shownTimer;
 
   const selected = createMemo(() => assets().find(asset => asset.id === selectedId()));
   const target = createMemo(() => targets().find(item => item.id === targetId()));
@@ -130,10 +133,17 @@ export function Home() {
     return path;
   };
   const folderLabel = (id, rows = folders()) => folderPath(id, rows).map(item => item.name).join(" / ") || "库根目录";
-  const filtered = createMemo(() => assets().filter(asset => {
-    const text = [asset.name, asset.category, asset.tags, asset.note, folderLabel(asset.folder_id)].join(" ").toLowerCase();
-    return (query().trim() || asset.folder_id === folderId()) && (kind() === "all" || asset.kind === kind()) && (category() === "全部组件" || asset.category === category()) && text.includes(query().trim().toLowerCase());
-  }).sort((a,b) => sortMode() === "name" ? a.name.localeCompare(b.name, "zh-CN") : sortMode() === "oldest" ? a.created_at.localeCompare(b.created_at) : b.created_at.localeCompare(a.created_at)));
+  const searchable = createMemo(() => {
+    const labels = new Map(folders().map(row => [row.id, folderLabel(row.id)]));
+    return assets().map(asset => ({asset, text:[asset.name,asset.category,asset.tags,asset.note,labels.get(asset.folder_id) || "库根目录"].join(" ").toLowerCase()}));
+  });
+  const filtered = createMemo(() => {
+    const search = query().trim().toLowerCase();
+    const rows = searchable().filter(({asset,text}) => (search || asset.folder_id === folderId()) &&
+      (kind() === "all" || asset.kind === kind()) && (category() === "全部组件" || asset.category === category()) && text.includes(search)).map(row => row.asset);
+    const mode = sortMode();
+    return rows.sort((a,b) => mode === "name" ? a.name.localeCompare(b.name, "zh-CN") : mode === "oldest" ? a.created_at.localeCompare(b.created_at) : b.created_at.localeCompare(a.created_at));
+  });
   const ready = () => status() === "connected" && !busy();
   const canInsert = () => ready() && modelEnabled() && nativeTargets().includes(targetId()) && !archived();
   const setField = (key, value) => setForm(current => ({ ...current, [key]: value }));
@@ -226,33 +236,32 @@ export function Home() {
   }
 
   async function refresh() {
+    if (libraryLoaded && !panelVisible) { refreshQueued = true; return; }
     if (!ready() || refreshPending) { refreshQueued = true; return; }
+    refreshQueued = false;
     refreshPending = true;
     try {
       const requestedLibrary = libraryId();
       const requestedArchive = archived();
       let state;
-      try { state = await client.request("library.state", {library_id:requestedLibrary, archived:requestedArchive}); }
+      try { state = await client.request("library.changes", {library_id:requestedLibrary, archived:requestedArchive, since:cursorView === requestedLibrary+":"+requestedArchive ? libraryCursor : null}); }
       catch (error) {
         if (!error.message.startsWith("未知操作")) throw error;
         state = await client.request("state", {library_id:requestedLibrary});
         if (requestedArchive) state.assets = await client.request("library.list", {library_id:requestedLibrary, archived:true});
       }
       if (requestedLibrary !== libraryId() || requestedArchive !== archived()) { refreshQueued = true; return; }
-      setLibraries(state.libraries || []);
-      setFolders(state.folders || []);
+      setLibraries(previous => JSON.stringify(previous) === JSON.stringify(state.libraries || []) ? previous : state.libraries || []);
+      setFolders(previous => JSON.stringify(previous) === JSON.stringify(state.folders || []) ? previous : state.folders || []);
       if (quickPanel) setFloatingPanel(!!state.launcher?.frameless);
       if (folderId() && !state.folders?.some(item => item.id === folderId())) setFolderId(null);
       setSidebarMode(state.panel_settings?.sidebar_mode || "fixed");
       if (!cardSizePending) setCardSize(state.panel_settings?.card_size || 184);
       if (embedded) window.parent.postMessage({type:"pat:panel-settings",settings:state.panel_settings}, hostOrigin);
-      const rows = state.assets;
       if (requestedLibrary !== libraryId() || requestedArchive !== archived()) { refreshQueued = true; return; }
-      setAssets(previous => {
-        const current = new Map(previous.map(row => [row.id,row]));
-        return rows.map(row => {const old=current.get(row.id);return old && JSON.stringify(old)===JSON.stringify(row) ? old : row;});
-      });
-      if (!rows.some(asset => asset.id === selectedId())) setSelectedId("");
+      setAssets(previous => mergeLibrary(previous, state));
+      libraryCursor = state.revision || null; cursorView = requestedLibrary+":"+requestedArchive; libraryLoaded = true;
+      if (!assets().some(asset => asset.id === selectedId())) setSelectedId("");
     } finally {
       refreshPending = false;
       if (refreshQueued && ready()) { refreshQueued = false; queueMicrotask(() => refresh().catch(error => showNotice(error.message, true))); }
@@ -284,6 +293,7 @@ export function Home() {
   }
   async function switchLibrary(id) {
     if (busy()) return;
+    libraryCursor = null; cursorView = null; libraryLoaded = false;
     setLibraryId(id); setAssets([]); setFolders([]); setFolderId(null); setSelectedId(""); setArchived(false); setCategory("全部组件"); setQuery(""); setKind("all"); await refresh();
   }
   function enterFolder(id) { setFolderId(id); setSelectedId(""); setCategory("全部组件"); setQuery(""); }
@@ -421,7 +431,7 @@ export function Home() {
     window.addEventListener("pointercancel", closeHeldPreview, true);
     window.addEventListener("blur", closeHeldPreview);
   });
-  onCleanup(() => { clearInterval(poll); clearTimeout(cardSizeTimer); client.disconnect(); previewClient.disconnect(); connectionClient.disconnect(); previewJobs.stop(); window.removeEventListener("keydown",onSearchKey);window.removeEventListener("message",hostMessage);
+  onCleanup(() => { clearInterval(poll); clearTimeout(cardSizeTimer); clearTimeout(shownTimer); client.disconnect(); previewClient.disconnect(); connectionClient.disconnect(); previewJobs.stop(); window.removeEventListener("keydown",onSearchKey);window.removeEventListener("message",hostMessage);
     window.removeEventListener("pointerup", previewPointerUp, true);
     window.removeEventListener("pointercancel", closeHeldPreview, true);
     window.removeEventListener("blur", closeHeldPreview);
@@ -489,10 +499,10 @@ export function Home() {
       <div class="library-layout">
         <section class="asset-grid" aria-label="组件列表">
           <Show when={filtered().length} fallback={<div class="empty-state"><div class="empty-cube"><Cube /></div><h2>{query() || category() !== "全部组件" || kind() !== "all" ? "没有匹配的组件" : archived() ? "没有归档组件" : folderId() || childFolders().length ? "当前分组没有直接保存的组件" : "从你的第一个组件开始"}</h2><p>{query() ? "换个关键词，或者查看全部组件。" : archived() ? "归档的组件会保留模型数据，随时可以恢复。" : "在 Plasticity 中选中模型，\n点击保存组件即可直接读取并保存。以后只需一点，即可原生置入。"}</p><Show when={!archived() && !query()}><button class="primary" disabled={!ready() || !clipboardSupported()} onClick={openCapture}>＋ 保存组件</button></Show></div>}>
-            <For each={filtered()}>{asset => <article data-insert-mode={displayMode(asset)} class={selectedId() === asset.id ? "asset-card selected" : "asset-card"}>
+            <VirtualAssetGrid items={filtered()} size={cardSize()}>{asset => <article data-insert-mode={displayMode(asset)} class={selectedId() === asset.id ? "asset-card selected" : "asset-card"}>
               <button class="asset-preview" data-insert-mode={displayMode(asset)} aria-label={"置入 " + asset.name} aria-disabled={!canInsert()} onClick={() => {if(canInsert())insert(asset);}} onPointerDown={event=>previewPointerDown(event,asset)} onContextMenu={event=>event.preventDefault()}><Show when={asset.has_geometry_preview || asset.has_preview} fallback={<div class="model-placeholder"><Cube /><span>原生模型</span></div>}><img loading="lazy" decoding="async" classList={{"geometry-thumbnail":!asset.has_preview}} src={previewUrl(asset)} alt={asset.name} draggable="false"/></Show><span class="asset-format">{kindNames[asset.kind]}</span><Show when={asset.recipe || (asset.insert_mode && asset.insert_mode !== "new-body")}><span class="asset-insert-mode" title={asset.recipe ? "按组内子部件顺序执行" : "默认置入：" + modeLabel(asset)}>{modeLabel(asset)}</span></Show></button>
               <div class="asset-body"><div class="asset-name">{asset.name}</div><div class="asset-meta" title={asset.recipe ? "连续布尔 · " + asset.recipe.parts.length + " 个子部件" : "默认置入：" + modeLabel(asset)}>{asset.category}<span>{Math.max(1, Math.round(asset.bytes / 1024))} KB</span></div><div class="card-footer"><span title={asset.tags}>{asset.tags || ""}</span><button class="insert-button" aria-label={"编辑 " + asset.name} onClick={() => openEdit(asset)}>编辑</button></div></div>
-            </article>}</For>
+            </article>}</VirtualAssetGrid>
           </Show>
         </section>
         <Show when={detailsOpen() && selected()}><div class="asset-details-backdrop" onClick={()=>setDetailsOpen(false)}><aside class="details-panel" role="dialog" aria-modal="true" aria-label="组件详情" onClick={event=>event.stopPropagation()}><button class="details-dismiss" aria-label="关闭组件详情" onClick={()=>setDetailsOpen(false)}>×</button><Show when={selected()} fallback={<div class="detail-placeholder"><Cube /><h3>组件详情</h3><p>选择一个组件，查看信息或置入到当前模型。</p></div>}>

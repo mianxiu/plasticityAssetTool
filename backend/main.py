@@ -3,6 +3,8 @@ import argparse
 import asyncio
 import json
 import logging
+import uuid
+from collections import deque
 import webbrowser
 from pathlib import Path
 from urllib.parse import urlparse
@@ -56,7 +58,7 @@ class WSHandler(websocket.WebSocketHandler):
             result = await self.application.dispatch(request["action"], request.get("args", {}))
             if self.ws_connection:
                 await self.write_message({"type": "response", "id": request_id, "ok": True, "data": result})
-            if request["action"].startswith(("library.", "collection.", "folder.")) and request["action"] not in ("library.list", "folder.list"):
+            if request["action"] in ("library.capture", "library.update", "library.archive", "library.restore", "collection.create", "collection.rename", "folder.create", "folder.rename", "asset.geometry.thumbnail"):
                 await self.application.broadcast({"type": "library_changed"})
         except Exception as exc:
             if not isinstance(exc, (ValueError, RuntimeError)):
@@ -155,6 +157,7 @@ class ImportHandler(LocalHandler):
             async with self.application.service.lock:
                 result = await asyncio.to_thread(self.application.service.library.import_package, files[0]["body"], self.get_body_argument("library_id", "default"), self.get_body_argument("folder_id", None) or None)
             self.write({"ok": True, "data": result})
+            self.application.record_library_change(result["id"])
             await self.application.broadcast({"type": "library_changed"})
         except (ValueError, OSError) as exc:
             self.set_status(400)
@@ -181,6 +184,9 @@ class StaticHandler(web.StaticFileHandler):
 class Application(web.Application):
     def __init__(self, config, service=None):
         self.clients = set()
+        self.library_generation = uuid.uuid4().hex
+        self.library_revision = 0
+        self.library_changes = deque(maxlen=512)
         self.service = service or AssetService(config, ROOT)
         self.control_window = ControlWindow(f'http://127.0.0.1:{config["server"]["http_port"]}', ROOT, self.service.desktop)
         self.stop_event = asyncio.Event()
@@ -210,10 +216,50 @@ class Application(web.Application):
             raise ValueError("参数必须是对象")
         if action.startswith("service."):
             return await self.control.dispatch(action,args)
+        if action == "library.changes":
+            return await self.changed_library_state(args)
         result = await self.service.dispatch(action,args,self.settings["base_url"])
+        if action in ("library.capture", "library.update"):
+            self.record_library_change(result["id"])
+        elif action in ("library.archive", "library.restore", "asset.geometry.thumbnail"):
+            self.record_library_change(args.get("id"))
         if action in ("state", "library.state"):
             result["panel_settings"] = self.service.panel_settings.snapshot()
         return result
+
+    def record_library_change(self, asset_id):
+        self.library_revision += 1
+        self.library_changes.append((self.library_revision, asset_id))
+
+    async def changed_library_state(self, args):
+        # A process-specific cursor forces a full snapshot after a restart.
+        revision = self.library_revision
+        cursor = f"{self.library_generation}:{revision}"
+        since = args.get("since")
+        generation, separator, number = since.rpartition(":") if isinstance(since, str) else ("", "", "")
+        valid = separator and generation == self.library_generation and number.isdigit()
+        number = int(number) if valid else -1
+        oldest = self.library_changes[0][0] - 1 if self.library_changes else revision
+        valid = valid and oldest <= number <= revision
+        library_id = args.get("library_id", "default")
+        archived = bool(args.get("archived", False))
+        if not valid:
+            state = await self.service.library_state(library_id, archived)
+            state.update(full=True, revision=cursor)
+        else:
+            ids = {asset_id for change, asset_id in self.library_changes if number < change <= revision}
+            def changed():
+                rows = [self.service.library.details(asset_id) for asset_id in ids]
+                return [row for row in rows if row['library_id'] == library_id and bool(row['archived']) == archived]
+            rows, libraries, folders = await asyncio.gather(
+                asyncio.to_thread(changed), asyncio.to_thread(self.service.library.libraries),
+                asyncio.to_thread(self.service.library.folders, library_id))
+            state = {"full": False, "revision": cursor, "changed": rows,
+                     "removed": list(ids - {row['id'] for row in rows}),
+                     "libraries": libraries, "folders": folders,
+                     "launcher": self.service.launcher.snapshot() if self.service.launcher else {"registered": False}}
+        state["panel_settings"] = self.service.panel_settings.snapshot()
+        return state
 
 async def reuse_backend(port, headless):
     url = f"http://127.0.0.1:{port}"

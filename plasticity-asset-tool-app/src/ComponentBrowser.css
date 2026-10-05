@@ -149,4 +149,11 @@ body:has(.component-first){background:#181818}
 .group-recipe ol { margin: 0; padding-left: 24px; max-height: 220px; overflow-y: auto; }
 .group-recipe li { padding: 3px; }
 .group-recipe li span { overflow-wrap: anywhere; }
+.component-first .asset-grid:has(.virtual-asset-grid){display:block}
+.virtual-asset-grid{position:relative;width:100%;overflow-anchor:none}
+.virtual-asset-slot{position:absolute;top:0;left:0;contain:layout style}
+.component-first .virtual-asset-slot>.asset-card{height:100%;display:flex;flex-direction:column}
+.component-first .virtual-asset-slot .asset-preview{height:var(--preview-height);aspect-ratio:auto;flex-shrink:0}
+.component-first .virtual-asset-slot .asset-body{flex:1;min-height:0}
+.component-first .virtual-asset-slot .asset-name{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .group-recipe small { float: right; margin-left: 8px; color: #aaa; }

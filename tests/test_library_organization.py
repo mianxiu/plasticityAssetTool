@@ -64,6 +64,10 @@ class OrganizationTests(unittest.TestCase):
         with self.library.connect() as db:
             db.execute("INSERT INTO assets (id,name,category,tags,note,created_at,source_version,digest,model) VALUES ('legacy','old','未分类','','','2024','unknown','digest',?)", (self.model,))
             db.execute("DROP INDEX assets_library_archive")
+            # A pre-index legacy database has neither this projection nor triggers.
+            for event in ("insert", "update", "delete"):
+                db.execute(f"DROP TRIGGER asset_metadata_{event}")
+            db.execute("DROP TABLE asset_metadata")
             for column in ("library_id", "folder_id", "kind", "updated_at"):
                 db.execute(f"ALTER TABLE assets DROP COLUMN {column}")
         migrated = AssetLibrary(self.directory.name)
