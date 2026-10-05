@@ -279,5 +279,5 @@
   "重新拾取基点": "Pick base point again",
   "保留剪贴板中的原生基点": "Preserve the native clipboard base point",
   "组件基点已更新": "Component base point updated",
-  "视口拾取使用原生捕捉，确认后保存，Esc 取消。编辑基点时请先选中原组件或参考模型；参考点使用原模型所在的世界坐标。": "Use native snapping to pick the base point. Confirm to save; Esc cancels. When editing, select the original component or a reference model first. Pick in the original model world coordinates."
+  "编辑基点会自动加载临时组件作为参考。确认后保存，Esc 取消；临时模型自动移除。": "Editing a base point automatically loads a temporary component. Confirm to save; Esc cancels. The reference is removed automatically."
 }

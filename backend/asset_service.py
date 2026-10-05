@@ -171,7 +171,7 @@ class AssetService:
                     raise ValueError('组件已归档或数据校验失败，未修改基点')
                 # Native copy is the authority for the placement envelope; do
                 # not guess coordinate order, units or quaternion conventions.
-                reference = await self.native.request(args.get('target_id'), 'capture', base_mode=args['base_mode'])
+                reference = await self.native.request(args.get('target_id'), 'rebase', model, base_mode=args['base_mode'])
                 updated = validate_model(reference[:56] + model[56:])
                 return await asyncio.to_thread(self.library.rebase, original['id'], original['digest'], updated)
             if action == "library.update":

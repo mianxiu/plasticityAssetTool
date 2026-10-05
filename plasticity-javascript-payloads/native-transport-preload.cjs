@@ -154,9 +154,9 @@ function captureSelection(editor) {
   if (!captured?.length || captured.length > 64*1024*1024) throw new Error('没有取得有效的模型数据');
   return {model:captured.toString('base64'),kind,counts:{solids,curves}};
 }
-async function captureWithBasePoint(editor, CopyWithPlacementCommand) {
+async function captureWithBasePoint(editor, CopyWithPlacementCommand, temporary) {
   requireIdle(editor);
-  if (!editor.selection.selected.size) throw new Error('请先选中原组件或参考模型，再拾取基点');
+  if (!temporary && !editor.selection.selected.size) throw new Error('请先选中原组件或参考模型，再拾取基点');
   if (typeof CopyWithPlacementCommand !== 'function') throw new Error('当前版本不支持原生基点拾取');
   const clipboard = editor.clipboard, originalCopy = clipboard.copy;
   let captured, calls = 0, timer, expired = false;
@@ -186,10 +186,27 @@ async function captureWithBasePoint(editor, CopyWithPlacementCommand) {
   let resolveFinished, rejectFinished;
   const finished = new Promise((resolve,reject)=>{resolveFinished=resolve;rejectFinished=reject;});
   const execute=command.execute;
+  const rollbackSuccess = temporary ? new temporary.Cancel() : null;
   if(typeof execute !== 'function') throw new Error('原生基点命令接口不兼容');
   command.execute = async function(...args) {
-    try {const value=await execute.apply(this,args);resolveFinished(value);return value;}
-    catch(error) {rejectFinished(error);throw error;}
+    try {
+      let value;
+      try {
+        if(temporary) await loadBasePointReference(editor,command,temporary);
+        if(expired) throw new Error('基点拾取已结束');
+        value=temporary?.base_mode === 'world' ? clipboard.copy() : await execute.apply(this,args);
+      } finally {
+        if(temporary?.items?.length) {
+          const transaction=editor.db.makeTransaction();
+          for(const item of temporary.items) transaction.delete(item.view);
+          await editor.db.commit(transaction);
+        }
+      }
+      resolveFinished(value);
+      // The executor rolls back the entire temporary import on both paths.
+      if(temporary) throw rollbackSuccess;
+      return value;
+    } catch(error) {if(error !== rollbackSuccess) rejectFinished(error);throw error;}
   };
   clipboard.copy = copyHook;
   transportBusy = true;
@@ -219,6 +236,43 @@ async function captureWithBasePoint(editor, CopyWithPlacementCommand) {
     transportBusy = false;
     if(editor.executor.activeCommand === command) throw new Error('基点命令尚未结束，未保存组件');
   }
+}
+async function loadBasePointReference(editor, command, temporary) {
+  const {data,PasteCommand}=temporary;
+  const pk=nativeRequire(nativeRequire('path').join(nativeRequire('process').resourcesPath,'app','.webpack','renderer','pk.node'));
+  const partition=pk.Session.GetPrimaryPartition();
+  const before=new Set(partition.GetBodies().map(body=>body.Id()));
+  const paste=new PasteCommand(editor);
+  paste.remember=false;
+  if(typeof command.register === 'function') paste.register=command.register.bind(command);
+  const read=transportClipboard.readBuffer,formats=transportClipboard.availableFormats,has=transportClipboard.has;
+  let pending,reads=0;
+  try {
+    transportClipboard.availableFormats=()=>[modelFormat];
+    transportClipboard.has=format=>format===modelFormat;
+    transportClipboard.readBuffer=format=>{
+      if(format!==modelFormat || ++reads!==1) throw new Error('临时组件读取接口不兼容');
+      return NativeBuffer.from(data);
+    };
+    pending=paste.execute();
+    if(reads!==1) throw new Error('未能加载临时组件');
+  } finally {
+    transportClipboard.readBuffer=read;transportClipboard.availableFormats=formats;transportClipboard.has=has;
+  }
+  try {await pending;} finally {
+    temporary.items=partition.GetBodies().filter(body=>!before.has(body.Id())).map(body=>editor.db.lookupByBodyId(body.Id())).filter(item=>item?.view);
+  }
+  editor.selection.selected.removeAll();
+  for(const item of temporary.items) editor.selection.selected.add(item.view);
+  if(!editor.selection.selected.size) throw new Error('组件没有可用于拾取的模型');
+  if(temporary.base_mode === 'pick') for(const viewport of editor.viewports || []) viewport.focus();
+}
+async function rebaseModel(editor, args, CopyCommand, PasteCommand, Cancel) {
+  if(!['world','pick'].includes(args.base_mode) || (typeof PasteCommand !== 'function' || typeof Cancel !== 'function')) throw new Error('组件基点接口不兼容，请更新插件');
+  if(typeof args.model !== 'string' || args.model.length>90*1024*1024 || !/^[A-Za-z0-9+/]*={0,2}$/.test(args.model)) throw new Error('组件模型编码无效');
+  const data=NativeBuffer.from(args.model,'base64');
+  if(data.length<68 || data.length>64*1024*1024) throw new Error('组件模型长度无效');
+  return captureWithBasePoint(editor,CopyCommand,{data,PasteCommand,Cancel,base_mode:args.base_mode});
 }
 async function captureGroupWithBasePoint(editor, signature, CopyWithPlacementCommand) {
   const group = captureGroup(editor,signature);
@@ -439,4 +493,4 @@ function configureGroupPlacement(editor,command,factory,recipe,targets,Operation
     return results;
   };
 }
-globalThis.__plasticityAssetTransport = Object.freeze({captureSelection,captureWithBasePoint,captureGroupWithBasePoint,captureGroup,inspectGroup,insertModel,calculationStatus});
+globalThis.__plasticityAssetTransport = Object.freeze({captureSelection,captureWithBasePoint,rebaseModel,captureGroupWithBasePoint,captureGroup,inspectGroup,insertModel,calculationStatus});

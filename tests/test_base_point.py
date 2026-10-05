@@ -10,6 +10,23 @@ import test_native_transport as transport_tests
 
 class BasePointNativeTests(unittest.IsolatedAsyncioTestCase):
     asyncSetUp = transport_tests.NativeTransportTests.asyncSetUp
+    async def test_asset_rebase_requires_new_plugin_and_transfers_saved_model(self):
+        from model_fixture import model_bytes
+        model=model_bytes()
+        self.transport.worker(self.target,self.token,capabilities=['base-point-v1'])
+        with self.assertRaisesRegex(ValueError,'自动基点插件'):
+            await self.transport.request(self.target,'rebase',model,base_mode='pick')
+        caps=['base-point-v1','asset-base-point-v1']
+        self.transport.worker(self.target,self.token,capabilities=caps)
+        pending=asyncio.create_task(self.transport.request(self.target,'rebase',model,base_mode='pick'))
+        await asyncio.sleep(0)
+        job=self.transport.worker(self.target,self.token,capabilities=caps)
+        self.assertEqual(base64.b64decode(job['model']),model)
+        self.assertEqual(job['action'],'rebase')
+        self.transport.worker(self.target,self.token,{'id':job['id'],'value':{'model':job['model']}},capabilities=caps)
+        self.assertEqual(await pending,model)
+        self.assertFalse(self.transport.jobs)
+
     async def test_point_capture_requires_capability_and_passes_mode(self):
         with self.assertRaisesRegex(ValueError, '基点插件'):
             await self.transport.request(self.target, 'capture', base_mode='pick')
@@ -36,7 +53,7 @@ class BasePointServiceTests(unittest.IsolatedAsyncioTestCase):
         reference=struct.pack('<7d',12,24,36,0,0,0,1)+model_bytes('reference')[56:]
         self.service.native.request=AsyncMock(return_value=reference)
         updated=await self.call('library.rebase',{'id':asset['id'],'target_id':'hwnd:42','base_mode':'pick'})
-        self.service.native.request.assert_awaited_once_with('hwnd:42','capture',base_mode='pick')
+        self.service.native.request.assert_awaited_once_with('hwnd:42','rebase',original,base_mode='pick')
         actual=bytes(self.service.library.get(asset['id'])['model'])
         self.assertEqual(actual[:56],reference[:56])
         self.assertEqual(actual[56:],original[56:])
@@ -83,5 +100,8 @@ class BasePointServiceTests(unittest.IsolatedAsyncioTestCase):
 
 
 class BasePointJavascriptTests(unittest.TestCase):
+    def test_automatic_reference(self):
+        subprocess.run(['node','tests/test_auto_base_point.js'],cwd=Path(__file__).resolve().parents[1],capture_output=True,check=True,timeout=10)
+
     def test_native_point_command(self):
         subprocess.run(['node','tests/test_base_point.js'],cwd=Path(__file__).resolve().parents[1],capture_output=True,check=True,timeout=10)

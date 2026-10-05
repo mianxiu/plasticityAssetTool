@@ -52,7 +52,7 @@ class NativeTransport:
                         if message.startswith('Error: '): message = message[7:]
                         raise ValueError(message[:300])
                     value=result.get('value')
-                    if job['action'] in ('capture','capture-group'):
+                    if job['action'] in ('capture','capture-group','rebase'):
                         encoded=value.get('model') if isinstance(value,dict) else None
                         if not isinstance(encoded,str) or len(encoded)>MAX_BYTES*4//3+4:
                             raise ValueError('原生模型数据无效')
@@ -112,7 +112,7 @@ class NativeTransport:
     async def request(self, target, action, model=None, placement=True, insert_mode="new-body", recipe=None, signature=None, with_metadata=False, base_mode=None):
         if target not in self.connected_targets():
             raise ValueError('目标窗口的原生模型插件未连接，请重新打开已安装插件的 Plasticity')
-        if action not in ('capture','insert','inspect-group','capture-group'):
+        if action not in ('capture','insert','inspect-group','capture-group','rebase'):
             raise ValueError('未知的原生模型操作')
         if any(job['target']==target for job in self.jobs.values()):
             if any(job['target']==target and job['future'].done() for job in self.jobs.values()):
@@ -120,7 +120,7 @@ class NativeTransport:
             raise ValueError('目标窗口正在处理组件，请稍后重试')
         payload={}
         if base_mode is not None:
-            if action not in ('capture','capture-group') or base_mode not in ('world','pick'):
+            if action not in ('capture','capture-group','rebase') or base_mode not in ('world','pick'):
                 raise ValueError('无效的组件基点模式')
             if base_mode == 'pick' and 'base-point-v1' not in self.workers[target]['capabilities']:
                 raise ValueError('目标窗口尚未加载基点插件，请更新插件并重新打开 Plasticity')
@@ -133,6 +133,10 @@ class NativeTransport:
             payload={'signature':signature}
         if base_mode is not None:
             payload['base_mode'] = base_mode
+        if action == 'rebase':
+            if base_mode not in ('world','pick') or 'asset-base-point-v1' not in self.workers[target]['capabilities']:
+                raise ValueError('目标窗口尚未加载自动基点插件，请更新插件并重新打开 Plasticity')
+            payload['model'] = encoded_model(model)
         if action=='insert':
             if insert_mode not in ('new-body','union','difference','intersection'):
                 raise ValueError('无效的默认置入模式')
@@ -152,7 +156,7 @@ class NativeTransport:
         if target in self.notifications:
             self.notifications[target].set()
         try:
-            return await asyncio.wait_for(asyncio.shield(future),140 if base_mode == 'pick' else self.request_timeout)
+            return await asyncio.wait_for(asyncio.shield(future),140 if base_mode == 'pick' or action == 'rebase' else self.request_timeout)
         except asyncio.TimeoutError as exc:
             raise ValueError('原生模型操作超时；请检查目标窗口的状态后再操作，勿重复置入') from exc
         finally:

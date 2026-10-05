@@ -11,7 +11,7 @@ function worker(target) {
     if(method==='Runtime.getProperties') {
       if(params.objectId==='fn')return {internalProperties:[{name:'[[Scopes]]',value:{objectId:'scopes'}}]};
       if(params.objectId==='scopes')return {result:[{value:{objectId:'closure',description:'Closure'}}]};
-      return {result:['editor','PasteCommand','CopyWithPlacementCommand','OperationType','BooleanFactory'].map(name=>({name,value:{objectId:name}}))};
+      return {result:['editor','PasteCommand','CopyWithPlacementCommand','Cancel','OperationType','BooleanFactory'].map(name=>({name,value:{objectId:name}}))};
     }
     if(method==='Runtime.callFunctionOn'){calls.push(params);return {result:{value:{started:true}}};}
     return {};
@@ -60,6 +60,12 @@ const job=id=>({id:id.repeat(32),action:'insert',model:'payload',placement:true}
   assert.equal(pointWorker.calls[0].arguments[0].value,true);
   assert.equal(pointWorker.calls[0].arguments[1].objectId,'CopyWithPlacementCommand');
   assert.equal(pointWorker.intervals.size,0,'Interactive heartbeat is cleaned after the command');pointWorker.destroy();
+  const rebaseWorker=worker('hwnd:47');await flush();
+  assert(rebaseWorker.requests[0].data.capabilities.includes('asset-base-point-v1'));
+  rebaseWorker.requests[0].reply({id:'f'.repeat(32),action:'rebase',base_mode:'pick',model:'saved-model'});await flush();
+  assert.equal(rebaseWorker.calls[0].arguments[0].value.model,'saved-model');
+  assert.equal(rebaseWorker.calls[0].arguments[3].objectId,'Cancel');
+  assert.equal(rebaseWorker.intervals.size,0);rebaseWorker.destroy();
   const changedDuringHide=worker('hwnd:45');await flush();
   changedDuringHide.onHide(()=>changedDuringHide.navigate());
   changedDuringHide.requests[0].reply(job('d'));await flush();

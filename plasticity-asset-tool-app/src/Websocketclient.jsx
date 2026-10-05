@@ -49,7 +49,7 @@ export class WebsocketClient {
       const timer = setTimeout(() => {
         this.pending.delete(id);
         reject(new Error("操作响应超时；请先检查视口，避免重复置入"));
-      }, args.base_mode === "pick" ? 160000 : 45000);
+      }, args.base_mode === "pick" || action === "library.rebase" ? 160000 : 45000);
       this.pending.set(id, { resolve, reject, timer });
       try { this.socket.send(JSON.stringify({ id, action, args })); }
       catch (error) { clearTimeout(timer); this.pending.delete(id); reject(error); }
