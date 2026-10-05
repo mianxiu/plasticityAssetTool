@@ -4,7 +4,7 @@ import struct
 import zlib
 from pathlib import Path
 
-SIZES = (16, 20, 24, 32, 40, 48, 64, 96, 128, 256)
+SIZES = (16, 20, 24, 28, 32, 36, 40, 48, 56, 64, 72, 80, 96, 120, 128, 160, 192, 256)
 OUTPUT = Path(__file__).resolve().parents[1] / 'plasticity-asset-tool-app/src/assets/favicon.ico'
 VERTICES = ((.5,.09),(.87,.3),(.87,.7),(.5,.91),(.13,.7),(.13,.3))
 SEGMENTS = list(zip(VERTICES, VERTICES[1:]+VERTICES[:1])) + [

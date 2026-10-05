@@ -32,11 +32,12 @@ class ControlWindowTests(unittest.TestCase):
     def test_existing_window_is_restored_without_spawning(self):
         desktop = Mock()
         window = ControlWindow("http://127.0.0.1:15150", ".", desktop)
-        with patch.object(window, "existing_window", return_value=42), patch("backend.control_window.subprocess.Popen") as spawn:
+        with patch.object(window, "existing_window", return_value=42), patch.object(window, '_watch_icons'), patch.object(window.icons, 'apply') as icons, patch("backend.control_window.subprocess.Popen") as spawn:
             self.assertTrue(window.open()["reused"])
             desktop.u.ShowWindowAsync.assert_called_once_with(42, 9)
             desktop.u.SetForegroundWindow.assert_called_once_with(42)
             spawn.assert_not_called()
+            icons.assert_called_once_with(42)
 
     def test_missing_edge_falls_back_to_webui(self):
         window = ControlWindow("http://127.0.0.1:15150", ".")

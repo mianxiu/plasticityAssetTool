@@ -73,6 +73,9 @@ class ServiceTray:
         class NotifyIcon(ctypes.Structure):
             _fields_ = [('size',W.DWORD),('hwnd',W.HWND),('id',W.UINT),('flags',W.UINT),('message',W.UINT),('icon',W.HICON),('tip',W.WCHAR*128),('state',W.DWORD),('stateMask',W.DWORD),('info',W.WCHAR*256),('version',W.UINT),('infoTitle',W.WCHAR*64),('infoFlags',W.DWORD),('guid',ctypes.c_byte*16),('balloonIcon',W.HICON)]
         declarations = [
+            ('FindWindowW',[W.LPCWSTR,W.LPCWSTR],W.HWND),
+            ('GetDpiForWindow',[W.HWND],W.UINT),
+            ('LoadImageW',[W.HINSTANCE,W.LPCWSTR,W.UINT,ctypes.c_int,ctypes.c_int,W.UINT],W.HANDLE),
             ('RegisterClassW',[ctypes.POINTER(WindowClass)],W.WORD),
             ('UnregisterClassW',[W.LPCWSTR,W.HINSTANCE],W.BOOL),
             ('CreateWindowExW',[W.DWORD,W.LPCWSTR,W.LPCWSTR,W.DWORD,ctypes.c_int,ctypes.c_int,ctypes.c_int,ctypes.c_int,W.HWND,W.HMENU,W.HINSTANCE,W.LPVOID],W.HWND),
@@ -94,12 +97,13 @@ class ServiceTray:
         k.GetModuleHandleW.argtypes, k.GetModuleHandleW.restype = [W.LPCWSTR], W.HMODULE
         shell.Shell_NotifyIconW.argtypes, shell.Shell_NotifyIconW.restype = [W.DWORD,ctypes.POINTER(NotifyIcon)],W.BOOL
         icons = []
-        for paused in (False,):
-            payload = ctypes.create_string_buffer(icon_bitmap(paused))
-            icon = u.CreateIconFromResourceEx(payload,len(payload)-1,True,0x30000,32,32,0)
-            if not icon:
-                raise ctypes.WinError(ctypes.get_last_error())
-            icons.append(icon)
+        taskbar = u.FindWindowW('Shell_TrayWnd',None)
+        dpi = (u.GetDpiForWindow(taskbar) if taskbar else 96) or 96
+        size = max(16,round(16*dpi/96))
+        icon = u.LoadImageW(None,str(ICON_PATH),1,size,size,0x10)
+        if not icon:
+            raise ctypes.WinError(ctypes.get_last_error())
+        icons.append(icon)
         notification = NotifyIcon()
         notification.size, notification.id = ctypes.sizeof(notification), 1
         notification.flags, notification.message = 1|2|4, 0x8001
