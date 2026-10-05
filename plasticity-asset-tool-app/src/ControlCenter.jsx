@@ -70,7 +70,7 @@ export function ControlCenter() {
   onCleanup(()=>{disposed=true;clearInterval(timer);document.title=previousTitle;});
   return <div class="control-shell">
     <aside class="control-sidebar">
-      <div class="brand"><Cube/><div><strong>Plasticity</strong><span>COMPONENT LIBRARY</span></div></div>
+      <div class="brand" title="Plasticity Asset Tool"><Cube/><strong>Plasticity Asset Tool</strong></div>
       <div class="sidebar-label">{t("工作空间")}</div>
       <div class="nav-item active">{t("◈ 控制中心")}</div>
       <a class="nav-item" href="/">{t("◇ 模型组件库")}</a>

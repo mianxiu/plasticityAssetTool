@@ -124,11 +124,6 @@ export function Home() {
   const kindNames = {solid:"Solid · 实体",curve:"Curve · 曲线",mixed:"混合组件",unknown:"未标注"};
   const currentLibrary = createMemo(() => libraries().find(item => item.id === libraryId()));
   const childFolders = createMemo(() => folders().filter(item => item.parent_id === folderId()));
-  const orderedFolders = createMemo(() => {
-    const rows = [];
-    const visit = parent => { for(const item of folders().filter(row => row.parent_id === parent)) { rows.push(item); visit(item.id); } };
-    visit(null); return rows;
-  });
   const folderPath = (id, rows = folders()) => {
     const path = [];
     let item = rows.find(row => row.id === id);
@@ -480,20 +475,28 @@ export function Home() {
       <Show when={notice()?.error}><p class="form-error" role="alert">{notice().message}</p></Show><div class="modal-actions"><button type="button" class="secondary" disabled={busy()} onClick={props.onCancel}>{t("取消")}</button><button type="submit" class="primary" disabled={!ready() || foldersLoading() || !form().name.trim()}>{busy() ? t("保存中…") : props.capture ? t("保存组件") : t("保存修改")}</button></div></form>;
   }
 
+  const FolderBranches = props => <ul class="sidebar-tree-children"><For each={folders().filter(item => item.parent_id === props.parent && !props.ancestors.includes(item.id))}>{item => <li><button class="tree-row" classList={{active:folderId() === item.id}} aria-current={folderId() === item.id ? "location" : undefined} onClick={() => enterFolder(item.id)} title={folderLabel(item.id)}><span class="tree-name">▱ {item.name}</span></button><Show when={folders().some(child => child.parent_id === item.id)}><FolderBranches parent={item.id} ancestors={[...props.ancestors,item.id]}/></Show></li>}</For></ul>;
+
   return <div class={floatingPanel() ? "app-shell component-first floating-panel" : "app-shell component-first"} classList={{"sidebar-hover":sidebarMode() === "hover"}} style={{"--asset-size":`${cardSize()}px`}}>
     <aside class="sidebar">
       <Show when={sidebarMode() === "hover"}><button class="sidebar-hover-trigger" aria-label={t("展开侧栏")} title={t("悬停展开侧栏")}>☰</button></Show>
       <div class="sidebar-content">
-      <div class="brand"><Cube /><div><strong>Plasticity</strong><span>COMPONENT LIBRARY</span></div></div>
-      <div class="sidebar-label">{t("模型组件库")}</div>
-      <button class={!archived() ? "nav-item active" : "nav-item"} onClick={() => toggleArchive(false)}>{t("◇ 全部组件 ")}<span>{!archived() ? assets().length : ""}</span></button>
-      <div class="sidebar-label">{t("资产库")}</div>
-      <nav class="library-tabs" aria-label={t("资产库")}><For each={libraries()}>{item => <button class={libraryId() === item.id ? "library-tab active" : "library-tab"} aria-pressed={libraryId() === item.id} disabled={busy()} onClick={() => switchLibrary(item.id)}>{item.name}<span>{item.count}</span></button>}</For><button class="library-tab add-library" disabled={!ready()} onClick={() => openOrganization("library")}>{t("＋ 新建库")}</button></nav>
-      <div class="sidebar-label category-label">{t("分组")}</div>
-      <button class={!folderId() ? "nav-item active" : "nav-item"} onClick={() => enterFolder(null)}>{t("⌂ 库根目录")}</button>
-      <div class="folder-tree"><For each={orderedFolders()}>{item => <button class={folderId() === item.id ? "folder-nav active" : "folder-nav"} style={{"padding-left":`${10 + (folderPath(item.id).length-1)*12}px`}} onClick={() => enterFolder(item.id)} title={folderLabel(item.id)}>▱ {item.name}</button>}</For></div>
-      <div class="sidebar-label category-label">{t("分类")}</div>
-      <For each={categories()}>{name => <button class={!archived() && category() === name ? "nav-item category active" : "nav-item category"} onClick={() => setCategory(name)}>▦ {name}<span>{assets().filter(asset => asset.category === name).length}</span></button>}</For>
+      <div class="brand" title="Plasticity Asset Tool"><Cube /><strong>Plasticity Asset Tool</strong></div>
+      <nav class="sidebar-tree" aria-label={t("模型组件库")}>
+        <ul>
+          <li><button class="tree-row tree-overview" classList={{active:!archived()}} onClick={() => toggleArchive(false)}><span class="tree-name">{t("◇ 全部组件 ")}</span><span class="tree-count">{!archived() ? assets().length : ""}</span></button></li>
+          <li><details open><summary>{t("资产库")}</summary><ul class="sidebar-tree-children">
+            <For each={libraries()}>{item => <li>
+              <button class="tree-row tree-library" classList={{active:libraryId() === item.id}} aria-pressed={libraryId() === item.id} disabled={busy()} onClick={() => switchLibrary(item.id)} title={item.name}><span class="tree-name">{item.name}</span><span class="tree-count">{item.count}</span></button>
+              <Show when={libraryId() === item.id}><ul class="sidebar-tree-children">
+                <li><details open><summary>{t("分组")}</summary><ul class="sidebar-tree-children"><li><button class="tree-row" classList={{active:!folderId()}} onClick={() => enterFolder(null)}><span class="tree-name">{t("⌂ 库根目录")}</span></button><FolderBranches parent={null} ancestors={[]}/></li></ul></details></li>
+                <li><details open><summary>{t("分类")}</summary><ul class="sidebar-tree-children"><For each={categories()}>{name => <li><button class="tree-row" classList={{active:!archived() && category() === name}} onClick={() => setCategory(name)} title={name}><span class="tree-name">▦ {name}</span><span class="tree-count">{assets().filter(asset => asset.category === name).length}</span></button></li>}</For></ul></details></li>
+              </ul></Show>
+            </li>}</For>
+            <li><button class="tree-row tree-add" disabled={!ready()} onClick={() => openOrganization("library")}>{t("＋ 新建库")}</button></li>
+          </ul></details></li>
+        </ul>
+      </nav>
       <button class={archived() ? "nav-item active archive-link" : "nav-item archive-link"} onClick={() => toggleArchive(true)}>{t("▧ 已归档")}</button>
       <div class="sidebar-bottom"><span class={status() === "connected" ? "status-dot online" : "status-dot"}/><span>{status() === "connected" ? t("本地服务已连接") : status() === "connecting" ? t("连接服务中…") : t("服务断开，正在重连")}</span></div>
       </div>
