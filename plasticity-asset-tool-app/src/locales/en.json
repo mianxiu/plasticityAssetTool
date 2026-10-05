@@ -279,5 +279,14 @@
   "重新拾取基点": "Pick base point again",
   "保留剪贴板中的原生基点": "Preserve the native clipboard base point",
   "组件基点已更新": "Component base point updated",
-  "编辑基点会自动加载临时组件作为参考。确认后保存，Esc 取消；临时模型自动移除。": "Editing a base point automatically loads a temporary component. Confirm to save; Esc cancels. The reference is removed automatically."
+  "编辑基点会自动加载临时组件作为参考。确认后保存，Esc 取消；临时模型自动移除。": "Editing a base point automatically loads a temporary component. Confirm to save; Esc cancels. The reference is removed automatically.",
+  "点击表面或曲线设置基点": "Click a surface or curve to set the base point",
+  "黄色十字表示基点。修改后点击保存修改；坐标使用模型原生单位。表面拾取基于预览网格。": "The yellow cross marks the base point. Save changes to apply. Coordinates use native model units; surface picking uses the preview mesh.",
+  "取消拾取": "Cancel picking",
+  "预览拾取": "Pick in preview",
+  "模型中心": "Model center",
+  "底部中心": "Bottom center",
+  "基点坐标 ": "Base point coordinate ",
+  "Plasticity 精确拾取": "Pick precisely in Plasticity",
+  "在 Plasticity 使用原生捕捉；确认后立即保存基点，Esc 取消。": "Use native snapping in Plasticity. Confirm to save the base point immediately; Esc cancels."
 }

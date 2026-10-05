@@ -74,6 +74,8 @@ class AssetService:
             return await self.library_state(args.get("library_id", "default"), bool(args.get("archived", False)))
         if action == "connection.state":
             return await self.connection_state()
+        if action == 'library.base_point':
+            return await asyncio.to_thread(self.library.base_point, args.get('id'))
         if action == "asset.geometry":
             if not self.model_enabled and not self.geometry.cached(args.get("id")):
                 raise ValueError("模型连接已暂停，请在托盘控制中心恢复")
@@ -173,7 +175,9 @@ class AssetService:
                 # not guess coordinate order, units or quaternion conventions.
                 reference = await self.native.request(args.get('target_id'), 'rebase', model, base_mode=args['base_mode'])
                 updated = validate_model(reference[:56] + model[56:])
-                return await asyncio.to_thread(self.library.rebase, original['id'], original['digest'], updated)
+                result = await asyncio.to_thread(self.library.rebase, original['id'], original['digest'], updated)
+                from .model_clipboard import model_base_point
+                return result | {'base_point': model_base_point(updated)}
             if action == "library.update":
                 fields = dict(args)
                 if "preview" in fields:

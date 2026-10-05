@@ -45,6 +45,37 @@ class BasePointServiceTests(unittest.IsolatedAsyncioTestCase):
     asyncSetUp = service_tests.ServiceTests.asyncSetUp
     asyncTearDown = service_tests.ServiceTests.asyncTearDown
     call = service_tests.ServiceTests.call
+    async def test_offline_point_is_atomic_and_preserves_orientation_geometry_and_package(self):
+        from model_fixture import model_bytes
+        from unittest.mock import AsyncMock
+        from backend.model_clipboard import model_base_point
+        original=struct.pack('<7d',1,2,3,0.1,0.2,0.3,0.9)+model_bytes('offline')[56:]
+        asset=self.service.library.add(original,{'name':'offline','kind':'curve'})
+        self.service.model_enabled=False
+        self.service.native.request=AsyncMock(side_effect=AssertionError('Native app is not required'))
+        point=await self.call('library.base_point',{'id':asset['id']})
+        self.assertEqual(point['base_point'],[1,2,3])
+        updated=await self.call('library.update',{'id':asset['id'],'name':'edited','base_point':[-12.5,4,9],'model_digest':point['digest']})
+        actual=bytes(self.service.library.get(asset['id'])['model'])
+        self.assertEqual(model_base_point(actual),[-12.5,4,9])
+        self.assertEqual(actual[24:],original[24:])
+        self.assertEqual(updated['base_point'],[-12.5,4,9])
+        imported=self.service.library.import_package(self.service.library.export(asset['id']))
+        self.assertEqual(bytes(self.service.library.get(imported['id'])['model']),actual)
+        self.service.native.request.assert_not_called()
+        self.assertEqual(self.desktop.calls,[])
+
+    async def test_offline_invalid_or_stale_point_does_not_change_model_or_metadata(self):
+        from model_fixture import model_bytes
+        asset=self.service.library.add(model_bytes(),{'name':'original'})
+        before=bytes(self.service.library.get(asset['id'])['model'])
+        for point in [[float('nan'),0,0],[True,0,0],[1,2],[1e13,0,0],['1',0,0]]:
+            with self.assertRaisesRegex(ValueError,'有限坐标'):
+                await self.call('library.update',{'id':asset['id'],'name':'wrong','base_point':point,'model_digest':asset['digest']})
+        with self.assertRaisesRegex(ValueError,'组件已变化'):
+            await self.call('library.update',{'id':asset['id'],'name':'wrong','base_point':[1,2,3],'model_digest':'stale'})
+        self.assertEqual(self.service.library.details(asset['id'])['name'],'original')
+        self.assertEqual(bytes(self.service.library.get(asset['id'])['model']),before)
     async def test_native_capture_and_rebase_preserve_bodies_and_package(self):
         from unittest.mock import AsyncMock
         from model_fixture import model_bytes
@@ -100,6 +131,8 @@ class BasePointServiceTests(unittest.IsolatedAsyncioTestCase):
 
 
 class BasePointJavascriptTests(unittest.TestCase):
+    def test_preview_coordinates_and_ray_cast(self):
+        subprocess.run(['node','tests/test_preview_base_point.mjs'],cwd=Path(__file__).resolve().parents[1],capture_output=True,check=True,timeout=10)
     def test_automatic_reference(self):
         subprocess.run(['node','tests/test_auto_base_point.js'],cwd=Path(__file__).resolve().parents[1],capture_output=True,check=True,timeout=10)
 

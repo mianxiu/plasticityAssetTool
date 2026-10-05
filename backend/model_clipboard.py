@@ -15,6 +15,22 @@ from collections import OrderedDict
 MAX_BYTES = 64 * 1024 * 1024
 
 
+def model_base_point(data):
+    validate_model(data)
+    return list(struct.unpack_from('<3d', data))
+
+
+def with_base_point(data, point):
+    validate_model(data)
+    if not isinstance(point, list) or len(point) != 3 or any(
+        type(v) not in (int, float) or not math.isfinite(v) or abs(v) > 1e12 for v in point
+    ):
+        raise ValueError('基点必须是三个有限坐标')
+    # Verified against native 26.1.3 copy(Vector3): XYZ uses the same units
+    # as the kernel preview. Preserve quaternion, bodies and recipe bytes.
+    return struct.pack('<3d', *point) + data[24:]
+
+
 def _parse_model(data):
     def invalid():
         return ValueError("数据不是完整的 Plasticity 模型，已阻止置入。请在 Plasticity 中重新复制模型")

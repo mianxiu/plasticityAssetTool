@@ -182,3 +182,14 @@ body:has(.component-first){background:#181818}
 .sidebar-tree .tree-row:hover:not(:disabled),.sidebar-tree summary:hover{background:#292929}
 .sidebar-tree .tree-add{color:#aaa}
 .component-first .archive-link{font-size:11px;font-weight:400;padding:0 2px;border-radius:3px}
+
+.preview-base-point{border:0;padding:0;margin:4px 0 8px;min-width:0}
+.preview-base-point legend{font-size:11px;color:#bbb;margin-bottom:4px;display:flex;gap:4px;align-items:center}
+.base-point-presets{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:3px}
+.component-first .base-point-presets button{font-size:11px;min-width:0;padding:4px 2px;white-space:normal}
+.base-point-presets button.active{border-color:var(--accent-color,#00a37a)}
+.base-point-coordinates{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;margin-top:4px}
+.base-point-coordinates label{display:flex;align-items:center;gap:3px;font-size:11px;min-width:0}
+.component-first .base-point-coordinates input{min-width:0;width:100%;padding:4px;font-size:11px}
+.base-point-picking{cursor:crosshair}
+.base-point-pick-status{position:absolute;bottom:4px;left:4px;padding:3px 5px;font-size:11px;background:#222d;color:#ffcc55;pointer-events:none}

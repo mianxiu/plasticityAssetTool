@@ -158,6 +158,16 @@ class AssetLibrary:
             raise ValueError("组件不存在，请刷新组件库")
         return self.metadata(row)
 
+    def base_point(self, asset_id):
+        # Read only the placement prefix, never the full model for details.
+        import struct
+        with self.connect() as db:
+            row = db.execute('SELECT substr(model,1,24),digest FROM assets WHERE id=?', (asset_id,)).fetchone()
+        if row is None:
+            raise ValueError('组件不存在，请刷新组件库')
+        prefix = row[0]
+        return {'base_point':list(struct.unpack('<3d', prefix)) if len(prefix) == 24 else None, 'digest':row[1]}
+
     @staticmethod
     def validate_preview(preview):
         if preview is not None and (not isinstance(preview, bytes) or not 2 <= len(preview) <= MAX_PREVIEW_BYTES or not preview.startswith(b"\xff\xd8")):
@@ -239,6 +249,16 @@ class AssetLibrary:
 
     def update(self, asset_id, fields):
         current = self.details(asset_id)
+        point = fields.get('base_point')
+        expected_digest = fields.get('model_digest')
+        updated_model = None
+        if 'base_point' in fields:
+            from .model_clipboard import with_base_point
+            model = self.model_row(asset_id)
+            if model['archived'] or model['digest'] != expected_digest:
+                raise ValueError('组件已变化，未保存基点，请重新打开编辑')
+            updated_model = with_base_point(bytes(model['model']), point)
+            new_digest = hashlib.sha256(updated_model).hexdigest()
         location = self.organization(fields, current)
         update_preview = "preview" in fields
         preview = self.validate_preview(fields.get("preview")) if update_preview else None
@@ -248,12 +268,22 @@ class AssetLibrary:
                 raise ValueError('连续布尔组仅支持实体组件')
             fields['insert_mode'] = 'new-body'
         with self.connect() as db:
+            if updated_model is not None:
+                changed = db.execute('UPDATE assets SET model=?,digest=? WHERE id=? AND digest=? AND archived=0',
+                                     (updated_model,new_digest,asset_id,expected_digest))
+                if changed.rowcount != 1:
+                    raise ValueError('组件已变化，未保存基点，请重新打开编辑')
+                db.execute('INSERT OR IGNORE INTO geometry_cache(digest,mesh,thumbnail) SELECT ?,mesh,thumbnail FROM geometry_cache WHERE digest=?',
+                           (new_digest,expected_digest))
             db.execute("UPDATE assets SET name=?,category=?,tags=?,note=?,updated_at=?,library_id=?,folder_id=?,kind=?,insert_mode=? WHERE id=?", (
                 fields["name"], fields["category"], fields["tags"], fields["note"], datetime.now(timezone.utc).isoformat(), *location, fields["insert_mode"], asset_id,
             ))
             if update_preview:
                 db.execute("UPDATE assets SET preview=? WHERE id=?", (preview, asset_id))
-        return self.details(asset_id)
+        result = self.details(asset_id)
+        if updated_model is not None:
+            result['base_point'] = point
+        return result
 
     def archive(self, asset_id, archived):
         self.details(asset_id)

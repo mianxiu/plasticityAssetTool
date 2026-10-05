@@ -1,51 +1,11 @@
 import {t} from "./i18n";
 import { createEffect, createMemo, createSignal, onCleanup, onMount, Show, untrack } from 'solid-js';
 import * as THREE from 'three';
+import {sceneFor} from './geometryScene.mjs';
+import {meshBounds, presetBasePoint} from './previewBasePoint.mjs';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 let thumbnailRenderer;
-
-function sceneFor(mesh) {
-  const scene = new THREE.Scene();
-  scene.background = new THREE.Color('#262628');
-  const model = new THREE.Group();
-  model.rotation.x = -Math.PI / 2; // Plasticity uses Z up.
-  for (const part of mesh.parts) {
-    if (part.indices.length) {
-      const geometry = new THREE.BufferGeometry();
-      geometry.setAttribute('position', new THREE.Float32BufferAttribute(part.positions, 3));
-      geometry.setAttribute('normal', new THREE.Float32BufferAttribute(part.normals, 3));
-      geometry.setIndex(part.indices);
-      model.add(new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({color:0xbcbcbc, metalness:0.25, roughness:0.45, side:THREE.DoubleSide})));
-    }
-    // The kernel stores each edge as a separate polyline (offset/count in floats).
-    const segments = [];
-    for (let g = 0; g < part.edge_groups.length; g += 2) {
-      const start = part.edge_groups[g], count = part.edge_groups[g + 1];
-      for (let i = start; i + 5 < start + count; i += 3) segments.push(...part.edges.slice(i, i + 6));
-    }
-    if (segments.length) {
-      const lines = new THREE.BufferGeometry();
-      lines.setAttribute('position', new THREE.Float32BufferAttribute(segments, 3));
-      model.add(new THREE.LineSegments(lines, new THREE.LineBasicMaterial({color:part.indices.length ? 0x555555 : 0xd4d4d4})));
-    }
-  }
-  const box = new THREE.Box3().setFromObject(model);
-  const center = box.getCenter(new THREE.Vector3());
-  const size = box.getSize(new THREE.Vector3());
-  model.position.sub(center);
-  scene.add(model, new THREE.HemisphereLight(0xffffff, 0x333333, 2));
-  const light = new THREE.DirectionalLight(0xffffff, 3);
-  light.position.set(3, 5, 4);scene.add(light);
-  const fill = new THREE.DirectionalLight(0xffffff, 1);
-  fill.position.set(-3, 0, -4);scene.add(fill);
-  const radius = Math.max(size.length() * 0.5, 1e-6);
-  const extent = radius * 1.15;
-  const camera = new THREE.OrthographicCamera(-extent, extent, extent, -extent, radius / 1000, radius * 100);
-  camera.position.set(1.5, 1.1, 1.6).normalize().multiplyScalar(radius * 3.8);
-  camera.lookAt(0, 0, 0);
-  return {scene, camera, extent, dispose:() => scene.traverse(object => {object.geometry?.dispose();object.material?.dispose();})};
-}
 
 // All component thumbnails share one offscreen WebGL context.
 export function renderThumbnail(mesh) {
@@ -61,6 +21,9 @@ export function GeometryPreview(props) {
   let container, renderer, view, controls, resize;
   const [error, setError] = createSignal('');
   const [loading, setLoading] = createSignal(false);
+  const [picking,setPicking] = createSignal(false);
+  const [bounds,setBounds] = createSignal(null);
+  let marker, pickObjects=[];
   const digest = createMemo(()=>props.asset?.digest);
   let revision = 0;
   let pointer = props.heldOrigin;
@@ -76,8 +39,45 @@ export function GeometryPreview(props) {
     view.camera.position.setFromSpherical(orbit);
     view.camera.lookAt(0,0,0);draw();
   };
-  const destroy = () => {controls?.dispose();view?.dispose();controls = null;view = null;};
-  const draw = () => {if(renderer && view)renderer.render(view.scene,view.camera);};
+  const destroy = () => {controls?.dispose();view?.dispose();controls = null;view = null;marker=null;pickObjects=[];};
+  const draw = () => {if(renderer && view){marker?.scale.setScalar(1/view.camera.zoom);renderer.render(view.scene,view.camera);}};
+  const updateMarker = () => {
+    if(!view || !props.editBasePoint)return;
+    if(!marker){
+      marker=new THREE.Group();
+      const radius=view.radius*0.045;
+      const geometry=new THREE.BufferGeometry();
+      geometry.setAttribute('position',new THREE.Float32BufferAttribute([-radius,0,0,radius,0,0,0,-radius,0,0,radius,0,0,0,-radius,0,0,radius],3));
+      const cross=new THREE.LineSegments(geometry,new THREE.LineBasicMaterial({color:0xffcc55,depthTest:false,depthWrite:false}));
+      cross.renderOrder=1000;
+      const dot=new THREE.Mesh(new THREE.SphereGeometry(radius*0.16,12,8),new THREE.MeshBasicMaterial({color:0xffcc55,depthTest:false,depthWrite:false}));
+      dot.renderOrder=1001;marker.add(cross,dot);view.model.add(marker);
+    }
+    const point=props.basePoint;
+    marker.visible=Array.isArray(point) && point.length===3 && point.every(Number.isFinite);
+    if(marker.visible)marker.position.fromArray(point);
+    draw();
+  };
+  createEffect(()=>{props.basePoint;updateMarker();});
+  const pickPoint = event => {
+    if(!picking() || props.disabled || event.button!==0 || !view)return;
+    const rect=renderer.domElement.getBoundingClientRect();
+    const ray=new THREE.Raycaster();
+    ray.params.Line.threshold=view.radius*0.018/view.camera.zoom;
+    ray.setFromCamera(new THREE.Vector2((event.clientX-rect.left)/rect.width*2-1,1-(event.clientY-rect.top)/rect.height*2),view.camera);
+    view.scene.updateMatrixWorld(true);
+    const hit=ray.intersectObjects(pickObjects,false)[0];
+    if(hit){props.onBasePointChange?.(view.model.worldToLocal(hit.point.clone()).toArray());setPicking(false);}
+  };
+  const preset = mode => {const point=presetBasePoint(bounds(),mode);if(point){props.onBasePointChange?.(point);setPicking(false);}};
+  const inputCoordinate = (axis,event) => {
+    if(!event.currentTarget.validity.valid || event.currentTarget.value===''){
+      event.currentTarget.value=props.basePoint[axis];return;
+    }
+    const value=Number(event.currentTarget.value);
+    if(!Number.isFinite(value))return;
+    const point=[...props.basePoint];point[axis]=value;props.onBasePointChange?.(point);
+  };
   const fit = () => {
     if(!renderer || !view)return;
     const width = container.clientWidth, height = container.clientHeight;
@@ -107,6 +107,7 @@ export function GeometryPreview(props) {
     props.load(asset).then(mesh => {
       if(current !== revision || !renderer)return;
       view=sceneFor(mesh);
+      pickObjects=[...view.model.children];setBounds(meshBounds(mesh));setPicking(false);updateMarker();
       controls=new OrbitControls(view.camera,renderer.domElement);
       controls.mouseButtons.LEFT=null;
       controls.mouseButtons.RIGHT=THREE.MOUSE.ROTATE;
@@ -116,5 +117,10 @@ export function GeometryPreview(props) {
     }).catch(e=>{if(current===revision)setError(e.message);}).finally(()=>{if(current===revision)setLoading(false);});
   });
   onCleanup(()=>{revision++;window.removeEventListener('pointermove',rotateHeld,true);resize?.disconnect();destroy();renderer?.dispose();renderer?.forceContextLoss();});
-  return <div class="geometry-viewer" title={props.heldOrigin ? t("按住右键移动旋转，松开恢复") : t("右键拖动旋转 · 滚轮缩放")}><div class="geometry-canvas" ref={container}/><Show when={loading()}><p class="geometry-message">{t("正在生成几何预览…")}</p></Show><Show when={error()}><p class="geometry-message geometry-error" role="status">{error()}</p></Show></div>;
+  return <><div class="geometry-viewer" title={props.heldOrigin ? t("按住右键移动旋转，松开恢复") : t("右键拖动旋转 · 滚轮缩放")}><div class="geometry-canvas" classList={{'base-point-picking':picking()}} ref={container} onClick={pickPoint}/><Show when={picking()}><span class="base-point-pick-status">{t("点击表面或曲线设置基点")}</span></Show><Show when={loading()}><p class="geometry-message">{t("正在生成几何预览…")}</p></Show><Show when={error()}><p class="geometry-message geometry-error" role="status">{error()}</p></Show></div>
+    <Show when={props.editBasePoint}><fieldset class="preview-base-point" disabled={props.disabled || !props.basePoint}>
+      <legend>{t("组件基点")}<span class="help-tip" tabindex="0" data-tip={t("黄色十字表示基点。修改后点击保存修改；坐标使用模型原生单位。表面拾取基于预览网格。")}>?</span></legend>
+      <div class="base-point-presets"><button type="button" class="secondary" classList={{active:picking()}} disabled={!bounds()} onClick={()=>setPicking(!picking())}>{picking()?t("取消拾取"):t("预览拾取")}</button><button type="button" class="secondary" onClick={()=>preset('world')}>{t("世界原点")}</button><button type="button" class="secondary" disabled={!bounds()} onClick={()=>preset('center')}>{t("模型中心")}</button><button type="button" class="secondary" disabled={!bounds()} onClick={()=>preset('bottom')}>{t("底部中心")}</button></div>
+      <div class="base-point-coordinates">{['X','Y','Z'].map((axis,i)=><label>{axis}<input type="number" step="any" min="-1e12" max="1e12" aria-label={t("基点坐标 ")+axis} value={props.basePoint?.[i] ?? ''} onChange={event=>inputCoordinate(i,event)}/></label>)}</div>
+    </fieldset></Show></>;
 }
