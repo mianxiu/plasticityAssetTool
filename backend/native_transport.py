@@ -9,10 +9,11 @@ from .group_recipe import validate_recipe
 
 
 class NativeTransport:
-    def __init__(self):
+    def __init__(self, request_timeout=10):
         self.workers = {}
         self.jobs = {}
         self.notifications = {}
+        self.request_timeout = request_timeout
 
     def connected_targets(self):
         return [key for key, value in self.workers.items() if time.monotonic()-value['seen'] < 5]
@@ -28,10 +29,23 @@ class NativeTransport:
             raise ValueError('目标窗口已有模型连接')
         if target not in self.workers and len(self.workers)>=64:
             raise ValueError('模型连接过多')
+        # HWNDs can be reused after a window closes. A queued command belongs
+        # to the worker session that accepted the request, not just that HWND.
+        for job_id, job in list(self.jobs.items()):
+            if job['target'] == target and job['token'] != token:
+                if not job['future'].done():
+                    job['future'].set_exception(ValueError('目标窗口连接已更换；旧任务不会重新执行，请检查视口后再操作'))
+                self.jobs.pop(job_id, None)
         self.workers[target]={'seen':now,'token':token,'capabilities':capabilities if isinstance(capabilities,list) else []}
         if isinstance(result,dict):
             job=self.jobs.get(result.get('id'))
-            if job and job.get('token')==token and job['target']==target and not job['future'].done():
+            if job and job.get('token')==token and job['target']==target and job['sent']:
+                if job['future'].done():
+                    # A late receipt resolves the uncertainty after timeout or
+                    # caller cancellation. Never resend the original command.
+                    self.jobs.pop(result['id'], None)
+                    job = None
+            if job and job.get('token')==token and job['target']==target and job['sent'] and not job['future'].done():
                 try:
                     if result.get('error'):
                         message = str(result['error']).splitlines()[0]
@@ -90,6 +104,9 @@ class NativeTransport:
             await asyncio.wait_for(notification.wait(), wait_ms / 1000)
         except asyncio.TimeoutError:
             pass
+        # A sleeping old poll must not reclaim a replaced/pruned session.
+        if self.workers.get(target, {}).get('token') != token:
+            return None
         return self.worker(target, token, capabilities=capabilities)
 
     async def request(self, target, action, model=None, placement=True, insert_mode="new-body", recipe=None, signature=None, with_metadata=False):
@@ -98,6 +115,8 @@ class NativeTransport:
         if action not in ('capture','insert','inspect-group','capture-group'):
             raise ValueError('未知的原生模型操作')
         if any(job['target']==target for job in self.jobs.values()):
+            if any(job['target']==target and job['future'].done() for job in self.jobs.values()):
+                raise ValueError('上次原生操作结果尚未确认，已阻止重复投递；请检查视口并等待连接回执')
             raise ValueError('目标窗口正在处理组件，请稍后重试')
         payload={}
         if action in ('inspect-group','capture-group') or recipe is not None:
@@ -121,13 +140,17 @@ class NativeTransport:
                     raise ValueError('组组件请使用定位置入，以保持部件顺序和组信息')
         future=asyncio.get_running_loop().create_future()
         job_id=uuid.uuid4().hex
-        self.jobs[job_id]={'target':target,'action':action,'payload':payload,'future':future,'sent':False,'with_metadata':with_metadata}
+        job = {'target':target,'token':self.workers[target]['token'],'action':action,'payload':payload,'future':future,'sent':False,'with_metadata':with_metadata}
+        self.jobs[job_id]=job
         if target in self.notifications:
             self.notifications[target].set()
         try:
-            return await asyncio.wait_for(asyncio.shield(future),10)
+            return await asyncio.wait_for(asyncio.shield(future),self.request_timeout)
         except asyncio.TimeoutError as exc:
             raise ValueError('原生模型操作超时；请检查目标窗口的状态后再操作，勿重复置入') from exc
         finally:
-            self.jobs.pop(job_id,None)
+            # Unsent jobs can be discarded. Sent jobs with no receipt retain
+            # their per-window lock, even when the UI caller has gone away.
+            if not job['sent'] or (future.done() and not future.cancelled()):
+                self.jobs.pop(job_id,None)
             if not future.done(): future.cancel()

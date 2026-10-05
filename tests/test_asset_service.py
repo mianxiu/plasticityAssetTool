@@ -137,6 +137,19 @@ class ServiceTests(unittest.IsolatedAsyncioTestCase):
         await self.call("asset.insert", {"id": asset["id"], "target_id": "hwnd:42", "placement": False})
         self.assertIn(("shortcut", 42, "ctrl+v"), self.desktop.calls)
 
+    async def test_follow_active_never_falls_back_to_a_stale_ui_target(self):
+        asset=self.service.library.add(model_bytes(),{'name':'saved'})
+        self.service.native.request=AsyncMock(return_value={'started':True})
+        with patch.object(self.service.bridge,'discover',new=AsyncMock()), patch.object(self.service.bridge,'active_target_id',None):
+            for action,args in [
+                ('asset.insert',{'id':asset['id']}),
+                ('library.capture',{'name':'new','copy_selection':True}),
+            ]:
+                with self.assertRaisesRegex(ValueError,'激活 Plasticity'):
+                    await self.call(action,args | {'target_id':'hwnd:42','transport':'native','follow_active':True})
+        self.service.native.request.assert_not_awaited()
+        self.assertEqual(self.desktop.calls,[])
+
     async def test_closed_target_and_archived_asset_never_change_clipboard(self):
         asset = self.service.library.add(b"geometry", {"name": "test"})
         with self.assertRaises(ValueError):

@@ -12,8 +12,11 @@ export class WebsocketClient {
     if (this.stopped || this.socket?.readyState === WebSocket.OPEN || this.socket?.readyState === WebSocket.CONNECTING) return;
     this.onStatus("connecting");
     const socket = this.socket = new WebSocket(this.url);
-    socket.addEventListener("open", () => this.onStatus("connected"));
+    socket.addEventListener("open", () => {
+      if (this.socket === socket && !this.stopped) this.onStatus("connected");
+    });
     socket.addEventListener("message", event => {
+      if (this.socket !== socket || this.stopped) return;
       let message;
       try { message = JSON.parse(event.data); } catch { return; }
       if (message.type === "response") {
@@ -56,6 +59,14 @@ export class WebsocketClient {
   disconnect() {
     this.stopped = true;
     clearTimeout(this.reconnectTimer);
-    this.socket?.close();
+    const socket = this.socket;
+    this.socket = null;
+    for (const pending of this.pending.values()) {
+      clearTimeout(pending.timer);
+      pending.reject(new Error("连接已断开；操作结果未知，请检查视口后再试"));
+    }
+    this.pending.clear();
+    socket?.close();
+    this.onStatus("disconnected");
   }
 }

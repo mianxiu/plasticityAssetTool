@@ -303,6 +303,10 @@ function configureGroupPlacement(editor,command,factory,recipe,targets,Operation
   // The native command owns the placement and every following factory, so
   // cancellation/failure rolls back its single transaction and undo restores it.
   const commit = factory.commit;
+  for (const [index, part] of recipe.parts.entries()) {
+    if (part.index !== index || !['new-body','union','difference','intersection'].includes(part.mode)) throw new Error('组运算步骤或顺序无效');
+    if (performBoolean && part.mode !== 'new-body' && typeof OperationType?.[{union:'Union',difference:'Difference',intersection:'Intersection'}[part.mode]] !== 'number') throw new Error('当前版本的组布尔运算接口不兼容');
+  }
   const booleans=recipe.parts.map(part=>{
     if (!performBoolean || part.mode === 'new-body') return null;
     const boolean=new BooleanFactory(editor);command.register(boolean);return boolean;

@@ -145,3 +145,77 @@ class NativeTransportTests(unittest.IsolatedAsyncioTestCase):
         for wait in [-1,2001,'2000',True]:
             with self.assertRaises(ValueError):
                 await self.transport.poll(self.target,self.token,wait_ms=wait)
+
+    async def test_unsent_job_never_moves_to_replacement_session(self):
+        pending=asyncio.create_task(self.transport.request(self.target,'insert',model_bytes()))
+        await asyncio.sleep(0)
+        self.transport.workers[self.target]['seen']-=6
+        self.assertIsNone(self.transport.worker(self.target,'b'*36))
+        with self.assertRaisesRegex(ValueError,'连接已更换'): await pending
+        self.assertFalse(self.transport.jobs)
+
+    async def test_sent_job_is_not_replayed_to_replacement_session(self):
+        pending=asyncio.create_task(self.transport.request(self.target,'insert',model_bytes()))
+        await asyncio.sleep(0)
+        job=self.transport.worker(self.target,self.token)
+        self.transport.workers[self.target]['seen']-=6
+        self.assertIsNone(self.transport.worker(self.target,'b'*36))
+        with self.assertRaisesRegex(ValueError,'连接已更换'): await pending
+        with self.assertRaisesRegex(ValueError,'已有模型连接'):
+            self.transport.worker(self.target,self.token,{'id':job['id'],'value':{'started':True}})
+
+    async def test_expired_old_poll_cannot_reclaim_replaced_session(self):
+        old=asyncio.create_task(self.transport.poll(self.target,self.token,wait_ms=30))
+        await asyncio.sleep(0)
+        self.transport.workers[self.target]['seen']-=6
+        self.transport.worker(self.target,'b'*36)
+        self.assertIsNone(await old)
+        self.assertEqual(self.transport.workers[self.target]['token'],'b'*36)
+
+    async def test_sent_timeout_blocks_only_that_window_until_matching_receipt(self):
+        self.transport.request_timeout=.02
+        pending=asyncio.create_task(self.transport.request(self.target,'insert',model_bytes()))
+        await asyncio.sleep(0)
+        job=self.transport.worker(self.target,self.token)
+        with self.assertRaisesRegex(ValueError,'超时'): await pending
+        with self.assertRaisesRegex(ValueError,'尚未确认'):
+            await self.transport.request(self.target,'insert',model_bytes())
+        self.transport.worker('hwnd:43','b'*36,{'id':job['id'],'value':{'started':True}})
+        self.assertIn(job['id'],self.transport.jobs)
+        other=asyncio.create_task(self.transport.request('hwnd:43','insert',model_bytes()))
+        await asyncio.sleep(0)
+        other_job=self.transport.worker('hwnd:43','b'*36)
+        self.transport.worker('hwnd:43','b'*36,{'id':other_job['id'],'value':{'started':True}})
+        self.assertEqual(await other,{'started':True})
+        self.assertIsNone(self.transport.worker(self.target,self.token))
+        self.transport.worker(self.target,self.token,{'id':job['id'],'error':'late failure'})
+        self.assertFalse(self.transport.jobs)
+
+    async def test_unsent_timeout_can_be_retried_without_delayed_delivery(self):
+        self.transport.request_timeout=.01
+        with self.assertRaisesRegex(ValueError,'超时'):
+            await self.transport.request(self.target,'insert',model_bytes())
+        self.assertFalse(self.transport.jobs)
+        self.assertIsNone(self.transport.worker(self.target,self.token))
+
+    async def test_caller_cancel_keeps_sent_job_until_receipt(self):
+        pending=asyncio.create_task(self.transport.request(self.target,'insert',model_bytes()))
+        await asyncio.sleep(0)
+        job=self.transport.worker(self.target,self.token)
+        pending.cancel()
+        with self.assertRaises(asyncio.CancelledError): await pending
+        self.assertIn(job['id'],self.transport.jobs)
+        with self.assertRaisesRegex(ValueError,'尚未确认'):
+            await self.transport.request(self.target,'capture')
+        self.transport.worker(self.target,self.token,{'id':job['id'],'value':{'started':True}})
+        self.assertFalse(self.transport.jobs)
+
+    async def test_unmatched_or_unsent_receipt_cannot_complete_a_job(self):
+        pending=asyncio.create_task(self.transport.request(self.target,'insert',model_bytes()))
+        await asyncio.sleep(0)
+        job_id=next(iter(self.transport.jobs))
+        job=self.transport.worker(self.target,self.token,{'id':job_id,'value':{'started':True}})
+        self.assertFalse(pending.done())
+        self.assertEqual(job['id'],job_id)
+        self.transport.worker(self.target,self.token,{'id':job_id,'value':{'started':True}})
+        await pending

@@ -111,7 +111,9 @@ class AssetService:
                 target_id, source_version = args.get("target_id"), "unknown"
                 if args.get("transport") == "native" and args.get("follow_active"):
                     await self.bridge.discover()
-                    target_id = self.bridge.active_target_id or target_id
+                    target_id = self.bridge.active_target_id
+                    if not target_id:
+                        raise ValueError('没有可用的激活 Plasticity 窗口，请激活目标窗口或选择固定目标')
                 native = args.get("transport") == "native" and args.get("copy_selection")
                 recipe = None
                 if native:
@@ -173,7 +175,9 @@ class AssetService:
                     target_id = args.get("target_id")
                     if args.get("follow_active"):
                         await self.bridge.discover()
-                        target_id = self.bridge.active_target_id or target_id
+                        target_id = self.bridge.active_target_id
+                        if not target_id:
+                            raise ValueError('没有可用的激活 Plasticity 窗口，请激活目标窗口或选择固定目标')
                     supported = row['kind'] not in ('curve', 'mixed')
                     recipe=json.loads(row['recipe_json']) if supported else None
                     mode = row["insert_mode"] if supported and args.get("placement", True) else "new-body"

@@ -1,6 +1,7 @@
 function startNativeWorker(win, baseURL, target) {
-  const http = require('http'), token = require('crypto').randomUUID();
-  const debuggerAPI = win.webContents.debugger, group = 'pat-native-'+token;
+  const http = require('http');
+  let token = require('crypto').randomUUID(), group = 'pat-native-'+token, generation=0;
+  const debuggerAPI = win.webContents.debugger;
   let editor, paste, operationType, booleanFactory, stopped=false, timer, result=null;
   const call = (method,params) => debuggerAPI.sendCommand(method,params);
   async function discover() {
@@ -35,10 +36,15 @@ function startNativeWorker(win, baseURL, target) {
   });
   async function poll() {
     if (stopped || win.isDestroyed()) return;
+    const currentGeneration=generation;
+    const isCurrent=()=>!stopped && !win.isDestroyed() && currentGeneration===generation;
     let delay=750;
     try {
       if (!editor) await discover();
-      const response=await send({target_id:target,token,result,wait_ms:2000,capabilities:['boolean-placement-v1','group-recipe-v1','selection-kind-v1']});result=null;
+      if(!isCurrent()) throw new Error('原生窗口上下文已更换');
+      const response=await send({target_id:target,token,result,wait_ms:2000,capabilities:['boolean-placement-v1','group-recipe-v1','selection-kind-v1']});
+      if(!isCurrent()) throw new Error('原生窗口上下文已更换');
+      result=null;
       delay=response.wait_supported ? 10 : 750;
       if (response.job) {
         const job=response.job;
@@ -48,6 +54,7 @@ function startNativeWorker(win, baseURL, target) {
           // Discover afresh before execution; never retry an executed command.
           editor=null;paste=null;operationType=null;booleanFactory=null;
           await discover();
+          if(!isCurrent()) throw new Error('原生窗口上下文已更换');
           const declarations={
             capture:'function(){return globalThis.__plasticityAssetTransport.captureSelection(this)}',
             'inspect-group':'function(){return globalThis.__plasticityAssetTransport.inspectGroup(this)}',
@@ -60,21 +67,29 @@ function startNativeWorker(win, baseURL, target) {
             win.show();win.focus();
             await win.webContents.executeJavaScript('(()=>{window.__plasticityAssetToolPanel?.hide();return true})()');
           }
+          if(!isCurrent()) throw new Error('原生窗口上下文已更换');
           const executed=await call('Runtime.callFunctionOn',{objectId:editor,functionDeclaration:declaration,arguments:args,returnByValue:true,awaitPromise:true,objectGroup:group});
           if (executed.exceptionDetails) {
             const details=executed.exceptionDetails;
             throw new Error((details.exception?.description || details.text).split('\n')[0].replace(/^Error: /,''));
           }
-          result={id:job.id,value:executed.result.value};
-        } catch(error) {result={id:job.id,error:error.message};}
+          if(isCurrent()) result={id:job.id,value:executed.result.value};
+        } catch(error) {if(isCurrent()) result={id:job.id,error:error.message};}
       }
     } catch(error) { /* Reconnect after a backend stop. Never retry a sent command. */ }
-    if (!stopped) timer=setTimeout(poll,result?0:delay);
+    if (!stopped && !win.isDestroyed()) timer=setTimeout(poll,result?0:delay);
   }
+  const invalidate = () => {
+    const oldGroup=group;
+    generation++;
+    token=require('crypto').randomUUID();group='pat-native-'+token;
+    editor=null;paste=null;operationType=null;booleanFactory=null;result=null;
+    if(debuggerAPI.isAttached()) call('Runtime.releaseObjectGroup',{objectGroup:oldGroup}).catch(()=>{});
+  };
   win.webContents.on('destroyed',()=>{stopped=true;clearTimeout(timer);});
   win.webContents.on('did-start-navigation',(_event,_url,_inPlace,isMainFrame)=>{
-    if (isMainFrame) {editor=null;paste=null;call('Runtime.releaseObjectGroup',{objectGroup:group}).catch(()=>{});}
+    if (isMainFrame) invalidate();
   });
-  debuggerAPI.on('detach',()=>{editor=null;paste=null;});
+  debuggerAPI.on('detach',invalidate);
   poll();
 }
