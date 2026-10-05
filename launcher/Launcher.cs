@@ -8,8 +8,8 @@ using System.Web.Script.Serialization;
 using System.Collections.Generic;
 using System.Windows.Forms;
 
-[assembly: System.Reflection.AssemblyTitle("Plasticity 模型组件库")]
-[assembly: System.Reflection.AssemblyProduct("Plasticity 模型组件库")]
+[assembly: System.Reflection.AssemblyTitle("Plasticity Asset Tool")]
+[assembly: System.Reflection.AssemblyProduct("Plasticity Asset Tool")]
 [assembly: System.Reflection.AssemblyVersion("1.0.0.0")]
 
 internal static class Launcher {

@@ -21,7 +21,7 @@ def build(python_runtime, dependencies):
     stage = ROOT / '.runtime/release-staging' / uuid.uuid4().hex / 'PlasticityAssetTool'
     stage.mkdir(parents=True)
     for name in ['main.py', 'start.ps1', 'config.json', 'LICENSE', 'requirements.txt',
-                 'install-plugin.ps1', 'Plasticity 模型组件库.exe']:
+                 'install-plugin.ps1', 'PlasticityAssetTool.exe']:
         shutil.copy2(ROOT / name, stage / name)
     excluded = shutil.ignore_patterns('__pycache__', '*.pyc', 'node_modules', 'test', 'tests', 'site-packages')
     for name in ['backend', 'installer', 'plasticity-javascript-payloads']:
@@ -41,8 +41,8 @@ def build(python_runtime, dependencies):
         if path.is_dir():
             shutil.copytree(path, site / path.name, ignore=excluded)
     # Model stores and status/settings are created locally on first launch.
-    (stage / '使用说明.txt').write_text(
-        '解压整个目录，双击 Plasticity 模型组件库.exe。无需另外安装 Python 或 Node.js。\n'
+    (stage / 'Readme.txt').write_text(
+        '解压整个目录，双击 PlasticityAssetTool.exe。无需另外安装 Python 或 Node.js。\n'
         '后台由托盘控制退出；重复打开复用已有实例。\n'
         '在 Plasticity 内使用 Tab，需要先按项目说明安装内嵌插件。\n'
         '用户组件保存在 library/，运行日志及插件恢复备份保存在 .runtime/。\n'

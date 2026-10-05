@@ -200,7 +200,7 @@ File:select_plasticity_file
 
 ## 有来源说明的 Windows 插件安装器
 
-使用 `install-plugin.ps1` 安装或升级入口，替代直接对 PowerShell 请求管理员权限。脚本构建带项目图标和名称的 `Plasticity 模型组件库插件安装.exe`，先显示项目来源、本次更新内容、目标文件、回滚备份和管理员权限的用途，再由这个安装器向 Windows 请求权限。来源为本开源项目，未签名时 Windows 仍会显示未知发布者；不将其标记为 Plasticity 官方发布者。
+使用 `install-plugin.ps1` 安装或升级入口，替代直接对 PowerShell 请求管理员权限。脚本构建带项目图标和名称的 `PlasticityAssetTool.PluginInstaller.exe`，先显示项目来源、本次更新内容、目标文件、回滚备份和管理员权限的用途，再由这个安装器向 Windows 请求权限。来源为本开源项目，未签名时 Windows 仍会显示未知发布者；不将其标记为 Plasticity 官方发布者。
 
 安装器参数与 `installer/main_embed_install.py` 对应：`-Target`、`-Backup`、`-UpgradeFrom`、`-BaseBackup`，恢复时使用 `-Restore -Backup`。`-Description` 用于填写此次具体更新，例如“更新组件默认布尔置入：独立、合并、减去、相交”。首次安装不传升级参数；升级必须使用与当前入口匹配的已验证备份。取消说明窗口或 UAC 时不执行安装。
 
@@ -210,7 +210,7 @@ File:select_plasticity_file
 
 ### Windows EXE 发布包
 
-从 GitHub Releases 下载 `PlasticityAssetTool-windows-x64.zip`，解压整个目录后双击 `Plasticity 模型组件库.exe`。包中自带 Python、Tornado 和已构建的界面，无需另装 Python 或 Node.js；EXE 需与发布目录一起使用。启动器打开控制窗口，后台由系统托盘控制退出；重复打开复用同一后台。日常启动不请求管理员权限。需要在 Plasticity 内使用 Tab 时，再按安装说明安装内嵌插件。
+从 GitHub Releases 下载 `PlasticityAssetTool-windows-x64.zip`，解压整个目录后双击 `PlasticityAssetTool.exe`。包中自带 Python、Tornado 和已构建的界面，无需另装 Python 或 Node.js；EXE 需与发布目录一起使用。启动器打开控制窗口，后台由系统托盘控制退出；重复打开复用同一后台。日常启动不请求管理员权限。需要在 Plasticity 内使用 Tab 时，再按安装说明安装内嵌插件。
 
 组件数据位于发布目录的 `library/`，日志、设置与安装恢复备份位于 `.runtime/`，更新前保留这两个目录。发布包不携带开发机的组件数据、缓存、环境或安装备份。Release 提供 SHA-256 校验文件；源码仓库仅保存启动器源码和构建脚本，生成的 EXE、ZIP 不进入 Git。
 
@@ -249,3 +249,8 @@ Plasticity 视口加载完成后，插件确认本地后台身份，再预加载
 源码目录启动器兼容 Windows 虚拟环境的 Python 重定向子进程：以启动前已在线的后台判断复用，不把子进程 PID 差异误判为重复启动检查超时。`python tests/verify_windows_release.py --venv` 可单独验证该路径；默认仍验证发布包自带 Python。两种方式均已验证冷启动、托盘和并发单实例。
 
 Tab 内嵌面板外框为 1px，直接引用 Plasticity 原生 `--accent-500` 主题变量，切换 Appearance 的 Accent Color 时自动同步，无需轮询。默认主题使用 Plasticity 自带的绿色回退值。插件更新回滚备份为 `.runtime/plasticity-formal-main-before-accent-border.js`；已有窗口下次启动加载更新。
+
+
+界面与启动入口：统一使用多尺寸立方体 `favicon.ico`，包含 16、20、24、32、40、48、64、96、128、256 像素版本；托盘、网页和 Windows EXE 使用同一资源，暂停状态在托盘菜单和悬停文字中显示。图标生成脚本为 `packaging/build_icon.py`，无需图像处理依赖。英文启动文件为 `PlasticityAssetTool.exe`，插件安装器为 `.runtime/PlasticityAssetTool.PluginInstaller.exe`，发布包说明文件为 `Readme.txt`。后台窗口默认 960×720，保留普通边框、缩放和滚动。
+
+控制中心新增语言切换（中文 / English），组件库、编辑表单和控制中心的界面文案支持即时切换。语言偏好保存在当前浏览器的本机存储，并在同一后台地址下的页面间同步；Edge 控制窗口、普通浏览器和 Plasticity 内嵌页使用不同浏览器存储时，各自保留语言设置。组件名称、库名称、标签和备注保持原文。翻译字典位于 `plasticity-asset-tool-app/src/locales/`，后端及 Plasticity 内核返回的错误暂保留原始语言。

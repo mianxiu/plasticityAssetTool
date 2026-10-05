@@ -183,7 +183,7 @@ class WindowsBridge:
             title = ctypes.create_unicode_buffer(1024)
             self.u.GetWindowTextW(foreground, title, len(title))
             path = self.process_path(foreground)
-            if title.value.startswith("Plasticity 模型组件库") and path and Path(path).name.lower() == "msedge.exe":
+            if title.value.startswith(("Plasticity Asset Tool — Component Library", "Plasticity 模型组件库")) and path and Path(path).name.lower() == "msedge.exe":
                 library_window = foreground
         minimized = False
         try:

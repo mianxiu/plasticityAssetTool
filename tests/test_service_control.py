@@ -63,11 +63,11 @@ class ServiceControlTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(ValueError):
             await self.app.dispatch('service.focus',{'target_id':'missing'})
 
-    def test_tray_icons_have_correct_windows_bitmap_and_status_variants(self):
+    def test_tray_uses_shared_ico_without_replacing_brand_for_status(self):
         active,paused=icon_bitmap(),icon_bitmap(True)
         self.assertEqual(struct.unpack_from('<IiiHH',active),(40,32,64,1,32))
         self.assertEqual(len(active),40+32*32*4+128)
-        self.assertNotEqual(active,paused)
+        self.assertEqual(active,paused)
 
 
 class ServiceHttpTests(AsyncHTTPTestCase):

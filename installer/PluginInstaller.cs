@@ -11,9 +11,9 @@ using System.Text.RegularExpressions;
 using System.Web.Script.Serialization;
 using System.Windows.Forms;
 
-[assembly: AssemblyTitle("Plasticity 模型组件库插件安装")]
+[assembly: AssemblyTitle("Plasticity Asset Tool Plugin Installer")]
 [assembly: AssemblyDescription("plasticityAssetTool 插件安装与升级；支持组件默认布尔置入")]
-[assembly: AssemblyProduct("Plasticity 模型组件库")]
+[assembly: AssemblyProduct("Plasticity Asset Tool")]
 [assembly: AssemblyCompany("plasticityAssetTool 开源项目")]
 [assembly: AssemblyVersion("1.0.0.0")]
 [assembly: AssemblyFileVersion("1.0.0.0")]

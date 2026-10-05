@@ -3,31 +3,24 @@ import ctypes
 import os
 import struct
 import threading
+from pathlib import Path
 from ctypes import wintypes as W
 
 
-def icon_bitmap(paused=False):
-    """32 px branded cube with a connection-status dot; Windows DIB icon."""
-    size = 32
-    pixels = bytearray(size*size*4)
-    def pixel(x, y, rgb):
-        if 0 <= x < size and 0 <= y < size:
-            index = ((size-1-y)*size+x)*4
-            pixels[index:index+4] = bytes((*rgb[::-1], 255))
-    def line(a, b):
-        steps = max(abs(a[0]-b[0]), abs(a[1]-b[1]))
-        for step in range(steps+1):
-            x = round(a[0]+(b[0]-a[0])*step/steps)
-            y = round(a[1]+(b[1]-a[1])*step/steps)
-            pixel(x, y, (181, 210, 249))
-    for a, b in [((15,3),(27,10)),((27,10),(27,23)),((27,23),(15,30)),((15,30),(3,23)),((3,23),(3,10)),((3,10),(15,3)),((3,10),(15,17)),((15,17),(27,10)),((15,17),(15,30))]:
-        line(a, b)
-    for y in range(22,32):
-        for x in range(22,32):
-            if (x-26)**2+(y-26)**2 <= 20:
-                pixel(x,y,(235,177,80) if paused else (94,207,152))
-    header = struct.pack('<IiiHHIIiiII',40,size,size*2,1,32,0,len(pixels),0,0,0,0)
-    return header+pixels+bytes(128)
+ICON_PATH = Path(__file__).resolve().parents[1] / "plasticity-asset-tool-app/src/assets/favicon.ico"
+
+
+def icon_bitmap(paused=False, size=32):
+    """Read the same native-size ICO entry used by the launcher and WebUI."""
+    data = ICON_PATH.read_bytes()
+    reserved, kind, count = struct.unpack_from('<HHH', data)
+    if reserved or kind != 1:
+        raise ValueError("Invalid application ICO")
+    for index in range(count):
+        width, height, _, _, _, _, length, offset = struct.unpack_from('<BBBBHHII', data, 6+16*index)
+        if (width or 256) == size and (height or 256) == size:
+            return data[offset:offset+length]
+    raise ValueError(f"Missing {size}px application icon")
 
 
 class ServiceTray:
@@ -101,7 +94,7 @@ class ServiceTray:
         k.GetModuleHandleW.argtypes, k.GetModuleHandleW.restype = [W.LPCWSTR], W.HMODULE
         shell.Shell_NotifyIconW.argtypes, shell.Shell_NotifyIconW.restype = [W.DWORD,ctypes.POINTER(NotifyIcon)],W.BOOL
         icons = []
-        for paused in (False,True):
+        for paused in (False,):
             payload = ctypes.create_string_buffer(icon_bitmap(paused))
             icon = u.CreateIconFromResourceEx(payload,len(payload)-1,True,0x30000,32,32,0)
             if not icon:
@@ -115,7 +108,7 @@ class ServiceTray:
             with self.lock:
                 state = dict(self.state)
             paused = not state.get('model_enabled',True)
-            notification.icon = icons[int(paused)]
+            notification.icon = icons[0]
             notification.tip = f"Plasticity 组件库 · {'连接暂停' if paused else '服务运行中'}\n{len(state.get('targets',[]))} 个窗口 · {state.get('component_count',0)} 个组件"[:127]
             return shell.Shell_NotifyIconW(operation,ctypes.byref(notification))
         def menu():

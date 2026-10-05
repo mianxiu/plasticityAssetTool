@@ -18,7 +18,7 @@ with socket.socket() as s:s.bind(('127.0.0.1',0));port=s.getsockname()[1]
 config['server']['http_port']=port
 config['plasticity']['cdp_endpoints']=[]
 (package/'config.json').write_text(json.dumps(config),encoding='utf8')
-exe=package/'Plasticity 模型组件库.exe'
+exe=package/'PlasticityAssetTool.exe'
 python=package/'runtime/python/python.exe'
 if options.venv:
  # Exercise the source checkout launcher path, with its Windows redirector

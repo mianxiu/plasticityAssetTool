@@ -7,7 +7,7 @@ import webbrowser
 from ctypes import wintypes as W
 from pathlib import Path
 
-TITLE = "Plasticity 组件库控制中心"
+TITLE = "Plasticity Asset Tool — Control Center"
 
 
 class ControlWindow:
@@ -32,7 +32,7 @@ class ControlWindow:
                 return True
             title = ctypes.create_unicode_buffer(512)
             desktop.u.GetWindowTextW(hwnd, title, len(title))
-            if title.value.startswith(TITLE):
+            if title.value.startswith((TITLE, "Plasticity 组件库控制中心")):
                 path = desktop.process_path(hwnd)
                 if path and Path(path).name.lower() == "msedge.exe":
                     matches.append(hwnd)
@@ -52,7 +52,7 @@ class ControlWindow:
             if self.edge:
                 profile = self.root / ".runtime" / "control-window-profile"
                 subprocess.Popen([str(self.edge), "--app=" + self.url,
-                                  "--user-data-dir=" + str(profile), "--no-first-run"],
+                                  "--user-data-dir=" + str(profile), "--no-first-run", "--window-size=960,720"],
                                  creationflags=0x08000000 if os.name == "nt" else 0)
                 return {"message": "后台管理窗口已打开", "mode": "window", "reused": False}
             webbrowser.open(self.url)

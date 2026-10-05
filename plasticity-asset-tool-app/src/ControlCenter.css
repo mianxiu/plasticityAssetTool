@@ -10,3 +10,14 @@
 .control-panel-settings{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 20px}
 .control-position-options{display:flex;gap:6px}
 .control-shell .control-position-options button[aria-pressed=true]{background:#009b73;border-color:#009b73;color:#fff}
+
+/* Compact desktop defaults, with normal scrolling at smaller window sizes. */
+.control-shell{grid-template-columns:164px minmax(0,1fr)}
+.control-sidebar{padding:18px 12px}.control-sidebar .brand{margin-bottom:20px}
+.control-sidebar .nav-item{padding:8px}.control-main{padding:20px 24px;max-width:1050px}
+.control-heading{gap:12px;margin-bottom:16px}.control-heading h1{font-size:24px;margin:5px 0}
+.control-stats{gap:10px;margin-bottom:12px}.control-card{padding:14px;gap:8px}.control-card strong{font-size:22px}
+.control-section{padding:14px 16px;margin-bottom:12px}.control-section-heading{margin-bottom:12px}
+.control-empty{min-height:100px;gap:6px}.model-window-row{padding:10px;gap:10px}
+.control-actions{gap:6px}.control-management{gap:12px}.control-shell .secondary-button,.control-quit{padding:7px 10px}
+@media(max-width:650px){.control-shell{display:block}.control-main{padding:16px}.control-heading{flex-direction:column}.control-stats{grid-template-columns:1fr}.control-panel-settings{flex-wrap:wrap}}

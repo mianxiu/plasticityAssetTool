@@ -172,7 +172,7 @@ class LibraryLauncher:
             def visit(hwnd, _):
                 title = ctypes.create_unicode_buffer(1024)
                 self.desktop.u.GetWindowTextW(hwnd, title, len(title))
-                if title.value.startswith("Plasticity 模型组件库"):
+                if title.value.startswith(("Plasticity Asset Tool — Component Library", "Plasticity 模型组件库")):
                     path = self.desktop.process_path(hwnd)
                     if path and Path(path).name.lower() == "msedge.exe":
                         candidates.append(hwnd)

@@ -1,3 +1,4 @@
+import {t} from "./i18n";
 import { createEffect, createMemo, createSignal, onCleanup, onMount, Show, untrack } from 'solid-js';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -92,7 +93,7 @@ export function GeometryPreview(props) {
     try {
       renderer = new THREE.WebGLRenderer({antialias:true});
       renderer.setPixelRatio(Math.min(devicePixelRatio,2));
-      renderer.domElement.setAttribute('aria-label','组件三维预览，按住右键旋转及滚轮缩放');
+      renderer.domElement.setAttribute('aria-label',t('右键拖动旋转 · 滚轮缩放'));
       container.append(renderer.domElement);
       resize = new ResizeObserver(fit);resize.observe(container);
     }catch(e){setError('当前设备无法启用三维预览');}
@@ -115,5 +116,5 @@ export function GeometryPreview(props) {
     }).catch(e=>{if(current===revision)setError(e.message);}).finally(()=>{if(current===revision)setLoading(false);});
   });
   onCleanup(()=>{revision++;window.removeEventListener('pointermove',rotateHeld,true);resize?.disconnect();destroy();renderer?.dispose();renderer?.forceContextLoss();});
-  return <div class="geometry-viewer" title={props.heldOrigin ? "按住右键移动旋转，松开恢复" : "右键拖动旋转 · 滚轮缩放"}><div class="geometry-canvas" ref={container}/><Show when={loading()}><p class="geometry-message">正在生成几何预览…</p></Show><Show when={error()}><p class="geometry-message geometry-error" role="status">{error()}</p></Show></div>;
+  return <div class="geometry-viewer" title={props.heldOrigin ? t("按住右键移动旋转，松开恢复") : t("右键拖动旋转 · 滚轮缩放")}><div class="geometry-canvas" ref={container}/><Show when={loading()}><p class="geometry-message">{t("正在生成几何预览…")}</p></Show><Show when={error()}><p class="geometry-message geometry-error" role="status">{error()}</p></Show></div>;
 }
