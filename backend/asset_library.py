@@ -2,7 +2,9 @@
 import hashlib
 import io
 import json
+import re
 import sqlite3
+import tempfile
 import uuid
 import zipfile
 from .group_recipe import validate_recipe
@@ -269,6 +271,35 @@ class AssetLibrary:
             if row["preview"]:
                 archive.writestr("preview.jpg", row["preview"])
         return output.getvalue()
+
+    def export_batch(self, asset_ids):
+        if not isinstance(asset_ids, list) or not 1 <= len(asset_ids) <= 10000 or any(
+            not isinstance(value, str) or not re.fullmatch(r'[a-f0-9]{32}', value) for value in asset_ids
+        ):
+            raise ValueError("请选择 1–10000 个有效组件")
+        asset_ids = list(dict.fromkeys(asset_ids))
+        # Validate the full selection before preparing an archive. Large bundles
+        # spill to disk; never retain all models or the whole ZIP in memory.
+        names = {}
+        with self.connect() as db:
+            for start in range(0, len(asset_ids), 500):
+                chunk = asset_ids[start:start+500]
+                names.update((row['id'],row['name']) for row in db.execute(
+                    'SELECT id,name FROM asset_metadata WHERE id IN ('+','.join('?' for _ in chunk)+')', chunk))
+        if len(names) != len(asset_ids):
+            raise ValueError("部分组件不存在，请刷新组件库")
+        output = tempfile.SpooledTemporaryFile(max_size=8*1024*1024, mode='w+b')
+        try:
+            with zipfile.ZipFile(output, 'w', zipfile.ZIP_STORED) as bundle:
+                for asset_id in asset_ids:
+                    name = names[asset_id]
+                    name = re.sub(r'[\x00-\x1f/\\:*?"<>|]', '_', name).strip('. ')[:80] or 'component'
+                    bundle.writestr(f'{name}--{asset_id}.patasset', self.export(asset_id))
+            output.seek(0)
+            return output, len(asset_ids)
+        except BaseException:
+            output.close()
+            raise
 
     def import_package(self, payload, library_id="default", folder_id=None):
         self.validate_location(library_id, folder_id)

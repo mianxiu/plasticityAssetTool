@@ -220,5 +220,22 @@
   "连续布尔 · ": "Sequential booleans · ",
   " 个子部件": " parts",
   "编辑 ": "Edit ",
-  "中文": "中文"
+  "中文": "中文",
+  "批量导出": "Batch export",
+  "↑ 导出": "↑ Export",
+  "多选组件导出": "Select components to export",
+  "导出当前库全部组件": "Export all components in this library",
+  "导出当前分类": "Export this category",
+  "导出当前库中此分类的所有组件，不受搜索、类型或分组筛选影响": "Export every component in this category in the current library, regardless of search, type or folder filters",
+  "批量导出选择": "Batch export selection",
+  "已选 {count} 个组件": "{count} components selected",
+  "全选当前结果": "Select all results",
+  "清空选择": "Clear selection",
+  "正在打包…": "Preparing archive…",
+  "导出所选": "Export selected",
+  "完成选择": "Done selecting",
+  "选择 ": "Select ",
+  "请先重启后台，启用批量导出": "Restart the backend to enable batch export",
+  "导出失败": "Export failed",
+  "已开始下载 {count} 个组件的 ZIP 包": "Downloading a ZIP with {count} components"
 }

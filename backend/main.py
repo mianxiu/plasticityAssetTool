@@ -8,7 +8,7 @@ from collections import deque
 import webbrowser
 from pathlib import Path
 from urllib.parse import urlparse
-from tornado import web, websocket
+from tornado import web, websocket, ioloop
 from .asset_service import AssetService
 from .library_launcher import LibraryLauncher
 from .service_control import ServiceControl
@@ -146,6 +146,44 @@ class ExportHandler(LocalHandler):
         self.set_header("Content-Disposition", f'attachment; filename="component-{asset_id}.patasset"')
         self.write(payload)
 
+
+class BatchExportHandler(LocalHandler):
+    async def post(self):
+        if self.application.export_lock.locked() or len(self.application.batch_exports) >= 8:
+            self.set_status(409)
+            self.write({"error": "正在打包或待下载组件包过多，请稍后重试"})
+            return
+        try:
+            request = json.loads(self.request.body)
+            if not isinstance(request, dict):
+                raise ValueError("无效的导出请求")
+            async with self.application.export_lock:
+                output, count = await asyncio.to_thread(self.application.service.library.export_batch, request.get('ids'))
+            token = uuid.uuid4().hex
+            self.application.batch_exports[token] = output
+            ioloop.IOLoop.current().call_later(600, self.application.discard_export, token)
+            self.write({"download_url": f"/api/exports/{token}.zip", "count": count})
+        except (ValueError, TypeError) as error:
+            self.set_status(400)
+            self.write({"error": str(error)})
+        except OSError:
+            self.set_status(500)
+            self.write({"error": "导出失败，请检查可用磁盘空间"})
+
+    async def get(self, token):
+        output = self.application.batch_exports.pop(token, None)
+        if output is None:
+            raise web.HTTPError(404, "组件包已下载或已过期")
+        try:
+            self.set_header('Content-Type', 'application/zip')
+            self.set_header('Content-Disposition', 'attachment; filename="PlasticityAssetTool-components.zip"')
+            self.set_header('Cache-Control', 'no-store')
+            while chunk := await asyncio.to_thread(output.read, 1024*1024):
+                self.write(chunk)
+                await self.flush()
+        finally:
+            output.close()
+
 class ImportHandler(LocalHandler):
     async def post(self):
         files = self.request.files.get("file", [])
@@ -187,6 +225,8 @@ class Application(web.Application):
         self.library_generation = uuid.uuid4().hex
         self.library_revision = 0
         self.library_changes = deque(maxlen=512)
+        self.export_lock = asyncio.Lock()
+        self.batch_exports = {}
         self.service = service or AssetService(config, ROOT)
         self.control_window = ControlWindow(f'http://127.0.0.1:{config["server"]["http_port"]}', ROOT, self.service.desktop)
         self.stop_event = asyncio.Event()
@@ -200,9 +240,16 @@ class Application(web.Application):
             (r"/api/assets/([a-f0-9]{32})/geometry(/preview)?", GeometryHandler),
             (r"/api/assets/([a-f0-9]{32})/preview", PreviewHandler),
             (r"/api/assets/([a-f0-9]{32})/export", ExportHandler),
+            (r"/api/export", BatchExportHandler),
+            (r"/api/exports/([a-f0-9]{32})\.zip", BatchExportHandler),
             (r"/api/import", ImportHandler),
             (r"/(.*)", StaticHandler, {"path": str(ROOT / "plasticity-asset-tool-app" / "dist"), "default_filename": "index.html"}),
         ], port=port, base_url=f"http://127.0.0.1:{port}", websocket_max_message_size=8 * 1024 * 1024)
+
+    def discard_export(self, token):
+        output = self.batch_exports.pop(token, None)
+        if output is not None:
+            output.close()
 
     async def broadcast(self, message):
         for client in tuple(self.clients):

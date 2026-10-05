@@ -101,6 +101,9 @@ export function Home() {
     finally {if (version === cardSizeVersion) cardSizePending = false;}
   }
   const [sortMode, setSortMode] = createSignal("recent");
+  const [exportMode, setExportMode] = createSignal(false);
+  const [exportSelection, setExportSelection] = createSignal(new Set());
+  const [exporting, setExporting] = createSignal(false);
   const [busy, setBusy] = createSignal(false);
   const [notice, setNotice] = createSignal(null);
   const [dialog, setDialog] = createSignal(null);
@@ -147,6 +150,31 @@ export function Home() {
     return rows.sort((a,b) => mode === "name" ? a.name.localeCompare(b.name, "zh-CN") : mode === "oldest" ? a.created_at.localeCompare(b.created_at) : b.created_at.localeCompare(a.created_at));
   });
   const ready = () => status() === "connected" && !busy();
+  const categoryExport = createMemo(() => assets().filter(asset => category() === "全部组件" || asset.category === category()));
+  const selectedExport = createMemo(() => assets().filter(asset => exportSelection().has(asset.id)).map(asset => asset.id));
+  function toggleExport(id) {
+    setExportSelection(current => {const next = new Set(current); next.has(id) ? next.delete(id) : next.add(id); return next;});
+  }
+  function startExportSelection(event) {
+    event.currentTarget.closest('details').open = false;
+    setExportMode(true); setDetailsOpen(false);
+  }
+  async function exportComponents(ids) {
+    if (!ids.length || exporting() || !ready()) return;
+    setExporting(true);
+    try {
+      const response = await fetch(`${api}/api/export`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ids})});
+      if (response.status === 404) throw new Error(t("请先重启后台，启用批量导出"));
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || t("导出失败"));
+      const link = document.createElement('a');
+      link.href = `${api}${result.download_url}`;
+      link.download = 'PlasticityAssetTool-components.zip';
+      document.body.append(link); link.click(); link.remove();
+      showNotice(t("已开始下载 {count} 个组件的 ZIP 包", {count:result.count}));
+    } catch (error) {showNotice(error.message, true);}
+    finally {setExporting(false);}
+  }
   const canInsert = () => ready() && modelEnabled() && nativeTargets().includes(targetId()) && !archived();
   const setField = (key, value) => setForm(current => ({ ...current, [key]: value, ...(key === "kind" && !supportsBoolean({kind:value}) ? {insert_mode:"new-body"} : {}) }));
   const [previewRevision, setPreviewRevision] = createSignal({});
@@ -296,6 +324,7 @@ export function Home() {
   async function switchLibrary(id) {
     if (busy()) return;
     libraryCursor = null; cursorView = null; libraryLoaded = false;
+    setExportMode(false); setExportSelection(new Set());
     setLibraryId(id); setAssets([]); setFolders([]); setFolderId(null); setSelectedId(""); setArchived(false); setCategory("全部组件"); setQuery(""); setKind("all"); await refresh();
   }
   function enterFolder(id) { setFolderId(id); setSelectedId(""); setCategory("全部组件"); setQuery(""); }
@@ -413,6 +442,7 @@ export function Home() {
     finally { setBusy(false); event.target.value = ""; await refresh(); }
   }
   async function toggleArchive(value) {
+    setExportMode(false); setExportSelection(new Set());
     setArchived(value); setCategory("全部组件"); setSelectedId(""); await refresh();
   }
   async function archiveSelected() {
@@ -474,8 +504,8 @@ export function Home() {
     <main class="main-content">
       <Show when={connectionLost() || (status() === "connected" && !modelEnabled())}><section class="connection-alert" role="alert"><span class="connection-alert-icon" aria-hidden="true">!</span><div><strong>{connectionLost() ? t("后台连接已断开") : t("模型连接已停止")}</strong><p>{connectionLost() ? t("组件置入和保存暂不可用。请启动后台服务，连接恢复后可继续使用。") : t("组件置入、自动复制和模型操作已停用。请在控制中心恢复模型连接。")}</p></div><Show when={status() === "connected"}><a href="/?control=1" target="_blank" rel="noopener noreferrer">{t("打开控制中心")}</a></Show></section></Show>
       <Show when={ready() && modelEnabled() && !!target() && !nativeTargets().includes(targetId())}><section class="connection-alert" role="alert"><span class="connection-alert-icon" aria-hidden="true">!</span><div><strong>{t("原生模型插件未连接")}</strong><p>{t("请重新打开已安装插件的 Plasticity。直连恢复后，即可保存选中模型和置入组件。")}</p></div></section></Show><header class="page-header"><div><div class="eyebrow">YOUR REUSABLE GEOMETRY</div><h1>{archived() ? t("已归档") : t("模型组件库")}</h1><p>{t("保存一次，随时置入。在 Plasticity 里继续创作。")}</p></div>
-        <label class="search-field"><span>⌕</span><input ref={searchInput} aria-label={t("搜索组件")} placeholder={t("搜索此库")} value={query()} onInput={event => setQuery(event.currentTarget.value)} onKeyDown={event => { if(event.key === "Enter" && filtered().length && canInsert()) {event.preventDefault();insert(filtered()[0]);} }}/></label>
-        <div class="header-actions"><button class="secondary connection-settings-toggle" aria-label={t("连接与分组设置")} aria-expanded={connectionSettings()} onClick={()=>setConnectionSettings(!connectionSettings())}>⚙</button><button class="secondary" disabled={!ready() || !modelEnabled()} onClick={generatePreviews} title={previewPending() ? t("预览在后台生成，仍可保存和置入") : t("生成几何预览")}>{previewPending() ? t("预览中 · {p0}",{p0:previewPending()}) : t("生成预览")}</button><button class="secondary" disabled={!ready()} onClick={() => importInput.click()}>{t("↓ 导入组件包")}</button><button class="primary" disabled={!ready() || !clipboardSupported()} onClick={openCapture}>{t("＋ 保存组件")}</button><Show when={floatingPanel()}><button class="panel-dismiss" aria-label={t("收起面板")} title={t("收起面板")} disabled={!ready()} onClick={hidePanel}>×</button></Show></div>
+        <label class="search-field"><span>⌕</span><input ref={searchInput} aria-label={t("搜索组件")} placeholder={t("搜索此库")} value={query()} onInput={event => setQuery(event.currentTarget.value)} onKeyDown={event => { if(event.key === "Enter" && filtered().length && (exportMode() || canInsert())) {event.preventDefault();exportMode() ? toggleExport(filtered()[0].id) : insert(filtered()[0]);} }}/></label>
+        <div class="header-actions"><button class="secondary connection-settings-toggle" aria-label={t("连接与分组设置")} aria-expanded={connectionSettings()} onClick={()=>setConnectionSettings(!connectionSettings())}>⚙</button><button class="secondary" disabled={!ready() || !modelEnabled()} onClick={generatePreviews} title={previewPending() ? t("预览在后台生成，仍可保存和置入") : t("生成几何预览")}>{previewPending() ? t("预览中 · {p0}",{p0:previewPending()}) : t("生成预览")}</button><details class="export-menu"><summary aria-label={t("批量导出")}>{t("↑ 导出")}</summary><div><button disabled={!ready() || exporting() || !assets().length} onClick={startExportSelection}>{t("多选组件导出")}</button><button disabled={!ready() || exporting() || !categoryExport().length} title={t("导出当前库中此分类的所有组件，不受搜索、类型或分组筛选影响")} onClick={event=>{event.currentTarget.closest('details').open=false;exportComponents(categoryExport().map(asset=>asset.id));}}>{category() === "全部组件" ? t("导出当前库全部组件") : t("导出当前分类")} · {categoryExport().length}</button></div></details><button class="secondary" disabled={!ready()} onClick={() => importInput.click()}>{t("↓ 导入组件包")}</button><button class="primary" disabled={!ready() || !clipboardSupported()} onClick={openCapture}>{t("＋ 保存组件")}</button><Show when={floatingPanel()}><button class="panel-dismiss" aria-label={t("收起面板")} title={t("收起面板")} disabled={!ready()} onClick={hidePanel}>×</button></Show></div>
       </header>
       <input ref={importInput} class="hidden-input" type="file" accept=".patasset" onChange={importPackage}/>
 
@@ -495,15 +525,16 @@ export function Home() {
       <Show when={!target()}><div class="connection-hint" title={t("打开 Plasticity，在连接设置中选择目标窗口。")}>{t("未连接 Plasticity 窗口")}</div></Show>
 
       <div class="library-toolbar"><div class="section-name">{category() === "全部组件" ? t("全部组件") : category()}<span>{filtered().length}{t(" 个组件")}</span></div><div class="type-tabs" aria-label={t("组件类型")}><For each={[["all",t("全部")],["solid","Solid"],["curve","Curve"],["mixed",t("混合")],["unknown",t("未标注")]]}>{item => <button class={kind() === item[0] ? "active" : ""} aria-pressed={kind() === item[0]} onClick={() => {setKind(item[0]);setSelectedId("");}}>{item[1]}</button>}</For><span>{t("直接保存时自动识别类型")}</span></div></div>
+      <Show when={exportMode() || exporting()}><div class="batch-export-toolbar" role="group" aria-label={t("批量导出选择")}><Show when={exportMode()}><span>{t("已选 {count} 个组件",{count:selectedExport().length})}</span><button class="secondary" onClick={()=>setExportSelection(current=>new Set([...current,...filtered().map(asset=>asset.id)]))}>{t("全选当前结果")}</button><button class="secondary" disabled={!selectedExport().length} onClick={()=>setExportSelection(new Set())}>{t("清空选择")}</button><button class="primary" disabled={!ready() || exporting() || !selectedExport().length} onClick={()=>exportComponents(selectedExport())}>{exporting() ? t("正在打包…") : t("导出所选")}</button><button class="secondary" onClick={()=>{setExportMode(false);setExportSelection(new Set());}}>{t("完成选择")}</button></Show><Show when={exporting() && !exportMode()}><span role="status">{t("正在打包…")}</span></Show></div></Show>
       <Show when={!query().trim() && !archived() && childFolders().length}><section class="folder-grid" aria-label={t("子分组")}><For each={childFolders()}>{item => <button class="folder-card" onClick={() => enterFolder(item.id)}><span>▱</span><strong>{item.name}</strong><small>{assets().filter(asset => folderPath(asset.folder_id).some(parent => parent.id === item.id)).length}{t(" 个组件 · ")}{folders().filter(row => row.parent_id === item.id).length}{t(" 个子分组")}</small><span>→</span></button>}</For></section></Show>
 
       <Show when={heldPreview()} keyed>{preview => <section class="held-model-preview" role="status" aria-label={t("旋转预览 ") + preview.asset.name} style={{left:`${preview.left}px`,top:`${preview.top}px`}}><strong>{preview.asset.name}</strong><GeometryPreview asset={preview.asset} load={loadGeometry} heldOrigin={preview.origin}/><span>{t("按住右键移动旋转 · 松开恢复")}</span></section>}</Show>
       <div class="library-layout">
         <section class="asset-grid" aria-label={t("组件列表")}>
           <Show when={filtered().length} fallback={<div class="empty-state"><div class="empty-cube"><Cube /></div><h2>{query() || category() !== "全部组件" || kind() !== "all" ? t("没有匹配的组件") : archived() ? t("没有归档组件") : folderId() || childFolders().length ? t("当前分组没有直接保存的组件") : t("从你的第一个组件开始")}</h2><p>{query() ? t("换个关键词，或者查看全部组件。") : archived() ? t("归档的组件会保留模型数据，随时可以恢复。") : t("在 Plasticity 中选中模型，\n点击保存组件即可直接读取并保存。以后只需一点，即可原生置入。")}</p><Show when={!archived() && !query()}><button class="primary" disabled={!ready() || !clipboardSupported()} onClick={openCapture}>{t("＋ 保存组件")}</button></Show></div>}>
-            <VirtualAssetGrid items={filtered()} size={cardSize()}>{asset => <article data-insert-mode={displayMode(asset)} class={selectedId() === asset.id ? "asset-card selected" : "asset-card"}>
-              <button class="asset-preview" data-insert-mode={displayMode(asset)} aria-label={t("置入 ") + asset.name} aria-disabled={!canInsert()} onClick={() => {if(canInsert())insert(asset);}} onPointerDown={event=>previewPointerDown(event,asset)} onContextMenu={event=>event.preventDefault()}><Show when={asset.has_geometry_preview || asset.has_preview} fallback={<div class="model-placeholder"><Cube /><span>{t("原生模型")}</span></div>}><img loading="lazy" decoding="async" classList={{"geometry-thumbnail":!asset.has_preview}} src={previewUrl(asset)} alt={asset.name} draggable="false"/></Show><span class="asset-format">{t(kindNames[asset.kind])}</span><Show when={displayMode(asset) !== "new-body"}><span class="asset-insert-mode" title={asset.recipe ? t("按组内子部件顺序执行") : t("默认置入：") + modeLabel(asset)}>{modeLabel(asset)}</span></Show></button>
-              <div class="asset-body"><div class="asset-name">{asset.name}</div><div class="asset-meta" title={asset.recipe ? t("连续布尔 · ") + asset.recipe.parts.length + t(" 个子部件") : t("默认置入：") + modeLabel(asset)}>{asset.category}<span>{Math.max(1, Math.round(asset.bytes / 1024))} KB</span></div><div class="card-footer"><span title={asset.tags}>{asset.tags || ""}</span><button class="insert-button" aria-label={t("编辑 ") + asset.name} onClick={() => openEdit(asset)}>{t("编辑")}</button></div></div>
+            <VirtualAssetGrid items={filtered()} size={cardSize()}>{asset => <article data-insert-mode={displayMode(asset)} class={selectedId() === asset.id ? "asset-card selected" : "asset-card"} classList={{"export-selected":exportMode() && exportSelection().has(asset.id)}}>
+              <button class="asset-preview" data-insert-mode={displayMode(asset)} aria-label={(exportMode() ? t("选择 ") : t("置入 ")) + asset.name} aria-pressed={exportMode() ? exportSelection().has(asset.id) : undefined} aria-disabled={exportMode() ? false : !canInsert()} onClick={() => {if(exportMode())toggleExport(asset.id);else if(canInsert())insert(asset);}} onPointerDown={event=>previewPointerDown(event,asset)} onContextMenu={event=>event.preventDefault()}><Show when={asset.has_geometry_preview || asset.has_preview} fallback={<div class="model-placeholder"><Cube /><span>{t("原生模型")}</span></div>}><img loading="lazy" decoding="async" classList={{"geometry-thumbnail":!asset.has_preview}} src={previewUrl(asset)} alt={asset.name} draggable="false"/></Show><span class="asset-format">{t(kindNames[asset.kind])}</span><Show when={displayMode(asset) !== "new-body"}><span class="asset-insert-mode" title={asset.recipe ? t("按组内子部件顺序执行") : t("默认置入：") + modeLabel(asset)}>{modeLabel(asset)}</span></Show></button>
+              <Show when={exportMode()}><label class="asset-export-check"><input type="checkbox" aria-label={t("选择 ")+asset.name} checked={exportSelection().has(asset.id)} onChange={()=>toggleExport(asset.id)}/></label></Show><div class="asset-body"><div class="asset-name">{asset.name}</div><div class="asset-meta" title={asset.recipe ? t("连续布尔 · ") + asset.recipe.parts.length + t(" 个子部件") : t("默认置入：") + modeLabel(asset)}>{asset.category}<span>{Math.max(1, Math.round(asset.bytes / 1024))} KB</span></div><div class="card-footer"><span title={asset.tags}>{asset.tags || ""}</span><button class="insert-button" aria-label={t("编辑 ") + asset.name} onClick={() => openEdit(asset)}>{t("编辑")}</button></div></div>
             </article>}</VirtualAssetGrid>
           </Show>
         </section>
