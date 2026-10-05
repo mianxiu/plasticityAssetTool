@@ -19,3 +19,8 @@ Source: https://github.com/mianxiu/plasticityAssetTool
 Versions released under MIT before this license change retain that
 permission. Third-party components retain their respective licenses.
 The license of this tool does not determine the license of user models.
+
+This is an independent third-party tool, not an official Plasticity product.
+Explicit official authorization for its injection approach has not been obtained.
+See DISCLAIMER.md for integration risks and license boundaries. That notice
+adds no restrictions to the rights granted under GPLv3.

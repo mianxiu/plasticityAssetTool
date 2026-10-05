@@ -18,6 +18,8 @@ Python、Tornado、Solid、Three.js 等第三方组件遵循各自的许可证�
 
 本许可证只授权本项目所提供的代码，不授予 Plasticity 软件或其内核的使用权。安装和使用 Plasticity 仍遵循其自身的授权条款。
 
+项目身份、注入方式及使用风险见 [第三方声明与使用风险说明](../DISCLAIMER.md)。该说明不替代官方授权，不增加与 GPLv3 不一致的使用限制；担保排除及责任限制以 GPLv3 第 15、16 条和适用法律为准。
+
 ## 发布与源码
 
 后续 Windows 发布包包含 `LICENSE` 和 `NOTICE`。对应版本源码可从 [仓库标签](https://github.com/mianxiu/plasticityAssetTool/tags) 及 [Releases](https://github.com/mianxiu/plasticityAssetTool/releases) 获取；重新分发时需要确保提供与所分发程序对应的源码，不能仅用指向未来最新代码的链接代替。
