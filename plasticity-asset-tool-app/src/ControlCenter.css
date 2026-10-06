@@ -25,3 +25,13 @@
 .update-status-row strong{font-size:11px;font-weight:500;min-width:60px}
 .update-status-row span,.update-status-row small{font-size:11px;color:var(--control-muted)}
 .update-status-row .update-required{color:#e0b184}
+
+.control-tabs{display:flex;gap:4px;border-bottom:1px solid var(--control-border);margin:4px 0 12px;overflow-x:auto;scrollbar-width:thin}
+.control-shell .control-tabs button{flex:none;padding:8px 12px;border:0;border-bottom:2px solid transparent;border-radius:5px 5px 0 0;background:transparent;color:var(--control-muted);font-size:12px;white-space:nowrap;cursor:pointer}
+.control-shell .control-tabs button[aria-selected=true]{border-bottom-color:#009b73;background:#009b7314;color:#eee}
+.control-shell .control-tabs button:hover{background:#282828}
+.control-shell .control-tabs button:focus-visible{outline-offset:-2px}
+.control-tab-panel{min-height:220px;outline-offset:2px}
+.control-tab-panel[hidden]{display:none}
+.control-tab-panel .control-section:first-child{padding-top:0}
+@media(max-width:480px){.control-shell .control-tabs button{padding:8px;font-size:11px}.control-tab-panel{min-height:180px}}
