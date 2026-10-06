@@ -7,7 +7,8 @@
 | 文件或格式 | 用途 | 应如何使用 |
 | --- | --- | --- |
 | `.patasset` | 单个组件交换包，含模型和编辑信息 | 组件库“导入组件包”导入；“编辑 → 导出组件包”导出 |
-| `plasticityassettool-components.zip` | 批量导出的多个 `.patasset` | 先解压，再逐个导入；目前不能直接导入外层 ZIP |
+| `plasticityassettool-components.zip` | 批量导出的多个 `.patasset` | 在组件库直接选择 ZIP，预览并处理冲突后批量导入 |
+| 整库备份 ZIP | 控制中心导出的全部库数据 | 在“备份与迁移”预览后确认恢复，不走组件导入入口 |
 | `library/library.sqlite3` | 所有组件、库、分组、归档及缓存的实际数据库 | 退出后台后备份整个 `library/`；不是组件包导入文件 |
 | `.plasticity` | Plasticity 原生建模文档 | 在 Plasticity 打开，选择对象后保存组件；插件不直接导入整个文档 |
 | `model.bin` | `.patasset` 内部的原始模型字节 | 由插件读取；不要单独打开或改后缀作为 CAD 文件 |
@@ -91,7 +92,7 @@ plasticityassettool-components.zip
 └── 内孔--<组件ID>.patasset
 ```
 
-外层 ZIP 不额外保存分类目录树或完整数据库。分类等信息在各组件清单中。当前需要解压后逐个导入，不能直接导入外层 ZIP，也没有一次选择多个单包的导入入口。
+外层 ZIP 不额外保存分类目录树或完整数据库。分类等信息在各组件清单中。支持直接导入外层 ZIP，也支持一次选择多个 `.patasset`；校验、冲突预览和确认提交见 [导入与备份](Import-and-Export.md)。
 
 ## 数据库和预览缓存
 
