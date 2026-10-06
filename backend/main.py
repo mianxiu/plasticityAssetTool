@@ -15,6 +15,7 @@ from .service_control import ServiceControl
 from .service_tray import ServiceTray
 from .control_window import ControlWindow
 from .single_instance import BackendInstance
+from .data_transfer import DataTransfer, MAX_UPLOAD
 from tornado.httpclient import AsyncHTTPClient, HTTPClientError
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -201,6 +202,61 @@ class ImportHandler(LocalHandler):
             self.set_status(400)
             self.write({"error": str(exc)})
 
+class DataTransferHandler(LocalHandler):
+    async def get(self, operation):
+        if operation != 'backup':
+            raise web.HTTPError(404)
+        try:
+            async with self.application.service.lock:
+                output = await asyncio.to_thread(self.application.transfers.backup)
+            try:
+                self.set_header('Content-Type','application/zip')
+                self.set_header('Content-Disposition','attachment; filename="plasticityassettool-library-backup.zip"')
+                self.set_header('Cache-Control','no-store')
+                while chunk := await asyncio.to_thread(output.read,1024*1024):
+                    self.write(chunk)
+                    await self.flush()
+            finally:
+                output.close()
+        except (ValueError,OSError) as exc:
+            if not self._headers_written:
+                self.set_status(400)
+                self.write({'error':str(exc)})
+
+    async def post(self, operation):
+        try:
+            async with self.application.service.lock:
+                if operation == 'preview':
+                    files=[(file['filename'],file['body']) for file in self.request.files.get('file',[])]
+                    result=await asyncio.to_thread(self.application.transfers.preview,files,
+                        self.get_body_argument('kind','import'),self.get_body_argument('library_id','default'),
+                        self.get_body_argument('folder_id',None) or None)
+                    ioloop.IOLoop.current().call_later(600,lambda:asyncio.create_task(self.application.discard_transfer(result['token'])))
+                elif operation == 'commit':
+                    request=json.loads(self.request.body)
+                    if not isinstance(request,dict):
+                        raise ValueError('无效的请求')
+                    # A restore must not race a dispatched model task or old geometry reply.
+                    if self.application.service.native.jobs or self.application.service.geometry.jobs:
+                        raise ValueError('模型任务仍在运行，请完成后再导入或恢复')
+                    result=await asyncio.to_thread(self.application.transfers.commit,
+                        request.get('token'),request.get('choices'),request.get('confirm_restore',False))
+                    self.application.library_generation=uuid.uuid4().hex
+                    self.application.library_changes.clear()
+                    self.application.library_revision=0
+                elif operation == 'cancel':
+                    request=json.loads(self.request.body)
+                    self.application.transfers.discard(request.get('token'))
+                    result={}
+                else:
+                    raise ValueError('未知的数据操作')
+            self.write({'ok':True,'data':result})
+            if operation=='commit':
+                await self.application.broadcast({'type':'library_changed'})
+        except (ValueError,OSError,TypeError,AttributeError) as exc:
+            self.set_status(400)
+            self.write({'error':str(exc)})
+
 class StaticHandler(web.StaticFileHandler):
     def is_html(self):
         return str(getattr(self,"absolute_path",self.path)).lower().endswith(".html") or not self.path
@@ -228,6 +284,7 @@ class Application(web.Application):
         self.export_lock = asyncio.Lock()
         self.batch_exports = {}
         self.service = service or AssetService(config, ROOT)
+        self.transfers = DataTransfer(self.service.library)
         self.control_window = ControlWindow(f'http://127.0.0.1:{config["server"]["http_port"]}', ROOT, self.service.desktop)
         self.stop_event = asyncio.Event()
         self.control = ServiceControl(self, self.stop_event)
@@ -243,6 +300,7 @@ class Application(web.Application):
             (r"/api/export", BatchExportHandler),
             (r"/api/exports/([a-f0-9]{32})\.zip", BatchExportHandler),
             (r"/api/import", ImportHandler),
+            (r"/api/data/(backup|preview|commit|cancel)", DataTransferHandler),
             (r"/(.*)", StaticHandler, {"path": str(ROOT / "plasticity-asset-tool-app" / "dist"), "default_filename": "index.html"}),
         ], port=port, base_url=f"http://127.0.0.1:{port}", websocket_max_message_size=8 * 1024 * 1024)
 
@@ -250,6 +308,10 @@ class Application(web.Application):
         output = self.batch_exports.pop(token, None)
         if output is not None:
             output.close()
+
+    async def discard_transfer(self, token):
+        async with self.service.lock:
+            self.transfers.discard(token)
 
     async def broadcast(self, message):
         for client in tuple(self.clients):
@@ -289,6 +351,10 @@ class Application(web.Application):
         oldest = self.library_changes[0][0] - 1 if self.library_changes else revision
         valid = valid and oldest <= number <= revision
         library_id = args.get("library_id", "default")
+        libraries = await asyncio.to_thread(self.service.library.libraries)
+        if not any(row['id']==library_id for row in libraries):
+            library_id='default'
+            valid=False
         archived = bool(args.get("archived", False))
         if not valid:
             state = await self.service.library_state(library_id, archived)
@@ -306,6 +372,7 @@ class Application(web.Application):
                      "libraries": libraries, "folders": folders,
                      "launcher": self.service.launcher.snapshot() if self.service.launcher else {"registered": False}}
         state["panel_settings"] = self.service.panel_settings.snapshot()
+        state['library_id']=library_id
         return state
 
 async def reuse_backend(port, headless):
@@ -356,7 +423,7 @@ async def run_backend(port, headless, no_tray, instance):
     app = Application(config)
     url = app.settings["base_url"]
     try:
-        server = app.listen(config["server"]["http_port"], address="127.0.0.1", max_buffer_size=96 * 1024 * 1024)
+        server = app.listen(config["server"]["http_port"], address="127.0.0.1", max_buffer_size=MAX_UPLOAD + 1024*1024)
     except OSError:
         # Compatibility with an already-running backend from before instance locks.
         await reuse_backend(config["server"]["http_port"], headless)

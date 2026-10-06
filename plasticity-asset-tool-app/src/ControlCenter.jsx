@@ -1,3 +1,4 @@
+import {DataTransferPanel} from "./DataTransferPanel";
 import {installUiUpdates} from "./uiUpdates.mjs";
 import {t, locale, setLocale} from "./i18n";
 import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
@@ -6,7 +7,7 @@ import "./ControlCenter.css";
 import {uiUpdateState,pluginUpdateState,pluginRunningMessage} from './updatePresentation.mjs';
 
 export function ControlCenter() {
-  const tabs=[['overview','概览'],['updates','更新状态'],['plugins','插件安装'],['connections','模型连接'],['preferences','偏好设置']];
+  const tabs=[['overview','概览'],['updates','更新状态'],['plugins','插件安装'],['connections','模型连接'],['data','备份与迁移'],['preferences','偏好设置']];
   const tabKey='pat.controlCenter.tab';
   const initialTab=()=>{try {const saved=sessionStorage.getItem(tabKey);return tabs.some(([id])=>id===saved) ? saved : 'overview';}catch{return 'overview';}};
   const [activeTab,setActiveTab] = createSignal(initialTab());
@@ -18,6 +19,7 @@ export function ControlCenter() {
     event.preventDefault();selectTab(tabs[next][0]);
     event.currentTarget.parentElement.querySelectorAll('[role="tab"]')[next]?.focus();
   };
+  const [transferPending,setTransferPending]=createSignal(false);
   const [state,setState] = createSignal(null);
   const [online,setOnline] = createSignal(false);
   const [loaded,setLoaded] = createSignal(false);
@@ -105,7 +107,7 @@ export function ControlCenter() {
   const enabled=()=>state()?.model_enabled !== false;
   const elapsed=()=>{const minutes=Math.floor((state()?.uptime_seconds || 0)/60);return minutes<60 ? t("{p0} 分钟",{p0:minutes}) : t("{p0} 小时 {p1} 分钟",{p0:Math.floor(minutes/60),p1:minutes%60});};
   const previousTitle=document.title;
-  onMount(()=>{stopUiUpdates=installUiUpdates({canReload:()=>online() && !busy() && !detecting() && !checkingUpdates() && !pluginPending() && !confirmPlugin() && !confirmQuit() && !quitting() && !installPath().trim()});document.title="plasticity asset tool — control center";refresh();timer=setInterval(refresh,3000);});
+  onMount(()=>{stopUiUpdates=installUiUpdates({canReload:()=>online() && !transferPending() && !busy() && !detecting() && !checkingUpdates() && !pluginPending() && !confirmPlugin() && !confirmQuit() && !quitting() && !installPath().trim()});document.title="plasticity asset tool — control center";refresh();timer=setInterval(refresh,3000);});
   onCleanup(()=>{stopUiUpdates();disposed=true;clearInterval(timer);document.title=previousTitle;});
   return <div class="control-shell">
     <aside class="control-sidebar">
@@ -158,6 +160,9 @@ export function ControlCenter() {
           <div class="model-window-list"><For each={state()?.targets}>{target=><article class="model-window-row"><Cube/><div><strong>{target.title}</strong><small>{target.mode === "desktop" ? t("原生模型窗口") : t("调试接口")} · {enabled() ? t("可进行模型操作") : t("模型操作暂停")}</small></div><button class="secondary-button" disabled={busy() || target.mode !== "desktop"} onClick={()=>command("service.focus",{target_id:target.id})}>{t("切换到窗口 ↗")}</button></article>}</For></div>
         </Show>
       </section>
+      </div>
+      <div class="control-tab-panel" role="tabpanel" id="control-panel-data" aria-labelledby="control-tab-data" hidden={activeTab()!=='data'} tabIndex="0">
+        <section class="control-section"><h2>{t("备份与迁移")}</h2><p>{t("整库备份包含所有资产库、分组、归档组件、模型和缩略图。组件分享 ZIP 请在组件库批量导入。")}</p><DataTransferPanel mode="backup" disabled={!online() || busy()} onPendingChange={setTransferPending} onComplete={refresh}/></section>
       </div>
       <div class="control-tab-panel" role="tabpanel" id="control-panel-preferences" aria-labelledby="control-tab-preferences" hidden={activeTab()!=='preferences'} tabIndex="0">
       <section class="control-section control-panel-settings">

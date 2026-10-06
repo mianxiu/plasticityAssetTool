@@ -3,6 +3,7 @@ import {t, locale} from "./i18n";
 import {supportsBoolean,componentMode} from "./componentModes.mjs";
 import {VirtualAssetGrid} from "./VirtualAssetGrid";
 import {mergeLibrary} from "./librarySync.mjs";
+import {DataTransferPanel} from "./DataTransferPanel";
 import {thumbnailImage} from "./thumbnailImage.mjs";
 import { previewQueue } from "./previewQueue.mjs";
 import { createMemo, createSignal, lazy, For, onCleanup, onMount, Show } from "solid-js";
@@ -119,7 +120,7 @@ export function Home() {
   const [form, setForm] = createSignal({ name: "", category: "", tags: "", note: "", preview: "" });
   const [copySelection, setCopySelection] = createSignal(false);
   const [autoPreview, setAutoPreview] = createSignal(true);
-  let importInput;
+  const [transferPending,setTransferPending]=createSignal(false);
   let searchInput;
   let poll;
   let refreshPending = false;
@@ -293,6 +294,7 @@ export function Home() {
         state = await client.request("state", {library_id:requestedLibrary});
         if (requestedArchive) state.assets = await client.request("library.list", {library_id:requestedLibrary, archived:true});
       }
+      if(state.library_id && state.library_id!==requestedLibrary){setLibraryId(state.library_id);setAssets([]);setFolders([]);setFolderId(null);setSelectedId("");refreshQueued=true;return;}
       if (requestedLibrary !== libraryId() || requestedArchive !== archived()) { refreshQueued = true; return; }
       setLibraries(previous => JSON.stringify(previous) === JSON.stringify(state.libraries || []) ? previous : state.libraries || []);
       setFolders(previous => JSON.stringify(previous) === JSON.stringify(state.folders || []) ? previous : state.folders || []);
@@ -457,20 +459,6 @@ export function Home() {
     }catch(error){showNotice(t('无法处理图片，请重新选择'),true);}
     finally {setPreviewReading(false);input.value='';}
   }
-  async function importPackage(event) {
-    const file = event.target.files?.[0];
-    if (!file || !ready()) return;
-    setBusy(true);
-    try {
-      const body = new FormData(); body.append("file", file); body.append("library_id",libraryId()); body.append("folder_id",folderId() || "");
-      const response = await fetch(api + "/api/import", { method: "POST", body });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || "导入失败");
-      setArchived(false); setCategory("全部组件"); setQuery(""); setSelectedId(result.data.id);
-      showNotice("组件包已导入");
-    } catch (error) { showNotice(error.message, true); }
-    finally { setBusy(false); event.target.value = ""; await refresh(); }
-  }
   async function toggleArchive(value) {
     setExportMode(false); setExportSelection(new Set());
     setArchived(value); setCategory("全部组件"); setSelectedId(""); await refresh();
@@ -483,7 +471,7 @@ export function Home() {
   onMount(() => {
     stopUiUpdates = installUiUpdates({
       canReload: () => panelVisible && status() === "connected" && !busy() && !dialog() && !organizationDialog() &&
-        !detailsOpen() && !heldPreview() && !connectionSettings() && !exportMode() && !exporting() &&
+        !transferPending() && !detailsOpen() && !heldPreview() && !connectionSettings() && !exportMode() && !exporting() &&
         !cardSizePending && !previewPending() && !pendingHost.size && !client.pending.size &&
         !previewClient.pending.size && !connectionClient.pending.size && !notice()?.error,
       beforeReload: () => saveUiReloadState({libraryId:libraryId(),folderId:folderId(),kind:kind(),query:query(),
@@ -583,9 +571,8 @@ export function Home() {
       <Show when={connectionLost() || (status() === "connected" && !modelEnabled())}><section class="connection-alert" role="alert"><span class="connection-alert-icon" aria-hidden="true">!</span><div><strong>{connectionLost() ? t("后台连接已断开") : t("模型连接已停止")}</strong><p>{connectionLost() ? t("组件置入和保存暂不可用。请启动后台服务，连接恢复后可继续使用。") : t("组件置入、自动复制和模型操作已停用。请在控制中心恢复模型连接。")}</p></div><Show when={status() === "connected"}><a href="/?control=1" target="_blank" rel="noopener noreferrer">{t("打开控制中心")}</a></Show></section></Show>
       <Show when={ready() && modelEnabled() && !!target() && !nativeTargets().includes(targetId())}><section class="connection-alert" role="alert"><span class="connection-alert-icon" aria-hidden="true">!</span><div><strong>{t("原生模型插件未连接")}</strong><p>{t("请重新打开已安装插件的 Plasticity。直连恢复后，即可保存选中模型和置入组件。")}</p></div></section></Show><header class="page-header"><div><div class="eyebrow">YOUR REUSABLE GEOMETRY</div><h1>{archived() ? t("已归档") : t("模型组件库")}</h1><p>{t("保存一次，随时置入。在 Plasticity 里继续创作。")}</p></div>
         <label class="search-field"><span>⌕</span><input ref={searchInput} aria-label={t("搜索组件")} placeholder={t("搜索此库")} value={query()} onInput={event => setQuery(event.currentTarget.value)} onKeyDown={event => { if(event.key === "Enter" && filtered().length && (exportMode() || canInsert())) {event.preventDefault();exportMode() ? toggleExport(filtered()[0].id) : insert(filtered()[0]);} }}/></label>
-        <div class="header-actions"><button class="secondary connection-settings-toggle" aria-label={t("连接与分组设置")} aria-expanded={connectionSettings()} onClick={()=>setConnectionSettings(!connectionSettings())}>⚙</button><button class="secondary" disabled={!ready() || !modelEnabled()} onClick={generatePreviews} title={previewPending() ? t("预览在后台生成，仍可保存和置入") : t("生成几何预览")}>{previewPending() ? t("预览中 · {p0}",{p0:previewPending()}) : t("生成预览")}</button><details class="export-menu"><summary aria-label={t("批量导出")}>{t("↑ 导出")}</summary><div><button disabled={!ready() || exporting() || !assets().length} onClick={startExportSelection}>{t("多选组件导出")}</button><button disabled={!ready() || exporting() || !categoryExport().length} title={t("导出当前库中此分类的所有组件，不受搜索、类型或分组筛选影响")} onClick={event=>{event.currentTarget.closest('details').open=false;exportComponents(categoryExport().map(asset=>asset.id));}}>{category() === "全部组件" ? t("导出当前库全部组件") : t("导出当前分类")} · {categoryExport().length}</button></div></details><button class="secondary" disabled={!ready()} onClick={() => importInput.click()}>{t("↓ 导入组件包")}</button><button class="primary" disabled={!ready() || !clipboardSupported()} onClick={openCapture}>{t("＋ 保存组件")}</button><Show when={floatingPanel()}><button class="panel-dismiss" aria-label={t("收起面板")} title={t("收起面板")} disabled={!ready()} onClick={hidePanel}>×</button></Show></div>
+        <div class="header-actions"><button class="secondary connection-settings-toggle" aria-label={t("连接与分组设置")} aria-expanded={connectionSettings()} onClick={()=>setConnectionSettings(!connectionSettings())}>⚙</button><button class="secondary" disabled={!ready() || !modelEnabled()} onClick={generatePreviews} title={previewPending() ? t("预览在后台生成，仍可保存和置入") : t("生成几何预览")}>{previewPending() ? t("预览中 · {p0}",{p0:previewPending()}) : t("生成预览")}</button><details class="export-menu"><summary aria-label={t("批量导出")}>{t("↑ 导出")}</summary><div><button disabled={!ready() || exporting() || !assets().length} onClick={startExportSelection}>{t("多选组件导出")}</button><button disabled={!ready() || exporting() || !categoryExport().length} title={t("导出当前库中此分类的所有组件，不受搜索、类型或分组筛选影响")} onClick={event=>{event.currentTarget.closest('details').open=false;exportComponents(categoryExport().map(asset=>asset.id));}}>{category() === "全部组件" ? t("导出当前库全部组件") : t("导出当前分类")} · {categoryExport().length}</button></div></details><DataTransferPanel mode="import" api={api} libraryId={libraryId()} folderId={folderId()} disabled={!ready()} onPendingChange={setTransferPending} onMessage={showNotice} onComplete={async()=>{setArchived(false);setCategory("全部组件");setQuery("");await refresh();}}/><button class="primary" disabled={!ready() || !clipboardSupported()} onClick={openCapture}>{t("＋ 保存组件")}</button><Show when={floatingPanel()}><button class="panel-dismiss" aria-label={t("收起面板")} title={t("收起面板")} disabled={!ready()} onClick={hidePanel}>×</button></Show></div>
       </header>
-      <input ref={importInput} class="hidden-input" type="file" accept=".patasset" onChange={importPackage}/>
 
       <Show when={connectionSettings()}><section class="target-bar" aria-label={t("目标窗口")}><div class="target-label"><span class="small-square">↗</span><div><strong>{t("置入目标")}</strong><span>{nativeTargets().includes(targetId()) ? t("原生模型直连 · 不占用剪贴板") : t("原生模型插件未连接")}</span></div></div>
         <select aria-label={t("Plasticity 目标窗口")} onChange={event => {setTargetId(event.currentTarget.value);setFollowActive(false);}} disabled={busy() || (embedded && !!preferredTarget)}><option value="" selected={!targetId()}>{targets().length ? t("请选择 Plasticity 窗口") : t("未发现 Plasticity 窗口")}</option><For each={targets()}>{item => <option value={item.id} selected={targetId() === item.id}>{item.title} · {item.mode === "cdp" ? "CDP" : t("原生")} · {item.target_id?.slice(0, 6) || item.hwnd}</option>}</For></select>
