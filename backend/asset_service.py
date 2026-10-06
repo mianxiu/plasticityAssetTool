@@ -77,9 +77,12 @@ class AssetService:
         if action == 'library.base_point':
             return await asyncio.to_thread(self.library.base_point, args.get('id'))
         if action == "asset.geometry":
-            if not self.model_enabled and not self.geometry.cached(args.get("id")):
-                raise ValueError("模型连接已暂停，请在托盘控制中心恢复")
-            return {"mesh": await self.geometry.generate(args.get("id"), args.get("target_id"))}
+            kernel_snaps = args.get("kernel_snaps") is True
+            if not self.model_enabled:
+                cached = self.geometry.cached(args.get("id"))
+                if not cached or kernel_snaps and not all("kernel_snaps" in part for part in cached["parts"]):
+                    raise ValueError("模型连接已暂停，请在托盘控制中心恢复")
+            return {"mesh": await self.geometry.generate(args.get("id"), args.get("target_id"), **({"kernel_snaps":True} if kernel_snaps else {}))}
         if action == "asset.geometry.thumbnail":
             return await asyncio.to_thread(self.geometry.save_thumbnail, args.get("id"), args.get("digest"), decode_preview(args.get("preview")))
         async with self.lock:

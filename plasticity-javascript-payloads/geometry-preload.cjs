@@ -6,6 +6,35 @@ const kernelPath = require('path').join(process.resourcesPath, 'app', '.webpack'
 let context, operation, partitions;
 let running = false;
 
+// Independent snap coordinates from the original edges, never facet vertices.
+// Kind 2 is a parameter midpoint, not an arc-length midpoint on a spline.
+function kernelSnapPoints(body, reserve) {
+  const points=[], seen=new Set();
+  let edges;
+  try {edges=body.GetEdges();} catch {return points;}
+  const add=(point,kind)=>{
+    const values=[point?.x,point?.y,point?.z];
+    if(!values.every(v=>Number.isFinite(v) && Math.abs(v)<=1e12))return;
+    const key=kind+':'+values.join(',');if(seen.has(key))return;
+    if(reserve(4)===false)return;
+    seen.add(key);points.push(...values,kind);
+  };
+  let count;
+  try {count=edges.Size();} catch {return points;}
+  if(!Number.isSafeInteger(count) || count<0 || count>500000)return points;
+  for(let i=0;i<count;i++) {
+    let edge;
+    try {edge=edges.Get(i);} catch {continue;}
+    for(const parameter of [0,1,.5]) {
+      let point, kind;
+      try {point=edge.GetPoint(parameter);kind=parameter===.5 ? (edge.IsLine()?1:2) : 0;}
+      catch {continue;} // An unsupported edge must not disable ordinary previewing.
+      add(point,kind);
+    }
+  }
+  return points;
+}
+
 function wirePreview(body, reserve) {
   const part = {positions:[], normals:[], indices:[], edges:[], edge_groups:[]};
   const edges = body.GetEdges();
@@ -102,6 +131,12 @@ async function convert(parts) {
       }
       return part;
     })};
+    // Optional snap data uses only the remaining budget; never invalidate a
+    // preview that already fits the original geometry limits.
+    for(let i=0;i<bodies.length;i++)mesh.parts[i].kernel_snaps=kernelSnapPoints(bodies[i],count=>{
+      if(values+count>2_000_000)return false;
+      reserve(count);return true;
+    });
     return mesh;
   } finally {
     try {

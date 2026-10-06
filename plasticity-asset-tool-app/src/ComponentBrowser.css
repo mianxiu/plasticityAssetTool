@@ -198,6 +198,7 @@ body:has(.component-first){background:#181818}
 .base-point-options{display:flex;gap:12px;flex-wrap:wrap;margin:5px 0;font-size:11px}
 .base-point-options label{display:flex;align-items:center;gap:4px}
 .base-point-options input{width:auto;margin:0}
+.kernel-snap-status{margin:4px 0;font-size:11px;color:#ffcc55}
 .base-point-fullscreen{position:fixed;inset:0;z-index:10000;background:#222;color:#ddd;display:flex;flex-direction:column;padding:8px;gap:6px;font-size:12px;user-select:none}
 .base-point-fullscreen header,.base-point-fullscreen footer{display:flex;align-items:center;gap:8px;flex:none}
 .base-point-fullscreen header span,.base-point-fullscreen footer span{flex:1;color:#aaa;font-size:11px}

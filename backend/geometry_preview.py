@@ -51,6 +51,19 @@ def validate_mesh(mesh):
         groups = item["edge_groups"]
         if len(groups) % 2 or any(start % 3 or count % 3 or start + count > len(item["edges"]) for start, count in zip(groups[::2], groups[1::2])):
             raise ValueError("预览边线分组无效")
+        if "kernel_snaps" in part:
+            snaps = part["kernel_snaps"]
+            if not isinstance(snaps, list) or len(snaps) % 4 or len(snaps) > MAX_VALUES:
+                raise ValueError("内核捕捉点格式无效")
+            total += len(snaps)
+            if total > MAX_VALUES:
+                raise ValueError("预览网格超过限制")
+            for i in range(0, len(snaps), 4):
+                if any(type(v) not in (int, float) or not math.isfinite(v) or abs(v) > 1e12 for v in snaps[i:i+3]):
+                    raise ValueError("内核捕捉点坐标无效")
+                if type(snaps[i+3]) is not int or snaps[i+3] not in (0, 1, 2):
+                    raise ValueError("内核捕捉点类型无效")
+            item["kernel_snaps"] = snaps
         nonempty |= bool(item["indices"] or item["edges"])
         clean.append(item)
     if not nonempty:
@@ -128,9 +141,9 @@ class GeometryPreview:
                 return {"id": job_id, "parts": job["parts"]}
         return None
 
-    async def generate(self, asset_id, target=None):
+    async def generate(self, asset_id, target=None, kernel_snaps=False):
         cached = await asyncio.to_thread(self.cached, asset_id)
-        if cached:
+        if cached and (not kernel_snaps or all("kernel_snaps" in part for part in cached["parts"])):
             return cached
         row = await asyncio.to_thread(self.library.model_row, asset_id)
         model = bytes(row["model"])

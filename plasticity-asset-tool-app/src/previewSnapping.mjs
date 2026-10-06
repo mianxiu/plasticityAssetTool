@@ -65,13 +65,27 @@ export function snapCandidates(mesh) {
   return candidates;
 }
 
+export function kernelSnapCandidates(mesh) {
+  const candidates=[],seen=new Set(),types=['顶点','边中点','曲线参数中点'];
+  for(const part of mesh.parts) {
+    const values=part.kernel_snaps || [];
+    for(let i=0;i<values.length;i+=4) {
+      const point=values.slice(i,i+3),type=types[values[i+3]],key=type+':'+point.join(',');
+      if(type && point.length===3 && point.every(Number.isFinite) && !seen.has(key)) {
+        seen.add(key);candidates.push({point,type,kernel:true});
+      }
+    }
+  }
+  return candidates;
+}
+
 export function closestSnap(candidates,model,camera,rect,pointer,maxDepth=Infinity,depthTolerance=0.0001) {
   let best=null;
   for(const candidate of candidates) {
     const projected=model.localToWorld(new THREE.Vector3().fromArray(candidate.point)).project(camera);
     if(projected.z<-1 || projected.z>1 || projected.z>maxDepth+depthTolerance)continue;
     const distance=Math.hypot((projected.x+1)*rect.width/2-pointer.x,(1-projected.y)*rect.height/2-pointer.y);
-    const priority=candidate.type==='顶点' ? 0 : candidate.type==='边中点' ? 1 : 2;
+    const priority=(candidate.type==='顶点' ? 0 : candidate.type==='边中点' || candidate.type==='曲线参数中点' ? 1 : 2)*2+(candidate.kernel?0:1);
     if(distance<=12 && (!best || priority<best.priority || priority===best.priority && distance<best.distance))best={...candidate,distance,priority};
   }
   return best;

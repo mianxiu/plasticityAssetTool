@@ -1,7 +1,7 @@
 import {t} from "./i18n";
 import { createEffect, createMemo, createSignal, onCleanup, onMount, Show, untrack } from 'solid-js';
 import {Portal} from 'solid-js/web';
-import {snapCandidates,closestSnap,normalOrientation} from './previewSnapping.mjs';
+import {snapCandidates,kernelSnapCandidates,closestSnap,normalOrientation} from './previewSnapping.mjs';
 import * as THREE from 'three';
 import {sceneFor} from './geometryScene.mjs';
 import {directionMarker, basePointMarker, rotateBaseOrientation} from './previewOrientation.mjs';
@@ -27,6 +27,10 @@ export function GeometryPreview(props) {
   const [picking,setPicking] = createSignal(false);
   const [expanded,setExpanded] = createSignal(false);
   const [snapping,setSnapping] = createSignal(true);
+  const [kernelSnapping,setKernelSnapping] = createSignal(false);
+  const [kernelCandidates,setKernelCandidates] = createSignal([]);
+  const [kernelLoading,setKernelLoading] = createSignal(false);
+  const [kernelError,setKernelError] = createSignal('');
   const [alignNormal,setAlignNormal] = createSignal(true);
   const [axisDirections,setAxisDirections] = createSignal([]);
   const [annotation,setAnnotation] = createSignal(null);
@@ -53,6 +57,23 @@ export function GeometryPreview(props) {
   onCleanup(()=>window.removeEventListener('keydown',escape,true));
   const digest = createMemo(()=>props.asset?.digest);
   let revision = 0;
+  const toggleKernelSnapping=async event=>{
+    const checked=event.currentTarget.checked;
+    setKernelError('');
+    if(!checked){setKernelSnapping(false);return;}
+    setKernelSnapping(true);
+    if(kernelCandidates().length){setKernelSnapping(true);return;}
+    const current=revision, asset=props.asset;
+    setKernelLoading(true);
+    try {
+      const mesh=await props.loadKernel(asset);
+      if(current!==revision || !renderer)return;
+      const points=kernelSnapCandidates(mesh);
+      if(!points.length)throw new Error(t('此组件暂无可用的内核捕捉点'));
+      setKernelCandidates(points);setKernelSnapping(true);
+    }catch(error){if(current===revision){setKernelSnapping(false);setKernelError(error.message);}}
+    finally {if(current===revision)setKernelLoading(false);}
+  };
   let pointer = props.heldOrigin;
   const rotateHeld = event => {
     if (!props.heldOrigin || !(event.buttons & 2)) return;
@@ -110,13 +131,14 @@ export function GeometryPreview(props) {
     view.scene.updateMatrixWorld(true);view.camera.updateMatrixWorld(true);
     const hits=ray.intersectObjects(pickObjects,false);
     const hit=hits[0];
-    const snap=snapping()?closestSnap(candidates,view.model,view.camera,rect,{x:event.clientX-rect.left,y:event.clientY-rect.top},hit?hit.point.clone().project(view.camera).z:Infinity,view.radius*.1/view.camera.zoom/(view.camera.far-view.camera.near)):null;
+    const targets=kernelSnapping() ? [...(snapping()?candidates:[]),...kernelCandidates()] : snapping()?candidates:[];
+    const snap=closestSnap(targets,view.model,view.camera,rect,{x:event.clientX-rect.left,y:event.clientY-rect.top},hit?hit.point.clone().project(view.camera).z:Infinity,view.radius*.1/view.camera.zoom/(view.camera.far-view.camera.near));
     if(!hit && !snap)return null;
     const surface=hits.find(h=>h.face && (!snap || h.point.distanceTo(view.model.localToWorld(new THREE.Vector3().fromArray(snap.point)))<view.radius*.08/view.camera.zoom));
     let normal=surface?.face.normal.clone().transformDirection(surface.object.matrixWorld);
     if(normal)normal.transformDirection(new THREE.Matrix4().copy(view.model.matrixWorld).invert());
     if(snap?.normal)normal=new THREE.Vector3().fromArray(snap.normal);
-    return {point:snap?.point || view.model.worldToLocal(hit.point.clone()).toArray(),type:snap?.type || (hit.face?'表面':'曲线'),normal};
+    return {point:snap?.point || view.model.worldToLocal(hit.point.clone()).toArray(),type:snap?.kernel ? '内核 · '+snap.type : snap?.type || (hit.face?'表面':'曲线'),normal};
   };
   const hoverPoint = event => {
     const hit=pointerHit(event);setSnapLabel(hit?.type || '');
@@ -168,10 +190,11 @@ export function GeometryPreview(props) {
     const asset = untrack(()=>props.asset);
     if(!renderer)return;
     const current = ++revision;
-    destroy();setError('');setLoading(true);
+    destroy();setError('');setLoading(true);setKernelSnapping(false);setKernelCandidates([]);setKernelError('');setKernelLoading(false);
     props.load(asset).then(mesh => {
       if(current !== revision || !renderer)return;
       view=sceneFor(mesh);
+      setKernelCandidates(kernelSnapCandidates(mesh));
       pickObjects=[...view.model.children];candidates=snapCandidates(mesh);setBounds(meshBounds(mesh));setPicking(!!props.fullscreen);updateMarker();
       controls=new OrbitControls(view.camera,renderer.domElement);
       controls.mouseButtons.LEFT=null;
@@ -187,14 +210,15 @@ export function GeometryPreview(props) {
       <legend>{t("组件基点")}<span class="help-tip" tabindex="0" data-tip={t("黄色十字表示基点。修改后点击保存修改；坐标使用模型原生单位。表面拾取基于预览网格。")}>?</span></legend>
       <Show when={props.fullscreen} fallback={<button type="button" class="secondary base-point-expand" disabled={!bounds()} onClick={openExpanded}>{t("编辑基点")}</button>}><div class="base-point-presets"><button type="button" class="secondary" classList={{active:picking()}} disabled={!bounds()} onClick={()=>setPicking(!picking())}>{picking()?t("取消拾取"):t("预览拾取")}</button><Show when={props.onNativePick}><button type="button" class="secondary" disabled={props.nativeDisabled} title={t("在 Plasticity 使用原生捕捉；确认后立即保存基点，Esc 取消。")} onClick={()=>props.onNativePick()}>{t("Plasticity 精确拾取")}</button></Show><button type="button" class="secondary" onClick={()=>preset('world')}>{t("世界原点")}</button><button type="button" class="secondary" disabled={!bounds()} onClick={()=>preset('center')}>{t("模型中心")}</button><button type="button" class="secondary" disabled={!bounds()} onClick={()=>preset('bottom')}>{t("底部中心")}</button></div>
       <div class="base-point-coordinates">{['X','Y','Z'].map((axis,i)=><label>{axis}<input type="number" step="any" min="-1e12" max="1e12" aria-label={t("基点坐标 ")+axis} value={props.basePoint?.[i] ?? ''} onInput={event=>inputCoordinate(i,event)}/></label>)}</div>
-      <div class="base-point-options"><label><input type="checkbox" checked={snapping()} onChange={e=>setSnapping(e.currentTarget.checked)}/>{t("吸附端点 / 边中点 / 面中心")}</label><label><input type="checkbox" checked={alignNormal()} onChange={e=>setAlignNormal(e.currentTarget.checked)}/>{t("按面法线定向")}</label></div>
+      <div class="base-point-options"><label><input type="checkbox" checked={snapping()} onChange={e=>setSnapping(e.currentTarget.checked)}/>{t("吸附端点 / 边中点 / 面中心")}</label><Show when={props.loadKernel || kernelCandidates().length}><label><input type="checkbox" checked={kernelSnapping()} disabled={kernelLoading() || !bounds()} onChange={toggleKernelSnapping}/>{kernelLoading()?t("正在加载内核捕捉点…"):t("内核捕捉（实验）")}</label></Show><label><input type="checkbox" checked={alignNormal()} onChange={e=>setAlignNormal(e.currentTarget.checked)}/>{t("按面法线定向")}</label></div>
+      <Show when={kernelError()}><p class="kernel-snap-status" role="status">{kernelError()}</p></Show>
       <div class="base-point-coordinates">{['X','Y','Z'].map((axis,i)=><label>{axis}°<input type="number" step="1" aria-label={t("基点旋转 ")+axis} value={Number(angles()[i].toFixed(3))} onInput={event=>inputAngle(i,event)}/></label>)}</div>
       <div class="base-point-flips">{['X','Y','Z'].map((axis,i)=><button type="button" class="secondary" onClick={()=>props.onOrientationChange?.(rotateBaseOrientation(props.orientation,i,180))}>{t('绕 {axis} 反转 180°',{axis})}</button>)}</div>
       <button type="button" class="secondary" onClick={()=>props.onOrientationChange?.([0,0,0,1])}>{t("重置方向")}</button></Show>
     </fieldset></Show>
     <Show when={expanded()}><Portal><div class="base-point-editor-backdrop" onClick={e=>e.stopPropagation()}><div class="base-point-fullscreen component-first" ref={editor} role="dialog" aria-modal="true" aria-label={t("基点编辑器")} onClick={e=>e.stopPropagation()} onContextMenu={e=>e.preventDefault()}>
       <header><strong>{t("基点编辑器")}</strong><span>{t("右键拖动旋转 · 滚轮缩放")} · {t("方向：红 X / 绿 Y / 蓝 Z")}</span><button type="button" class="secondary" onClick={closeExpanded}>{t("取消")}</button></header>
-      <GeometryPreview asset={props.asset} load={props.load} fullscreen editBasePoint basePoint={draftPoint()} orientation={draftOrientation()} onBasePointChange={setDraftPoint} onOrientationChange={setDraftOrientation} onNativePick={props.onNativePick ? ()=>{closeExpanded();props.onNativePick();} : undefined} nativeDisabled={props.nativeDisabled} disabled={props.disabled}/>
+      <GeometryPreview asset={props.asset} load={props.load} loadKernel={props.loadKernel} fullscreen editBasePoint basePoint={draftPoint()} orientation={draftOrientation()} onBasePointChange={setDraftPoint} onOrientationChange={setDraftOrientation} onNativePick={props.onNativePick ? ()=>{closeExpanded();props.onNativePick();} : undefined} nativeDisabled={props.nativeDisabled} disabled={props.disabled}/>
       <footer><span>{t("确认后仍需保存修改")}</span><button type="button" class="secondary" onClick={closeExpanded}>{t("取消")}</button><button type="button" disabled={props.disabled} onClick={()=>{props.onBasePointChange?.(draftPoint());props.onOrientationChange?.(draftOrientation());closeExpanded();}}>{t("确认基点")}</button></footer>
     </div></div></Portal></Show></>;
 }

@@ -24,6 +24,11 @@ console.log('Preview base point: world coordinates, Z-up presets and zoomed ray 
 
 const {snapCandidates,closestSnap,normalOrientation}=await import('../plasticity-asset-tool-app/src/previewSnapping.mjs');
 const {planarFaceCenters}=await import('../plasticity-asset-tool-app/src/previewSnapping.mjs');
+const {kernelSnapCandidates}=await import('../plasticity-asset-tool-app/src/previewSnapping.mjs');
+const kernel=kernelSnapCandidates({parts:[{kernel_snaps:[0,0,0,0,.25,1,0,2,2,0,0,1]},{kernel_snaps:[0,0,0,0]}]});
+assert.deepEqual(kernel.map(point=>point.type),['顶点','曲线参数中点','边中点']);
+assert.ok(kernel.every(point=>point.kernel));
+assert.deepEqual(kernelSnapCandidates({parts:[{}]}),[],'Old cached meshes remain valid without native snap data');
 const rectangle={positions:[0,0,0,4,0,0,4,2,0,0,2,0,.25,.75,0],indices:[0,1,4,1,2,4,2,3,4,3,0,4],edges:[],edge_groups:[]};
 const faceCenters=planarFaceCenters(rectangle);
 assert.equal(faceCenters.length,1,'Merge the triangles of one planar face into a single target');
@@ -47,6 +52,7 @@ const snaps=snapCandidates({parts:[{edges:[0,0,0,2,0,0,2,6,0],edge_groups:[0,9]}
 assert.deepEqual(snaps.map(s=>s.point),[[0,0,0],[2,6,0],[2,2,0]],'Midpoint must use arc length, not sample index');
 const camera=new THREE.OrthographicCamera(-10,10,10,-10,.1,100);camera.position.z=20;camera.lookAt(0,0,0);camera.updateMatrixWorld(true);
 const model=new THREE.Group();model.updateMatrixWorld(true);
+assert.equal(closestSnap([{point:[.01,0,0],type:'顶点'},kernel[0]],model,camera,{width:200,height:200},{x:100,y:100}).kernel,true,'Prefer kernel coordinates over a nearby approximate snap of the same type');
 assert.equal(closestSnap(snaps,model,camera,{width:200,height:200},{x:102,y:101}).type,'顶点');
 assert.equal(closestSnap(snaps,model,camera,{width:200,height:200},{x:150,y:150}),null);
 assert.equal(closestSnap(snaps,model,camera,{width:200,height:200},{x:100,y:100},-1),null,'Occluded snaps must be rejected');

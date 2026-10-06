@@ -41,6 +41,21 @@ class FakeDesktop:
             self.number += 1
 
 class ServiceTests(unittest.IsolatedAsyncioTestCase):
+    async def test_kernel_snap_request_and_paused_cache_rules(self):
+        enriched = {'parts':[{'kernel_snaps':[0,0,0,0]}]}
+        self.service.geometry.generate = AsyncMock(return_value=enriched)
+        result = await self.call('asset.geometry', {'id':'fixture','kernel_snaps':True})
+        self.assertEqual(result['mesh'], enriched)
+        self.service.geometry.generate.assert_awaited_once_with('fixture', None, kernel_snaps=True)
+        self.service.geometry.generate.reset_mock()
+        self.service.model_enabled = False
+        with patch.object(self.service.geometry, 'cached', return_value={'parts':[{}]}):
+            with self.assertRaisesRegex(ValueError, '模型连接已暂停'):
+                await self.call('asset.geometry', {'id':'fixture','kernel_snaps':True})
+        self.service.geometry.generate.assert_not_awaited()
+        with patch.object(self.service.geometry, 'cached', return_value=enriched):
+            self.assertEqual((await self.call('asset.geometry', {'id':'fixture','kernel_snaps':True}))['mesh'], enriched)
+
     async def test_native_mixed_capture_overrides_manual_kind_and_disables_whole_model_boolean(self):
         self.service.native.worker('hwnd:42','a'*36,capabilities=['selection-kind-v1'])
         model=model_bytes(count=2)

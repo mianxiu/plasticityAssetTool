@@ -101,3 +101,41 @@ class GeometryTests(unittest.IsolatedAsyncioTestCase):
         data = mesh();part = data["parts"][0]
         part["positions"] = part["normals"] = part["indices"] = []
         self.assertEqual(validate_mesh(data), data)
+
+    def test_kernel_snap_validation_and_legacy_compatibility(self):
+        data = mesh()
+        data['parts'][0]['kernel_snaps'] = [0, 0, 0, 0, .25, 1, 0, 2]
+        self.assertEqual(validate_mesh(data), data)
+        for invalid in [[0, 0, 0], [0, 0, 0, 3], [0, 0, 0, True],
+                        [float('nan'), 0, 0, 0], [1e13, 0, 0, 0], 'bad']:
+            data['parts'][0]['kernel_snaps'] = invalid
+            with self.assertRaises(ValueError):
+                validate_mesh(data)
+        self.assertEqual(validate_mesh(mesh()), mesh())
+
+    async def test_kernel_snap_upgrade_preserves_existing_cache_until_success(self):
+        task, job = await self.job()
+        self.preview.worker(self.target, self.token, {'id': job['id'], 'mesh': mesh()})
+        await task
+        upgrade = asyncio.create_task(self.preview.generate(self.asset['id'], self.target, kernel_snaps=True))
+        for _ in range(20):
+            if self.preview.jobs:
+                break
+            await asyncio.sleep(.01)
+        job = self.preview.worker(self.target, self.token)
+        self.assertIsNotNone(job, 'Legacy mesh should request enriched geometry without deleting the existing preview')
+        self.assertEqual(self.preview.cached(self.asset['id']), mesh())
+        enriched = mesh(); enriched['parts'][0]['kernel_snaps'] = [0, 0, 0, 0]
+        self.preview.worker(self.target, self.token, {'id': job['id'], 'mesh': enriched})
+        self.assertEqual(await upgrade, enriched)
+        self.preview.workers.clear()
+        self.assertEqual(await self.preview.generate(self.asset['id'], kernel_snaps=True), enriched, 'Enriched points should work offline')
+
+    async def test_kernel_snap_upgrade_error_retains_ordinary_preview(self):
+        task, job = await self.job()
+        self.preview.worker(self.target, self.token, {'id': job['id'], 'mesh': mesh()})
+        await task
+        self.preview.workers.clear()
+        with self.assertRaisesRegex(ValueError, '插件未连接'):
+            await self.preview.generate(self.asset['id'], self.target, kernel_snaps=True)
+        self.assertEqual(await self.preview.generate(self.asset['id']), mesh())

@@ -330,5 +330,13 @@
   "偏好设置": "Preferences",
   "编辑基点": "Edit base point",
   "面中心": "Face center",
-  "吸附端点 / 边中点 / 面中心": "Snap endpoints / edge midpoints / face centers"
+  "吸附端点 / 边中点 / 面中心": "Snap endpoints / edge midpoints / face centers",
+  "内核捕捉（实验）": "Kernel snapping (experimental)",
+  "正在加载内核捕捉点…": "Loading kernel snap points…",
+  "当前预览插件未提供内核捕捉点，请更新插件": "The preview plugin does not provide kernel snap points. Update the plugin.",
+  "此组件暂无可用的内核捕捉点": "No kernel snap points are available for this component.",
+  "内核 · 顶点": "Kernel · Vertex",
+  "内核 · 边中点": "Kernel · Edge midpoint",
+  "内核 · 曲线参数中点": "Kernel · Curve parameter midpoint",
+  "曲线参数中点": "Curve parameter midpoint"
 }
