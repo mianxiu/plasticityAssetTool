@@ -1,3 +1,4 @@
+import {createParentChannel} from "./hostMessaging.mjs";
 import {installUiUpdates, takeUiReloadState, saveUiReloadState} from "./uiUpdates.mjs";
 import {t, locale} from "./i18n";
 import {supportsBoolean,componentMode} from "./componentModes.mjs";
@@ -30,13 +31,13 @@ export function Home() {
   const [sidebarMode, setSidebarMode] = createSignal("fixed");
   const pendingHost = new Map();
   let panelVisible = !embedded;
-  const hostOrigin = document.referrer.startsWith("file:") || !document.referrer ? "*" : new URL(document.referrer).origin;
+  const hostChannel = createParentChannel(window.parent);
   function hidePanel() {
-    if (embedded) window.parent.postMessage({type:"pat:hide"}, hostOrigin);
+    if (embedded) hostChannel.send({type:"pat:hide"});
     else operate("panel.dismiss", {});
   }
   function hostMessage(event) {
-    if (!embedded || event.source !== window.parent) return;
+    if (!embedded || !hostChannel.receive(event)) return;
     if (event.data?.type === "pat:hidden") panelVisible = false;
     if (event.data?.type === "pat:shown") { panelVisible = true; refreshConnection().catch(() => {}); if (preferredTarget) setTargetId(preferredTarget); window.dispatchEvent(new Event("pat:layout")); clearTimeout(shownTimer); shownTimer = setTimeout(() => refresh().catch(error => showNotice(error.message,true)), 150); focusSearch(); }
     if (event.data?.type === "pat:prepared") pendingHost.get(event.data.id)?.(event.data);
@@ -47,7 +48,7 @@ export function Home() {
       const id = crypto.randomUUID();
       const timeout = setTimeout(() => {pendingHost.delete(id); reject(new Error("内嵌面板未能交回视口焦点，请重新唤起后重试"));}, preview ? 2800 : 1500);
       pendingHost.set(id, data => {clearTimeout(timeout);pendingHost.delete(id);data.ready ? resolve(data.preview || null) : reject(new Error("Plasticity 视口尚未加载"));});
-      window.parent.postMessage({type:"pat:prepare",id,preview}, hostOrigin);
+      hostChannel.send({type:"pat:prepare",id,preview});
     });
   }
   const preferredTarget = new URLSearchParams(location.search).get("target");
@@ -302,7 +303,7 @@ export function Home() {
       if (folderId() && !state.folders?.some(item => item.id === folderId())) setFolderId(null);
       setSidebarMode(state.panel_settings?.sidebar_mode || "fixed");
       if (!cardSizePending) setCardSize(state.panel_settings?.card_size || 184);
-      if (embedded) window.parent.postMessage({type:"pat:panel-settings",settings:state.panel_settings}, hostOrigin);
+      if (embedded) hostChannel.send({type:"pat:panel-settings",settings:state.panel_settings});
       if (requestedLibrary !== libraryId() || requestedArchive !== archived()) { refreshQueued = true; return; }
       setAssets(previous => mergeLibrary(previous, state));
       libraryCursor = state.revision || null; cursorView = requestedLibrary+":"+requestedArchive; libraryLoaded = true;
@@ -369,7 +370,7 @@ export function Home() {
       return result;
     } catch (error) {
       showNotice(error.message, true);
-      if (embedded) window.parent.postMessage({type:"pat:show"}, hostOrigin);
+      if (embedded) hostChannel.send({type:"pat:show"});
       return null;
     } finally {
       setBusy(false);
@@ -432,7 +433,7 @@ export function Home() {
       enterFolder(result.folder_id); setKind("all"); setSelectedId(result.id); await refresh();
       if (!capturing) openEdit(result);
       if (result.preview_warning) showNotice(result.preview_warning);
-      if (capturing && embedded) window.parent.postMessage({type:"pat:show"}, hostOrigin);
+      if (capturing && embedded) hostChannel.send({type:"pat:show"});
       if (generateGeometry) {
         try { previewJobs.add(result); }
         catch (error) { showNotice("组件已保存。"+error.message, true); }
@@ -441,7 +442,7 @@ export function Home() {
   }
   async function rebaseAsset(mode) {
     const result=await operate("library.rebase",{id:selectedId(),target_id:embedded ? preferredTarget || targetId() : targetId(),base_mode:mode},"组件基点已更新");
-    if(embedded) window.parent.postMessage({type:"pat:show"},hostOrigin);
+    if(embedded) hostChannel.send({type:"pat:show"});
     if(result){setForm(current=>({...current,base_point:result.base_point,base_orientation:result.base_orientation,model_digest:result.digest}));await refresh();}
   }
   const [previewReading,setPreviewReading]=createSignal(false);
@@ -481,7 +482,7 @@ export function Home() {
     poll = setInterval(() => { if (panelVisible && ready()) {refresh().catch(() => {});refreshConnection().catch(() => {});} }, 10000);
     window.addEventListener("keydown",onSearchKey);
     window.addEventListener("message",hostMessage);
-    if (embedded) window.parent.postMessage({type:"pat:ready"}, hostOrigin);
+    if (embedded) hostChannel.send({type:"pat:ready"});
     if (new URLSearchParams(location.search).has("quick")) focusSearch();
   });
   onMount(() => {
