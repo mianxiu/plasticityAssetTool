@@ -33,6 +33,17 @@ def build(python_runtime, dependencies):
         shutil.copytree(ROOT / name, stage / name, ignore=excluded)
     shutil.copytree(ROOT / 'plasticity-asset-tool-app/dist', stage / 'plasticity-asset-tool-app/dist')
     shutil.copytree(ROOT / 'plasticity-asset-tool-app/src/assets', stage / 'plasticity-asset-tool-app/src/assets')
+    notices = stage / 'third-party-licenses'
+    notices.mkdir()
+    modules = ROOT / 'plasticity-asset-tool-app/node_modules'
+    for name in ('solid-js', 'three'):
+        shutil.copy2(modules / name / 'LICENSE', notices / (name + '-LICENSE.txt'))
+    for name in ('seroval', 'seroval-plugins'):
+        matches = list((modules / '.pnpm').glob(name + '@*/node_modules/' + name + '/LICENSE*'))
+        if not matches:
+            raise ValueError('Missing third-party license: ' + name)
+        shutil.copy2(matches[0], notices / (name + '-LICENSE.txt'))
+
     runtime = stage / 'runtime/python'
     runtime.mkdir(parents=True)
     for path in python_runtime.iterdir():

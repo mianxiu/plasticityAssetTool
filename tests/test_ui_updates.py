@@ -10,3 +10,9 @@ class UiUpdateTests(unittest.TestCase):
         root = Path(__file__).resolve().parents[1]
         subprocess.run(['node', str(root / 'tests/test_ui_updates.js')], cwd=root,
                        check=True, capture_output=True, timeout=10)
+
+    @unittest.skipUnless(shutil.which('node'), 'Node.js required')
+    def test_parent_handshake_survives_ui_reload_and_base_point_then_placement(self):
+        root = Path(__file__).resolve().parents[1]
+        subprocess.run(['node', str(root / 'tests/test_host_messaging.mjs')], cwd=root,
+                       check=True, capture_output=True, timeout=10)
