@@ -225,5 +225,3 @@ body:has(.component-first){background:#181818}
 .thumbnail-picker:focus-within{outline:2px solid #00a887;outline-offset:2px}
 .thumbnail-picker svg,.thumbnail-picker img{width:24px;height:24px;object-fit:contain}
 .thumbnail-picker svg{fill:none;stroke:currentColor;stroke-width:1.7}
-.component-first .thumbnail-remove{position:absolute;top:-5px;right:-5px;width:16px;height:16px;padding:0;border:1px solid #666;border-radius:50%;background:#242424;color:#ddd;font-size:12px;line-height:12px;opacity:0}
-.thumbnail-picker-controls:hover .thumbnail-remove,.thumbnail-picker-controls:focus-within .thumbnail-remove{opacity:1}
