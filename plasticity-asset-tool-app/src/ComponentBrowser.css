@@ -196,7 +196,6 @@ body:has(.component-first){background:#181818}
 
 .geometry-base-point-entry{position:absolute;bottom:10px;left:10px;z-index:2;display:flex;align-items:center;gap:6px}
 .geometry-base-point-entry .base-point-expand{width:auto;margin:0;padding:7px 10px;font-size:11px}
-.geometry-base-point-entry .help-tip::after{top:auto;bottom:calc(100% + 6px);left:0;right:auto}
 .base-point-options{display:flex;gap:12px;flex-wrap:wrap;margin:5px 0;font-size:11px}
 .base-point-options label{display:flex;align-items:center;gap:4px}
 .base-point-options input{width:auto;margin:0}
