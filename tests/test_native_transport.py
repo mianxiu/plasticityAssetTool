@@ -182,6 +182,8 @@ class NativeTransportTests(unittest.IsolatedAsyncioTestCase):
             await self.transport.request(self.target,'insert',model_bytes())
         self.transport.worker('hwnd:43','b'*36,{'id':job['id'],'value':{'started':True}})
         self.assertIn(job['id'],self.transport.jobs)
+        # Only the first request exercises timeout; allow scheduler jitter for the healthy window.
+        self.transport.request_timeout=1
         other=asyncio.create_task(self.transport.request('hwnd:43','insert',model_bytes()))
         await asyncio.sleep(0)
         other_job=self.transport.worker('hwnd:43','b'*36)

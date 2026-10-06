@@ -392,7 +392,7 @@ export function Home() {
     try {
       const result = await client.request('library.base_point',{id:asset.id});
       if(revision===editRevision && detailsOpen() && selectedId()===asset.id)
-        setForm(current=>({...current,base_point:result.base_point,model_digest:result.digest}));
+        setForm(current=>({...current,base_point:result.base_point,base_orientation:result.base_orientation,model_digest:result.digest}));
     }catch(error){if(revision===editRevision)showNotice(error.message,true);}
   }
   async function save(event) {
@@ -424,7 +424,7 @@ export function Home() {
   async function rebaseAsset(mode) {
     const result=await operate("library.rebase",{id:selectedId(),target_id:embedded ? preferredTarget || targetId() : targetId(),base_mode:mode},"组件基点已更新");
     if(embedded) window.parent.postMessage({type:"pat:show"},hostOrigin);
-    if(result){setForm(current=>({...current,base_point:result.base_point,model_digest:result.digest}));await refresh();}
+    if(result){setForm(current=>({...current,base_point:result.base_point,base_orientation:result.base_orientation,model_digest:result.digest}));await refresh();}
   }
   async function readPreview(event) {
     const file = event.target.files?.[0];
@@ -569,7 +569,7 @@ export function Home() {
         <Show when={detailsOpen() && selected()}><div class="asset-details-backdrop" onClick={()=>setDetailsOpen(false)}><aside class="details-panel" role="dialog" aria-modal="true" aria-label={t("组件详情")} onClick={event=>event.stopPropagation()}><button class="details-dismiss" aria-label={t("关闭组件详情")} onClick={()=>setDetailsOpen(false)}>×</button><Show when={selected()} fallback={<div class="detail-placeholder"><Cube /><h3>{t("组件详情")}</h3><p>{t("选择一个组件，查看信息或置入到当前模型。")}</p></div>}>
           <div class="detail-heading"><span>{t("编辑组件")}</span></div>
           <h2>{selected().name}</h2><span class="category-pill">{selected().category}</span>
-          <GeometryPreview asset={selected()} load={loadGeometry} editBasePoint basePoint={form().base_point} onBasePointChange={point=>setField('base_point',point)} disabled={busy() || archived()}/>
+          <GeometryPreview asset={selected()} load={loadGeometry} editBasePoint basePoint={form().base_point} orientation={form().base_orientation} onBasePointChange={point=>setField('base_point',point)} onOrientationChange={value=>setField('base_orientation',value)} disabled={busy() || archived()}/>
           <dl><dt>{t("保存时间")}</dt><dd>{new Date(selected().created_at).toLocaleDateString(locale())}</dd><dt>{t("模型大小")}</dt><dd>{(selected().bytes / 1024).toFixed(1)} KB</dd><dt>{t("来源版本")}</dt><dd>{selected().source_version === "unknown" ? t("未记录") : selected().source_version}</dd><dt>{t("标签")}</dt><dd>{selected().tags || "—"}</dd></dl>
           <AssetForm capture={false} onCancel={()=>setDetailsOpen(false)}/>
           <Show when={!archived()}><button class="primary full-width" disabled={!canInsert()} onClick={() => insert(selected())}>{t("置入组件")}</button><button class="secondary full-width" disabled={!canInsert() || !!selected()?.recipe} title={selected()?.recipe ? t("组组件使用定位置入，保留部件顺序与组信息") : ""} onClick={() => insert(selected(), false)}>{t("原位置粘贴")}</button><button class="secondary full-width" disabled={!ready() || !modelEnabled() || !clipboardSupported()} onClick={() => operate("asset.copy", { id: selectedId() })}>{t("仅复制到剪贴板")}</button></Show>

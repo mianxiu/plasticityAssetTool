@@ -21,3 +21,15 @@ const projectedZoom=world.clone().project(view.camera);ray.setFromCamera(new THR
 assert.ok(view.model.worldToLocal(ray.intersectObjects(view.model.children)[0].point.clone()).distanceTo(original)<1e-6);
 view.dispose();
 console.log('Preview base point: world coordinates, Z-up presets and zoomed ray picking verified');
+
+const {snapCandidates,closestSnap,normalOrientation}=await import('../plasticity-asset-tool-app/src/previewSnapping.mjs');
+const snaps=snapCandidates({parts:[{edges:[0,0,0,2,0,0,2,6,0],edge_groups:[0,9]}]});
+assert.deepEqual(snaps.map(s=>s.point),[[0,0,0],[2,6,0],[2,2,0]],'Midpoint must use arc length, not sample index');
+const camera=new THREE.OrthographicCamera(-10,10,10,-10,.1,100);camera.position.z=20;camera.lookAt(0,0,0);camera.updateMatrixWorld(true);
+const model=new THREE.Group();model.updateMatrixWorld(true);
+assert.equal(closestSnap(snaps,model,camera,{width:200,height:200},{x:102,y:101}).type,'顶点');
+assert.equal(closestSnap(snaps,model,camera,{width:200,height:200},{x:150,y:150}),null);
+assert.equal(closestSnap(snaps,model,camera,{width:200,height:200},{x:100,y:100},-1),null,'Occluded snaps must be rejected');
+const orientation=new THREE.Quaternion().fromArray(normalOrientation([1,0,0]));
+assert.ok(new THREE.Vector3(0,0,1).applyQuaternion(orientation).distanceTo(new THREE.Vector3(1,0,0))<1e-8);
+console.log('Snapping: endpoints, arc midpoint, screen threshold, depth rejection and native Z orientation verified');

@@ -65,6 +65,22 @@ class BasePointServiceTests(unittest.IsolatedAsyncioTestCase):
         self.service.native.request.assert_not_called()
         self.assertEqual(self.desktop.calls,[])
 
+    async def test_offline_orientation_normalizes_native_quaternion_and_preserves_geometry(self):
+        from model_fixture import model_bytes
+        asset=self.service.library.add(model_bytes(),{'name':'orientation'})
+        original=bytes(self.service.library.get(asset['id'])['model'])
+        result=await self.call('library.update',{'id':asset['id'],'base_point':[1,2,3],'base_orientation':[0,2,0,2],'model_digest':asset['digest']})
+        actual=bytes(self.service.library.get(asset['id'])['model'])
+        self.assertEqual(actual[56:],original[56:])
+        self.assertAlmostEqual(result['base_orientation'][1],2**-0.5)
+        point=await self.call('library.base_point',{'id':asset['id']})
+        self.assertEqual(point['base_orientation'],result['base_orientation'])
+        for quaternion in [[0,0,0,0],[True,0,0,1],[0,0,float('nan'),1],[0,0,1],['0',0,0,1]]:
+            with self.assertRaises(ValueError):
+                await self.call('library.update',{'id':asset['id'],'name':'invalid','base_point':[0,0,0],'base_orientation':quaternion,'model_digest':result['digest']})
+        self.assertEqual(bytes(self.service.library.get(asset['id'])['model']),actual)
+        self.assertEqual(self.service.library.details(asset['id'])['name'],'orientation')
+
     async def test_offline_invalid_or_stale_point_does_not_change_model_or_metadata(self):
         from model_fixture import model_bytes
         asset=self.service.library.add(model_bytes(),{'name':'original'})

@@ -193,3 +193,18 @@ body:has(.component-first){background:#181818}
 .component-first .base-point-coordinates input{min-width:0;width:100%;padding:4px;font-size:11px}
 .base-point-picking{cursor:crosshair}
 .base-point-pick-status{position:absolute;bottom:4px;left:4px;padding:3px 5px;font-size:11px;background:#222d;color:#ffcc55;pointer-events:none}
+
+.base-point-expand{width:100%;margin-bottom:4px}
+.base-point-options{display:flex;gap:12px;flex-wrap:wrap;margin:5px 0;font-size:11px}
+.base-point-options label{display:flex;align-items:center;gap:4px}
+.base-point-options input{width:auto;margin:0}
+.base-point-fullscreen{position:fixed;inset:0;z-index:10000;background:#222;color:#ddd;display:flex;flex-direction:column;padding:8px;gap:6px;font-size:12px;user-select:none}
+.base-point-fullscreen header,.base-point-fullscreen footer{display:flex;align-items:center;gap:8px;flex:none}
+.base-point-fullscreen header span,.base-point-fullscreen footer span{flex:1;color:#aaa;font-size:11px}
+.base-point-fullscreen .geometry-viewer{flex:1;min-height:80px;height:auto;margin:0;background:#262628;border-color:#444}
+.base-point-fullscreen .preview-base-point{margin:0;flex:none}
+.base-point-fullscreen button{padding:4px 8px;font-size:12px;border:1px solid #555;border-radius:5px;background:#333;color:#ddd}
+.base-point-fullscreen footer button:last-child{background:var(--accent-color,#00a37a)}
+.base-point-fullscreen input{background:#222;color:#ddd;border:1px solid #555;border-radius:4px}
+.base-point-fullscreen .base-point-presets{display:flex}
+.base-point-fullscreen .base-point-presets button{flex:1}

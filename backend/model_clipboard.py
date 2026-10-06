@@ -20,7 +20,7 @@ def model_base_point(data):
     return list(struct.unpack_from('<3d', data))
 
 
-def with_base_point(data, point):
+def with_base_point(data, point, orientation=None):
     validate_model(data)
     if not isinstance(point, list) or len(point) != 3 or any(
         type(v) not in (int, float) or not math.isfinite(v) or abs(v) > 1e12 for v in point
@@ -28,7 +28,18 @@ def with_base_point(data, point):
         raise ValueError('基点必须是三个有限坐标')
     # Verified against native 26.1.3 copy(Vector3): XYZ uses the same units
     # as the kernel preview. Preserve quaternion, bodies and recipe bytes.
-    return struct.pack('<3d', *point) + data[24:]
+    tail = data[24:]
+    if orientation is not None:
+        if not isinstance(orientation, list) or len(orientation) != 4 or any(
+            type(v) not in (int,float) or not math.isfinite(v) or abs(v)>1e12 for v in orientation
+        ):
+            raise ValueError('基点方向必须是有效四元数')
+        length=math.sqrt(sum(v*v for v in orientation))
+        if length<1e-12:
+            raise ValueError('基点方向必须是有效四元数')
+        # Native copy(point, Quaternion) verified in 26.1.3: XYZW.
+        tail=struct.pack('<4d',*(v/length for v in orientation))+data[56:]
+    return struct.pack('<3d', *point) + tail
 
 
 def _parse_model(data):

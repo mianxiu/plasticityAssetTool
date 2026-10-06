@@ -310,5 +310,18 @@
   "只有内嵌入口发生变化才需要更新插件；安装前需自行保存并关闭对应 Plasticity 窗口。": "Update the plugin only when its embedded entry changes. Save and close the affected Plasticity windows yourself before installation.",
   "正在运行": "Running",
   "检测失败": "Check failed",
-  "检测暂不可用": "Detection temporarily unavailable"
+  "检测暂不可用": "Detection temporarily unavailable",
+  "顶点": "Vertex",
+  "边中点": "Edge midpoint",
+  "表面": "Surface",
+  "曲线": "Curve",
+  "放大编辑基点": "Open full-screen editor",
+  "吸附端点 / 边中点": "Snap endpoints / edge midpoints",
+  "按面法线定向": "Orient to face normal",
+  "基点旋转 ": "Base rotation ",
+  "重置方向": "Reset orientation",
+  "基点编辑器": "Base point editor",
+  "方向：红 X / 绿 Y / 蓝 Z": "Axes: red X / green Y / blue Z",
+  "确认后仍需保存修改": "Save changes after confirming",
+  "确认基点": "Confirm base point"
 }

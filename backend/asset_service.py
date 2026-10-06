@@ -177,7 +177,8 @@ class AssetService:
                 updated = validate_model(reference[:56] + model[56:])
                 result = await asyncio.to_thread(self.library.rebase, original['id'], original['digest'], updated)
                 from .model_clipboard import model_base_point
-                return result | {'base_point': model_base_point(updated)}
+                import struct
+                return result | {'base_point': model_base_point(updated),'base_orientation':list(struct.unpack_from('<4d',updated,24))}
             if action == "library.update":
                 fields = dict(args)
                 if "preview" in fields:

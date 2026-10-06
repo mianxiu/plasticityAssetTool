@@ -162,11 +162,12 @@ class AssetLibrary:
         # Read only the placement prefix, never the full model for details.
         import struct
         with self.connect() as db:
-            row = db.execute('SELECT substr(model,1,24),digest FROM assets WHERE id=?', (asset_id,)).fetchone()
+            row = db.execute('SELECT substr(model,1,56),digest FROM assets WHERE id=?', (asset_id,)).fetchone()
         if row is None:
             raise ValueError('组件不存在，请刷新组件库')
         prefix = row[0]
-        return {'base_point':list(struct.unpack('<3d', prefix)) if len(prefix) == 24 else None, 'digest':row[1]}
+        return {'base_point':list(struct.unpack_from('<3d', prefix)) if len(prefix) >=24 else None,
+                'base_orientation':list(struct.unpack_from('<4d',prefix,24)) if len(prefix)==56 else None,'digest':row[1]}
 
     @staticmethod
     def validate_preview(preview):
@@ -257,7 +258,7 @@ class AssetLibrary:
             model = self.model_row(asset_id)
             if model['archived'] or model['digest'] != expected_digest:
                 raise ValueError('组件已变化，未保存基点，请重新打开编辑')
-            updated_model = with_base_point(bytes(model['model']), point)
+            updated_model = with_base_point(bytes(model['model']), point, fields.get('base_orientation'))
             new_digest = hashlib.sha256(updated_model).hexdigest()
         location = self.organization(fields, current)
         update_preview = "preview" in fields
@@ -283,6 +284,8 @@ class AssetLibrary:
         result = self.details(asset_id)
         if updated_model is not None:
             result['base_point'] = point
+            import struct
+            result['base_orientation'] = list(struct.unpack_from('<4d',updated_model,24))
         return result
 
     def archive(self, asset_id, archived):
