@@ -8,8 +8,8 @@
 
 <p align="center">
   <a href="https://github.com/mianxiu/plasticityassettool/releases">下载 Windows 发布包</a> ·
-  <a href="docs/wiki/Plugin-Installation.md">安装说明</a> ·
-  <a href="docs/wiki/Home.md">使用文档</a> ·
+  <a href="https://github.com/mianxiu/plasticityassettool/wiki/Plugin-Installation">安装说明</a> ·
+  <a href="https://github.com/mianxiu/plasticityassettool/wiki">使用文档</a> ·
   <a href="TODO.md">开发计划</a>
 </p>
 
@@ -31,7 +31,7 @@ Plasticity 本地模型组件库：把常用实体、曲线和组合模型保存
 
 当前验证环境：**Windows x64 / Plasticity 26.1.3**。下载完整发布包，运行启动器，在控制中心安装插件；按 **Tab** 打开或关闭组件库。
 
-[下载安装](docs/wiki/Plugin-Installation.md) · [使用指南](docs/wiki/Home.md) · [常见问题](docs/wiki/FAQ.md) · [源码运行](docs/wiki/Development.md)
+[下载安装](https://github.com/mianxiu/plasticityassettool/wiki/Plugin-Installation) · [使用指南](https://github.com/mianxiu/plasticityassettool/wiki) · [常见问题](https://github.com/mianxiu/plasticityassettool/wiki/FAQ) · [源码运行](https://github.com/mianxiu/plasticityassettool/wiki/Development)
 
 本项目为非官方工具，安装会修改 Plasticity 入口并保留恢复备份。使用前请阅读 [第三方声明与使用风险](DISCLAIMER.md)。
 
