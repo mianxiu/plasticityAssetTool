@@ -327,5 +327,6 @@
   "基点": "Base point",
   "绕 {axis} 反转 180°": "Flip around {axis} 180°",
   "概览": "Overview",
-  "偏好设置": "Preferences"
+  "偏好设置": "Preferences",
+  "编辑基点": "Edit base point"
 }
