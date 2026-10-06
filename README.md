@@ -210,3 +210,5 @@ python -m venv .venv
 **Plasticity 官方单独授权：** [OFFICIAL-LICENSE.md](OFFICIAL-LICENSE.md) 允许 **Plastic Software LLC** 免费修改作者有权授权的代码、闭源集成，并随 Plasticity 及官方插件、配套工具分发，无需公开宿主或集成代码。该授权不允许将工具独立转授权给无关第三方，不覆盖第三方依赖或其他作者未经单独授权的贡献，也不代表官方认可本项目。
 
 历史 MIT 授权不会被撤回：已经按 MIT 获得的代码仍可继续按 MIT 使用，此次变更无法阻止基于旧版本的闭源开发。第三方依赖保留各自许可证，用户模型与组件数据不因使用本工具而采用 GPL。详细范围见 [许可证说明](docs/Licensing.md)，贡献要求见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+
+组件编辑预览框左上角提供缩略图选择和移除入口。JPEG、PNG、WebP 图片超过 512×512 时等比例缩小至该范围，不裁切、不放大小图；小 JPEG 保留原始图片数据，其他格式转换为 JPEG，透明区域使用白色背景。选择后仍需保存修改。

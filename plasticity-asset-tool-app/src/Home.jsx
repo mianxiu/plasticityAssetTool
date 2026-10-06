@@ -3,6 +3,7 @@ import {t, locale} from "./i18n";
 import {supportsBoolean,componentMode} from "./componentModes.mjs";
 import {VirtualAssetGrid} from "./VirtualAssetGrid";
 import {mergeLibrary} from "./librarySync.mjs";
+import {thumbnailImage} from "./thumbnailImage.mjs";
 import { previewQueue } from "./previewQueue.mjs";
 import { createMemo, createSignal, lazy, For, onCleanup, onMount, Show } from "solid-js";
 import { WebsocketClient } from "./Websocketclient";
@@ -441,15 +442,20 @@ export function Home() {
     if(embedded) window.parent.postMessage({type:"pat:show"},hostOrigin);
     if(result){setForm(current=>({...current,base_point:result.base_point,base_orientation:result.base_orientation,model_digest:result.digest}));await refresh();}
   }
+  const [previewReading,setPreviewReading]=createSignal(false);
   async function readPreview(event) {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    if (file.type !== "image/jpeg" || file.size > 5 * 1024 * 1024) {
-      showNotice("请选择小于 5 MB 的 JPEG 预览图", true); event.target.value = ""; return;
+    const input=event.currentTarget, file=input.files?.[0];
+    if(!file)return;
+    const currentId=selectedId(),currentDialog=dialog(),currentRevision=editRevision;
+    if(!['image/jpeg','image/png','image/webp'].includes(file.type)) {
+      showNotice("请选择 JPEG、PNG 或 WebP 图片",true);input.value='';return;
     }
-    const reader = new FileReader();
-    reader.onload = () => setField("preview", reader.result);
-    reader.readAsDataURL(file);
+    setPreviewReading(true);
+    try {
+      const preview=await thumbnailImage(file);
+      if(selectedId()===currentId && dialog()===currentDialog && editRevision===currentRevision)setField('preview',preview);
+    }catch(error){showNotice(t('无法处理图片，请重新选择'),true);}
+    finally {setPreviewReading(false);input.value='';}
   }
   async function importPackage(event) {
     const file = event.target.files?.[0];
@@ -501,10 +507,21 @@ export function Home() {
     window.removeEventListener("blur", closeHeldPreview);
   });
 
+  function ThumbnailPicker() {
+    const preview=()=>form().preview || (dialog()!=='capture' && form().preview===undefined && selected()?.has_preview ? previewUrl(selected()) : '');
+    return <div class="thumbnail-picker-controls">
+      <label class="thumbnail-picker" title={t("选择缩略图；超过 512×512 自动缩小")}>
+        <input type="file" accept="image/jpeg,image/png,image/webp" aria-label={t("选择缩略图")} disabled={busy() || previewReading()} onChange={readPreview}/>
+        <Show when={preview()} fallback={<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8" cy="8" r="1.5"/><path d="m4 18 6-7 4 4 3-3 4 6"/></svg>}><img src={preview()} alt={t("组件预览")}/></Show>
+        <span>{previewReading()?t("正在处理图片…"):t("缩略图")}</span>
+      </label>
+      <Show when={preview()}><button type="button" class="thumbnail-remove" aria-label={t("移除预览图")} title={t("移除预览图")} disabled={busy() || previewReading()} onClick={()=>setField('preview','')}>×</button></Show>
+    </div>;
+  }
   function AssetForm(props) {
     return <form class="asset-edit-form" onSubmit={save}><label>{t("组件名称")}<input required maxlength="120" autofocus placeholder={t("例如：六角螺栓 M8")} value={form().name} onInput={event => setField("name", event.currentTarget.value)}/></label>
       <div class="form-row"><label>{t("分类")}<input maxlength="80" placeholder={t("未分类")} list="asset-categories" value={form().category} onInput={event => setField("category", event.currentTarget.value)}/></label><label>{t("标签")}<input maxlength="300" placeholder={t("螺栓，紧固件")} value={form().tags} onInput={event => setField("tags", event.currentTarget.value)}/></label></div><datalist id="asset-categories"><For each={categories()}>{name => <option value={name}/>}</For></datalist>
-      <Show when={!props.capture}><GeometryPreview asset={selected()} load={loadGeometry} loadKernel={loadKernelGeometry} editBasePoint basePoint={form().base_point} orientation={form().base_orientation} onBasePointChange={point=>setField('base_point',point)} onOrientationChange={value=>setField('base_orientation',value)} onNativePick={()=>rebaseAsset("pick")} nativeDisabled={busy() || !target() || !modelEnabled()} disabled={busy() || archived()}/><dl><dt>{t("保存时间")}</dt><dd>{new Date(selected().created_at).toLocaleDateString(locale())}</dd><dt>{t("模型大小")}</dt><dd>{(selected().bytes / 1024).toFixed(1)} KB</dd><dt>{t("来源版本")}</dt><dd>{selected().source_version === "unknown" ? t("未记录") : selected().source_version}</dd></dl></Show>
+      <Show when={!props.capture}><GeometryPreview asset={selected()} load={loadGeometry} loadKernel={loadKernelGeometry} editBasePoint thumbnailPicker={<ThumbnailPicker/>} basePoint={form().base_point} orientation={form().base_orientation} onBasePointChange={point=>setField('base_point',point)} onOrientationChange={value=>setField('base_orientation',value)} onNativePick={()=>rebaseAsset("pick")} nativeDisabled={busy() || !target() || !modelEnabled()} disabled={busy() || archived()}/><dl><dt>{t("保存时间")}</dt><dd>{new Date(selected().created_at).toLocaleDateString(locale())}</dd><dt>{t("模型大小")}</dt><dd>{(selected().bytes / 1024).toFixed(1)} KB</dd><dt>{t("来源版本")}</dt><dd>{selected().source_version === "unknown" ? t("未记录") : selected().source_version}</dd></dl></Show>
       <div class="form-row"><label>{t("资产库")}<select aria-label={t("组件所属资产库")} onChange={event => changeFormLibrary(event.currentTarget.value)}><For each={libraries()}>{item => <option value={item.id} selected={form().library_id === item.id}>{item.name}</option>}</For></select></label><label>{t("组件类型")}<select aria-label={t("组件类型标注")} disabled={!!form().recipe} title={form().recipe ? t("连续布尔组仅支持实体组件") : t("直接保存时按实际选择自动识别；剪贴板保存由此标注")} onChange={event => setField("kind",event.currentTarget.value)}><For each={Object.entries(kindNames)}>{item => <option value={item[0]} selected={form().kind === item[0]}>{t(item[1])}</option>}</For></select></label></div>
       <Show when={supportsBoolean(form())}><Show when={form().recipe} fallback={<fieldset class="insert-mode-picker" title={t("布尔模式使用置入前选中的实体作为目标。原位置粘贴始终保持独立对象。")}><legend>{t("默认置入模式")}</legend><div class="insert-mode-options"><For each={Object.entries(insertModes)}>{item=><label><input type="radio" name="insert_mode" value={item[0]} checked={(form().insert_mode || "new-body") === item[0]} onChange={()=>setField("insert_mode",item[0])}/><span>{t(item[1])}</span></label>}</For></div></fieldset>}><fieldset class="group-recipe"><legend>{t("组：")}{form().recipe?.name}{t(" · 按顺序执行")}</legend><ol><For each={form().recipe?.parts}>{part=><li><span>{part.name}</span><small>{t(insertModes[part.mode])}</small></li>}</For></ol></fieldset></Show></Show>
       <label>{t("分组")}<select aria-label={t("组件所属分组")} disabled={foldersLoading()} onChange={event => setField("folder_id",event.currentTarget.value || null)}><option value="" selected={!form().folder_id}>{foldersLoading() ? t("正在加载分组…") : t("库根目录")}</option><For each={formFolders()}>{item => <option value={item.id} selected={form().folder_id === item.id}>{folderLabel(item.id,formFolders())}</option>}</For></select></label>
@@ -513,10 +530,9 @@ export function Home() {
       <Show when={props.capture}>
         <fieldset class="insert-mode-picker base-point-picker"><legend>{t("组件基点")}</legend><Show when={copySelection()} fallback={<span>{t("保留剪贴板中的原生基点")}</span>}><div class="insert-mode-options"><For each={[["world","世界原点"],["pick","视口拾取"]]}>{item=><label><input type="radio" name="base_mode" value={item[0]} checked={(form().base_mode || "world") === item[0]} disabled={busy()} onChange={()=>setField("base_mode",item[0])}/><span>{t(item[1])}</span></label>}</For></div></Show></fieldset>
       </Show>
-      <label class="preview-picker">{t("预览图（可选）")}<input type="file" accept="image/jpeg" onChange={readPreview}/></label>
+      <Show when={props.capture}><ThumbnailPicker/></Show>
       <Show when={props.capture}><label class="check-label" title={t("从模型生成正交缩略图和三维预览，需要连接 Plasticity；上传的预览图优先使用。")}><input type="checkbox" checked={autoPreview()} disabled={busy()} onChange={event=>setAutoPreview(event.currentTarget.checked)}/><span>{t("自动生成几何预览")}</span></label></Show>
-      <Show when={form().preview || (!props.capture && form().preview === undefined && selected()?.has_preview)}><div class="preview-editor"><img class="form-preview" src={form().preview || previewUrl(selected())} alt={t("组件预览")}/><button type="button" class="secondary" disabled={busy()} onClick={() => setField("preview", "")}>{t("移除预览图")}</button></div></Show>
-      <Show when={notice()?.error}><p class="form-error" role="alert">{notice().message}</p></Show><div class="modal-actions"><button type="button" class="secondary" disabled={busy()} onClick={props.onCancel}>{t("取消")}</button><button type="submit" class="primary" disabled={!ready() || foldersLoading() || !form().name.trim()}>{busy() ? t("保存中…") : props.capture ? t("保存组件") : t("保存修改")}</button></div></form>;
+      <Show when={notice()?.error}><p class="form-error" role="alert">{notice().message}</p></Show><div class="modal-actions"><button type="button" class="secondary" disabled={busy()} onClick={props.onCancel}>{t("取消")}</button><button type="submit" class="primary" disabled={!ready() || foldersLoading() || previewReading() || !form().name.trim()}>{busy() ? t("保存中…") : props.capture ? t("保存组件") : t("保存修改")}</button></div></form>;
   }
 
   const FolderBranches = props => <ul class="sidebar-tree-children"><For each={folders().filter(item => item.parent_id === props.parent && !props.ancestors.includes(item.id))}>{item => <li><button class="tree-row" classList={{active:folderId() === item.id}} aria-current={folderId() === item.id ? "location" : undefined} onClick={() => enterFolder(item.id)} title={folderLabel(item.id)}><span class="tree-name">▱ {item.name}</span></button><Show when={folders().some(child => child.parent_id === item.id)}><FolderBranches parent={item.id} ancestors={[...props.ancestors,item.id]}/></Show></li>}</For></ul>;

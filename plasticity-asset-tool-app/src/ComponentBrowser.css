@@ -217,3 +217,12 @@ body:has(.component-first){background:#181818}
 .base-point-editor-backdrop{position:fixed;inset:0;z-index:10000;background:#0009;display:flex;align-items:center;justify-content:center;padding:12px}
 .base-point-editor-backdrop .base-point-fullscreen{position:relative;inset:auto;width:min(1100px,100%);height:calc(100dvh - 24px);max-height:900px;box-sizing:border-box;border:1px solid #555;border-radius:12px;box-shadow:0 16px 60px #0008}
 @media(max-width:480px){.base-point-fullscreen header{flex-wrap:wrap}.base-point-fullscreen header span{flex-basis:100%;order:3}.preview-direction-axes{width:64px;height:64px}.base-point-fullscreen .base-point-options{gap:5px}}
+
+.geometry-thumbnail-picker{position:absolute;top:10px;left:10px;z-index:2}
+.thumbnail-picker-controls{display:flex;align-items:center;gap:4px}
+.component-first .thumbnail-picker{position:relative;display:flex;align-items:center;gap:5px;padding:5px 7px;border:1px solid #666;border-radius:7px;background:#242424e6;color:#ddd;cursor:pointer;font-size:12px}
+.thumbnail-picker input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
+.thumbnail-picker:focus-within{outline:2px solid #00a887;outline-offset:2px}
+.thumbnail-picker svg,.thumbnail-picker img{width:24px;height:24px;object-fit:contain}
+.thumbnail-picker svg{fill:none;stroke:currentColor;stroke-width:1.7}
+.component-first .thumbnail-remove{padding:2px 6px;border:1px solid #666;border-radius:6px;background:#242424e6;color:#ddd;font-size:16px}
