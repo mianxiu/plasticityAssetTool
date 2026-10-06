@@ -30,6 +30,17 @@ class ServiceControlTests(unittest.IsolatedAsyncioTestCase):
     async def asyncTearDown(self):
         self.directory.cleanup()
 
+    async def test_update_check_is_read_only_and_preserves_model_connection(self):
+        before=self.service.library.get(self.asset['id'])['model']
+        result=await self.app.dispatch('service.updates',{})
+        self.assertIn('ui',result['updates'])
+        self.assertIn('backend',result['updates'])
+        self.assertTrue(self.service.model_enabled)
+        self.assertFalse(self.app.stop_event.is_set())
+        self.assertIsNone(self.app.control.plugins.job)
+        self.assertEqual(self.service.desktop.calls,[])
+        self.assertEqual(self.service.library.get(self.asset['id'])['model'],before)
+
     async def test_pause_blocks_native_operations_but_preserves_browsing_and_resume(self):
         state=await self.app.dispatch('service.status',{})
         self.assertEqual(state['component_count'],1)

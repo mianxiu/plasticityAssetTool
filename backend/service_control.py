@@ -4,6 +4,7 @@ import os
 import time
 from .plugin_manager import PluginManager
 from .version import APP_NAME, APP_VERSION
+from .update_status import UpdateStatus
 
 
 class ServiceControl:
@@ -12,12 +13,14 @@ class ServiceControl:
         self.started = time.monotonic()
         self.tray = None
         self.plugins = PluginManager(app.service.library.root.parent)
+        self.updates = UpdateStatus(self.plugins.root)
 
     async def status(self):
         service = self.app.service
         async with service.lock:
             targets = await service.bridge.discover()
         libraries = await asyncio.to_thread(service.library.libraries)
+        plugins, updates = await asyncio.gather(self.plugins.refresh(), asyncio.to_thread(self.updates.snapshot))
         return {"running": True, "app_name": APP_NAME, "app_version": APP_VERSION,
                 "pid": os.getpid(), "uptime_seconds": int(time.monotonic()-self.started),
                 "model_enabled": service.model_enabled, "clipboard_supported": service.desktop is not None,
@@ -25,7 +28,7 @@ class ServiceControl:
                 "component_count": sum(row["count"] for row in libraries), "libraries": libraries,
                 "url": self.app.settings["base_url"],
                 "panel_settings": service.panel_settings.snapshot(),
-                "plugin_manager": self.plugins.snapshot(),
+                "plugin_manager": plugins, "updates": updates,
                 "shortcut": service.config["keymap"].get("show_panel_event_key_code", "Tab"),
                 "tray_available": bool(self.tray and self.tray.available),
                 "tray_error": self.tray.error if self.tray else ""}
@@ -35,6 +38,10 @@ class ServiceControl:
             raise ValueError("参数必须是对象")
         service = self.app.service
         if action == "service.status":
+            return await self.status()
+        if action == 'service.updates':
+            await self.plugins.refresh(force=True)
+            await asyncio.to_thread(self.updates.snapshot, True)
             return await self.status()
         if action == "service.open_control":
             return await asyncio.to_thread(self.app.control_window.open)

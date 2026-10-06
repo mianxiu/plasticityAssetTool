@@ -19,3 +19,9 @@
 @media(max-width:480px){.control-shell{display:block}.control-sidebar{flex-direction:row;flex-wrap:wrap;align-items:center;border-right:0;border-bottom:1px solid var(--control-border);padding:6px;gap:4px}.control-sidebar .brand{margin:0 auto 0 0}.control-sidebar .sidebar-label,.control-sidebar-bottom{display:none}.control-sidebar .nav-item{font-size:11px;padding:5px}.control-card{padding:0 5px}.control-card strong{font-size:16px}.control-card em{display:none}.plugin-installation,.model-window-row{flex-wrap:wrap}.plugin-installation>div:first-child{flex-basis:100%}.model-window-row>div{flex-basis:calc(100% - 40px)}.model-window-row .secondary-button{margin-left:34px}.control-panel-settings{flex-wrap:wrap}}
 
 .plugin-experimental{display:flex;align-items:center;gap:4px;font-size:11px;margin:0 0 5px;cursor:pointer}.plugin-experimental input{width:13px;height:13px;margin:0;accent-color:var(--accent-color,#009e7b)}
+
+.update-status-list{display:flex;flex-direction:column;gap:4px}
+.update-status-row{display:flex;align-items:center;gap:8px;font-size:11px;flex-wrap:wrap}
+.update-status-row strong{font-size:11px;font-weight:500;min-width:60px}
+.update-status-row span,.update-status-row small{font-size:11px;color:var(--control-muted)}
+.update-status-row .update-required{color:#e0b184}

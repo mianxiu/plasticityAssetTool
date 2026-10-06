@@ -5,6 +5,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 import uuid
 from pathlib import Path
 
@@ -23,6 +24,8 @@ class PluginManager:
         self.job = None
         self.task = None
         self.lock = asyncio.Lock()
+        self.last_checked = 0
+        self.check_error = ''
         self.settings_path = self.root / '.runtime/plugin-settings.json'
         self.allow_unverified_versions = False
         try:
@@ -32,9 +35,41 @@ class PluginManager:
             pass
 
     def snapshot(self):
-        return {'installations': list(self.records.values()), 'job': self.job,
+        return {'installations': list(self.records.values()), 'job': self.job, 'check_error': self.check_error,
                 'allow_unverified_versions': self.allow_unverified_versions,
                 'supported_versions': sorted(discovery.SUPPORTED_VERSIONS)}
+
+    async def refresh(self, force=False):
+        async with self.lock:
+            if self.task and not self.task.done():
+                return self.snapshot()
+            if force or time.monotonic() - self.last_checked >= 5:
+                # Test and portable incomplete roots may not contain an installer.
+                if (self.root / 'config.json').is_file():
+                    try:
+                        await asyncio.to_thread(self.refresh_records)
+                        self.check_error = ''
+                    except (OSError, ValueError, RuntimeError) as exc:
+                        # Detection failures must not make a healthy service
+                        # appear disconnected or claim stale records are current.
+                        self.check_error = str(exc)
+                self.last_checked = time.monotonic()
+            return self.snapshot()
+
+    def refresh_records(self):
+        # Retain explicitly detected custom directories during automatic checks.
+        processes = self.process_reader()
+        folders = self.root_reader() + [Path(p['Path']).parent for p in processes if p.get('Path')]
+        folders += [Path(row['path']) for row in self.records.values()]
+        rows = {}
+        for folder in dict.fromkeys(folders):
+            for candidate in discovery.directories(folder):
+                try:
+                    row = self.inspect(candidate, processes)
+                    rows[row['id']] = row
+                except (OSError, ValueError, KeyError, UnicodeError):
+                    continue
+        self.records = rows
 
     async def update_settings(self, enabled):
         if type(enabled) is not bool:
@@ -95,9 +130,10 @@ class PluginManager:
                 # patch_main reads payloads from the module's application root.
                 expected = patch_main(base[2], (self.root / 'plasticity-javascript-payloads/init.js').read_text(encoding='utf-8'),
                                       f'http://127.0.0.1:{config["server"]["http_port"]}/?embedded=1',
-                                      config['keymap'].get('show_panel_event_key_code', 'Tab'))
+                                      config['keymap'].get('show_panel_event_key_code', 'Tab'), payload_root=self.root)
                 row.update(state='current' if current == expected else 'update', previous_backup=str(previous[1]), base_backup=str(base[1]))
         self.permissions(row)
+        row['update_kind'] = 'plugin' if row['state'] in ('update', 'not-installed') else None
         return row
 
     def scan(self, custom=None):
@@ -118,6 +154,7 @@ class PluginManager:
         if custom and not any(Path(r['path']) == Path(custom).resolve() or Path(r['path']).parent == Path(custom).resolve() for r in rows.values()):
             raise ValueError('指定目录中未找到完整的 Plasticity 安装')
         self.records = rows
+        self.check_error = ''
         return self.snapshot()
 
     async def start(self, identity, action):

@@ -8,7 +8,8 @@ ROOT = Path(__file__).resolve().parent.parent
 MARKER = '// plasticity-asset-tool:main-embedded'
 
 
-def patch_main(original, script, url, key='Tab', profile=None):
+def patch_main(original, script, url, key='Tab', profile=None, payload_root=None):
+    payload_root = Path(payload_root) if payload_root is not None else ROOT
     source = original.decode('utf-8')
     if MARKER in source:
         raise ValueError('Main 入口已安装组件库，请先恢复备份')
@@ -18,10 +19,10 @@ def patch_main(original, script, url, key='Tab', profile=None):
     isolate = ''
     if profile:
         isolate = 'const p=' + json.dumps(str(Path(profile).resolve())) + ';require("fs").mkdirSync(p,{recursive:true});app.setPath("userData",p);app.setPath("logs",p+"/logs");'
-    geometry = (ROOT/'plasticity-javascript-payloads/geometry-preload.cjs').read_text(encoding='utf-8')
-    geometry += '\n' + (ROOT/'plasticity-javascript-payloads/native-transport-preload.cjs').read_text(encoding='utf-8')
-    worker = (ROOT/'plasticity-javascript-payloads/geometry-worker.js').read_text(encoding='utf-8')
-    worker += '\n' + (ROOT/'plasticity-javascript-payloads/native-worker.js').read_text(encoding='utf-8')
+    geometry = (payload_root/'plasticity-javascript-payloads/geometry-preload.cjs').read_text(encoding='utf-8')
+    geometry += '\n' + (payload_root/'plasticity-javascript-payloads/native-transport-preload.cjs').read_text(encoding='utf-8')
+    worker = (payload_root/'plasticity-javascript-payloads/geometry-worker.js').read_text(encoding='utf-8')
+    worker += '\n' + (payload_root/'plasticity-javascript-payloads/native-worker.js').read_text(encoding='utf-8')
     preload_hook = '''
 let geometryPreloadFile;
 app.on("ready", () => {

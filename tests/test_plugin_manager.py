@@ -68,6 +68,43 @@ class PluginManagerTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.manager.job['state'], 'complete', self.manager.job)
         return self.row()
 
+    async def test_ui_and_backend_changes_do_not_require_plugin_installation(self):
+        row=await self.perform('install')
+        self.assertEqual(row['state'],'current')
+        (self.root/'backend').mkdir()
+        (self.root/'backend/main.py').write_text('updated backend')
+        (self.root/'plasticity-asset-tool-app').mkdir()
+        (self.root/'plasticity-asset-tool-app/Home.jsx').write_text('updated UI')
+        self.assertEqual(self.row()['state'],'current')
+        self.assertFalse(self.row()['can_update'])
+        payload=self.root/'plasticity-javascript-payloads/native-worker.js'
+        payload.write_text(payload.read_text(encoding='utf-8')+'\n// native update',encoding='utf-8')
+        row=self.row()
+        self.assertEqual(row['state'],'update')
+        self.assertEqual(row['update_kind'],'plugin')
+
+    async def test_automatic_refresh_releases_running_block_and_retains_custom_install(self):
+        await self.perform('install')
+        self.processes=[{'Path':str(self.folder/'Plasticity.exe')}]
+        state=await self.manager.refresh(force=True)
+        self.assertTrue(state['installations'][0]['running'])
+        self.manager.root_reader=lambda:[]
+        self.processes=[]
+        state=await self.manager.refresh(force=True)
+        self.assertFalse(state['installations'][0]['running'])
+        self.assertEqual(state['installations'][0]['state'],'current')
+
+    async def test_automatic_detection_failure_is_reported_without_losing_service_state(self):
+        await self.perform('install')
+        def unavailable():
+            raise OSError('process query unavailable')
+        self.manager.process_reader=unavailable
+        state=await self.manager.refresh(force=True)
+        self.assertIn('unavailable',state['check_error'])
+        self.assertEqual(len(state['installations']),1)
+        self.manager.process_reader=lambda:[]
+        self.assertEqual((await self.manager.refresh(force=True))['check_error'],'')
+
     async def test_install_update_and_restore_original_after_multiple_updates(self):
         row = await self.perform('install')
         self.assertEqual(row['state'], 'current')

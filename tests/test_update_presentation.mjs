@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import {uiUpdateState,pluginUpdateState,pluginRunningMessage} from '../plasticity-asset-tool-app/src/updatePresentation.mjs';
+assert.equal(uiUpdateState({state:'ready',revision:'v1'},'v1'),'current');
+assert.equal(uiUpdateState({state:'ready',revision:'v2'},'v1'),'hot-update');
+assert.equal(uiUpdateState({state:'building',revision:'v2'},'v1'),'building');
+assert.equal(pluginUpdateState({installations:[{state:'current',installed:true,running:true}]}),'current');
+assert.equal(pluginRunningMessage({state:'current',installed:true,running:true}),'正在运行');
+assert.equal(pluginUpdateState({installations:[{state:'update',installed:true,running:true}]}),'install-required');
+assert.equal(pluginRunningMessage({state:'update',installed:true,running:true}),'正在运行，请先保存并关闭此版本所有窗口');
+assert.equal(pluginRunningMessage({state:'update',installed:true,running:false}),'');
+assert.equal(pluginUpdateState({installations:[]}),'not-detected');
+assert.equal(pluginUpdateState({check_error:'failed',installations:[{state:'current'}]}),'check-failed');
+console.log('Update presentation: UI hot reload, current plugin and real installation requirements verified');

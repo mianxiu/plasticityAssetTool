@@ -3,6 +3,7 @@ import {t, locale, setLocale} from "./i18n";
 import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { Cube } from "./Home";
 import "./ControlCenter.css";
+import {uiUpdateState,pluginUpdateState,pluginRunningMessage} from './updatePresentation.mjs';
 
 export function ControlCenter() {
   const [state,setState] = createSignal(null);
@@ -14,6 +15,7 @@ export function ControlCenter() {
   const [confirmQuit,setConfirmQuit] = createSignal(false);
   const [plugins,setPlugins] = createSignal(null);
   const [detecting,setDetecting] = createSignal(false);
+  const [checkingUpdates,setCheckingUpdates] = createSignal(false);
   const [installPath,setInstallPath] = createSignal("");
   const [confirmPlugin,setConfirmPlugin] = createSignal(null);
   const pluginPending=()=>plugins()?.job?.state === "waiting";
@@ -56,6 +58,23 @@ export function ControlCenter() {
     catch(error) {if(!disposed)setNotice(error.message);}
     finally {if(!disposed)setDetecting(false);}
   }
+  async function checkUpdates() {
+    if(checkingUpdates() || pluginPending() || !online())return;
+    setCheckingUpdates(true);setNotice('');
+    try {
+      const response=await fetch('/api/service',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'service.updates',args:{}}),signal:AbortSignal.timeout(30000)});
+      const result=await response.json();
+      if(!response.ok || !result.ok)throw new Error(result.error || t('检测失败'));
+      if(!disposed){setState(result.data);setPlugins(result.data.plugin_manager);}
+    }catch(error){if(!disposed)setNotice(error.message);}
+    finally{if(!disposed)setCheckingUpdates(false);}
+  }
+  const updateRows=()=>[
+    {name:'界面',state:uiUpdateState(state()?.updates?.ui,__PAT_UI_BUILD__,import.meta.env.DEV),help:'界面自动热更新；编辑或操作期间会等待安全时机，无需重启 Plasticity。'},
+    {name:'后台',state:state()?.updates?.backend?.state || 'unknown',help:'后台代码变化只需重启组件库后台，无需关闭 Plasticity 或重新安装插件。'},
+    {name:'内嵌插件',state:pluginUpdateState(plugins()),help:'只有内嵌入口发生变化才需要更新插件；安装前需自行保存并关闭对应 Plasticity 窗口。'},
+  ];
+  const updateLabels={'current':'已是最新版','hot-update':'等待安全热更新','building':'等待构建完成','not-built':'界面尚未构建','development':'开发模式热更新','unknown':'尚未检测','restart-required':'需重启后台','install-required':'需更新插件','not-installed':'需安装插件','not-detected':'未检测到安装','unverified':'需检查安装备份','check-failed':'检测暂不可用'};
   async function installPlugin() {
     const choice=confirmPlugin();
     if(!choice || busy() || pluginPending())return;
@@ -74,7 +93,7 @@ export function ControlCenter() {
   const enabled=()=>state()?.model_enabled !== false;
   const elapsed=()=>{const minutes=Math.floor((state()?.uptime_seconds || 0)/60);return minutes<60 ? t("{p0} 分钟",{p0:minutes}) : t("{p0} 小时 {p1} 分钟",{p0:Math.floor(minutes/60),p1:minutes%60});};
   const previousTitle=document.title;
-  onMount(()=>{stopUiUpdates=installUiUpdates({canReload:()=>online() && !busy() && !detecting() && !pluginPending() && !confirmPlugin() && !confirmQuit() && !quitting() && !installPath().trim()});document.title="Plasticity Asset Tool — Control Center";refresh().then(()=>{if(state()?.plugin_manager)detectPlugins();});timer=setInterval(refresh,3000);});
+  onMount(()=>{stopUiUpdates=installUiUpdates({canReload:()=>online() && !busy() && !detecting() && !checkingUpdates() && !pluginPending() && !confirmPlugin() && !confirmQuit() && !quitting() && !installPath().trim()});document.title="Plasticity Asset Tool — Control Center";refresh();timer=setInterval(refresh,3000);});
   onCleanup(()=>{stopUiUpdates();disposed=true;clearInterval(timer);document.title=previousTitle;});
   return <div class="control-shell">
     <aside class="control-sidebar">
@@ -93,6 +112,10 @@ export function ControlCenter() {
         <section class="control-card"><span class="control-card-label">{t("Plasticity 窗口")}</span><strong>{online() ? state()?.targets.length || 0 : "—"}<em>{t("个可用窗口")}</em></strong><small>{enabled() ? t("原生模型连接") : t("模型操作已暂停")}</small></section>
         <section class="control-card"><span class="control-card-label">{t("模型组件")}</span><strong>{online() ? state()?.component_count || 0 : "—"}<em>{t("个组件")}</em></strong><small>{state()?.libraries.length || 0}{t(" 个组件库 · 数据保存在本机")}</small></section>
       </div>
+      <section class="control-section update-section" aria-label={t('更新状态')}>
+        <div class="control-section-heading"><h2>{t('更新状态')}</h2><button class="secondary-button" disabled={!online() || checkingUpdates() || pluginPending()} onClick={checkUpdates}>{checkingUpdates()?t('正在检测…'):t('检查更新')}</button></div>
+        <div class="update-status-list"><For each={updateRows()}>{row=><div class="update-status-row" title={t(row.help)}><strong>{t(row.name)}</strong><span classList={{'update-required':['restart-required','install-required','not-installed'].includes(row.state)}}>{t(updateLabels[row.state] || '尚未检测')}</span><Show when={row.state==='restart-required'}><small>{t('请重启组件库后台，Plasticity 无需关闭')}</small></Show></div>}</For></div>
+      </section>
       <section class="control-section plugin-section">
         <div class="control-section-heading"><div><h2 title={t("检测版本和目录，安装后重新启动 Plasticity 即可使用 Tab 面板。")}>{t("插件安装")} <span class="control-help" aria-label={t("检测版本和目录，安装后重新启动 Plasticity 即可使用 Tab 面板。")}>?</span></h2></div><button class="secondary-button" disabled={!online() || detecting() || pluginPending()} onClick={()=>detectPlugins()}>{detecting() ? t("正在检测…") : t("检测安装")}</button></div>
         <Show when={plugins()} fallback={<p>{t("请重启后台，启用插件安装管理")}</p>}>
@@ -100,7 +123,7 @@ export function ControlCenter() {
           <label class="plugin-experimental" title={t("其他版本尚未验证兼容性；安装仍会校验入口并保留恢复备份。设置自动保存。") }><input type="checkbox" checked={plugins()?.allow_unverified_versions === true} disabled={!online() || busy() || detecting() || pluginPending() || !!confirmPlugin()} onChange={event=>setExperimentalVersions(event.currentTarget.checked)}/>{t("允许测试其他版本")}</label>
           <div class="plugin-directory"><input aria-label={t("Plasticity 安装目录")} placeholder={t("其他目录：输入 Plasticity 安装目录完整路径")} value={installPath()} onInput={event=>setInstallPath(event.currentTarget.value)} /><button class="secondary-button" disabled={!online() || detecting() || pluginPending() || !installPath().trim()} onClick={()=>detectPlugins(true)}>{t("检测目录")}</button></div>
           <Show when={plugins()?.installations?.length} fallback={<p>{detecting() ? t("正在检测…") : t("未检测到安装，可输入其他安装目录。")}</p>}>
-            <div class="plugin-installations"><For each={plugins()?.installations}>{row=><article class="plugin-installation"><div><strong>Plasticity {row.version}</strong><small class="plugin-path">{row.path}</small><span class="plugin-status">{!row.supported && !row.experimental ? t("此版本尚未支持自动安装") : pluginLabels[row.state]?.() || row.state}<Show when={row.experimental}> · {t("未验证版本")}</Show><Show when={row.running}> · {t("正在运行，请先保存并关闭此版本所有窗口")}</Show></span></div><div class="control-actions"><Show when={!row.installed}><button class="secondary-button" disabled={!row.can_install || busy() || detecting() || pluginPending()} onClick={()=>setConfirmPlugin({row,operation:"install"})}>{t("安装插件")}</button></Show><Show when={row.state === "update"}><button class="secondary-button" disabled={!row.can_update || busy() || detecting() || pluginPending()} onClick={()=>setConfirmPlugin({row,operation:"update"})}>{t("更新插件")}</button></Show><Show when={row.can_restore}><button class="secondary-button" disabled={busy() || detecting() || pluginPending()} onClick={()=>setConfirmPlugin({row,operation:"restore"})}>{t("恢复原始入口")}</button></Show></div></article>}</For></div>
+            <div class="plugin-installations"><For each={plugins()?.installations}>{row=><article class="plugin-installation"><div><strong>Plasticity {row.version}</strong><small class="plugin-path">{row.path}</small><span class="plugin-status">{!row.supported && !row.experimental ? t("此版本尚未支持自动安装") : pluginLabels[row.state]?.() || row.state}<Show when={row.experimental}> · {t("未验证版本")}</Show><Show when={row.running}> · {t(pluginRunningMessage(row))}</Show></span></div><div class="control-actions"><Show when={!row.installed}><button class="secondary-button" disabled={!row.can_install || busy() || detecting() || pluginPending()} onClick={()=>setConfirmPlugin({row,operation:"install"})}>{t("安装插件")}</button></Show><Show when={row.state === "update"}><button class="secondary-button" disabled={!row.can_update || busy() || detecting() || pluginPending()} onClick={()=>setConfirmPlugin({row,operation:"update"})}>{t("更新插件")}</button></Show><Show when={row.can_restore}><button class="secondary-button" disabled={busy() || detecting() || pluginPending()} onClick={()=>setConfirmPlugin({row,operation:"restore"})}>{t("恢复原始入口")}</button></Show></div></article>}</For></div>
           </Show>
           <Show when={plugins()?.job}><div class={`plugin-job plugin-job-${plugins()?.job.state}`} role="status"><strong>{plugins()?.job.state === "waiting" ? t("等待安装确认 / Windows 权限") : plugins()?.job.state === "complete" ? t("操作完成") : plugins()?.job.state === "cancelled" ? t("操作已取消") : t("操作失败")}</strong><span>{plugins()?.job.message}</span><small>{t("备份：")}{plugins()?.job.backup}</small></div></Show>
         </Show>
