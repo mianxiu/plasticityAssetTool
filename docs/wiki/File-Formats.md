@@ -7,16 +7,16 @@
 | 文件或格式 | 用途 | 应如何使用 |
 | --- | --- | --- |
 | `.patasset` | 单个组件交换包，含模型和编辑信息 | 组件库“导入组件包”导入；“编辑 → 导出组件包”导出 |
-| `PlasticityAssetTool-components.zip` | 批量导出的多个 `.patasset` | 先解压，再逐个导入；目前不能直接导入外层 ZIP |
+| `plasticityassettool-components.zip` | 批量导出的多个 `.patasset` | 先解压，再逐个导入；目前不能直接导入外层 ZIP |
 | `library/library.sqlite3` | 所有组件、库、分组、归档及缓存的实际数据库 | 退出后台后备份整个 `library/`；不是组件包导入文件 |
 | `.plasticity` | Plasticity 原生建模文档 | 在 Plasticity 打开，选择对象后保存组件；插件不直接导入整个文档 |
 | `model.bin` | `.patasset` 内部的原始模型字节 | 由插件读取；不要单独打开或改后缀作为 CAD 文件 |
 | `manifest.json` | `.patasset` 内部的组件元数据 | 记录名称、分类、默认布尔模式、连续布尔顺序和校验值 |
 | `preview.jpg` | `.patasset` 内可选的手动预览图片 | JPEG 展示图，不含可编辑模型 |
 | 自动几何网格和缩略图 | 数据库中的可重建预览缓存 | 由连接的 Plasticity 内核生成；不包含在导出的组件包内 |
-| `PlasticityAssetTool.exe` | Windows 启动入口 | 与完整发布目录一起使用，不能只复制 EXE |
+| `plasticityassettool.exe` | Windows 启动入口 | 与完整发布目录一起使用，不能只复制 EXE |
 | `PluginInstaller.exe` | 发布包自带的插件安装器 | 从后台控制中心“插件安装”启动，确认目标及 Windows 权限 |
-| `PlasticityAssetTool-windows-x64.zip` | 程序发布包，含启动器、运行时、插件和界面 | 解压运行，不包含个人组件数据库 |
+| `plasticityassettool-windows-x64.zip` | 程序发布包，含启动器、运行时、插件和界面 | 解压运行，不包含个人组件数据库 |
 | `.zip.sha256` | 程序发布 ZIP 的完整性校验值 | 比较文件 SHA-256；不是数字签名或模型文件 |
 | `config.json`、运行状态 `.json` | 后台配置、面板设置或实例信息 | 不通过组件包入口导入 |
 | `.ps1`、`.py`、`.js`、`.cjs`、`.ico` | 启动脚本、代码和图标 | 程序资源，不是组件模型 |
@@ -86,7 +86,7 @@ Curve 和混合组件仅独立对象置入，不使用布尔模式。连续布�
 批量包是外层 ZIP，内部每个文件都是完整 `.patasset`，文件名使用“组件名 + 完整组件 ID”，避免同名覆盖。单次支持 1–10000 个组件。
 
 ```text
-PlasticityAssetTool-components.zip
+plasticityassettool-components.zip
 ├── 外壳--<组件ID>.patasset
 └── 内孔--<组件ID>.patasset
 ```

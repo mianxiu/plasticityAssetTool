@@ -9,7 +9,7 @@ from ctypes import wintypes as W
 from pathlib import Path
 from .window_icons import WindowIcons
 
-TITLE = "Plasticity Asset Tool — Control Center"
+TITLE = "plasticity asset tool — control center"
 
 
 class ControlWindow:

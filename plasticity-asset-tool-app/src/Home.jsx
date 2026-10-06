@@ -166,7 +166,7 @@ export function Home() {
       if (!response.ok) throw new Error(result.error || t("导出失败"));
       const link = document.createElement('a');
       link.href = `${api}${result.download_url}`;
-      link.download = 'PlasticityAssetTool-components.zip';
+      link.download = 'plasticityassettool-components.zip';
       document.body.append(link); link.click(); link.remove();
       showNotice(t("已开始下载 {count} 个组件的 ZIP 包", {count:result.count}));
     } catch (error) {showNotice(error.message, true);}
@@ -508,7 +508,7 @@ export function Home() {
     <aside class="sidebar">
       <Show when={sidebarMode() === "hover"}><button class="sidebar-hover-trigger" aria-label={t("展开侧栏")} title={t("悬停展开侧栏")}>☰</button></Show>
       <div class="sidebar-content">
-      <div class="brand" title="Plasticity Asset Tool"><Cube /><strong>Plasticity Asset Tool</strong></div>
+      <div class="brand" title="plasticity asset tool"><Cube /><strong>plasticity asset tool</strong></div>
       <nav class="sidebar-tree" aria-label={t("模型组件库")}>
         <ul>
           <li><button class="tree-row tree-overview" classList={{active:!archived()}} onClick={() => toggleArchive(false)}><span class="tree-name">{t("◇ 全部组件 ")}</span><span class="tree-count">{!archived() ? assets().length : ""}</span></button></li>

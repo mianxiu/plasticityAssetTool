@@ -10,7 +10,7 @@ class ControlWindowTests(unittest.TestCase):
     @unittest.skipUnless(os.name == 'nt', 'Windows window enumeration')
     def test_library_window_is_not_reused_as_control_center(self):
         desktop = Mock()
-        titles = {41: 'Plasticity Asset Tool — Component Library', 42: 'Plasticity Asset Tool — Control Center'}
+        titles = {41: 'plasticity asset tool — component library', 42: 'plasticity asset tool — control center'}
         desktop.u.IsWindowVisible.return_value = True
         desktop.u.GetWindowTextW.side_effect = lambda hwnd, buffer, size: setattr(buffer, 'value', titles[hwnd])
         desktop.process_path.return_value = 'C:/Program Files/Edge/msedge.exe'

@@ -176,7 +176,7 @@ class BatchExportHandler(LocalHandler):
             raise web.HTTPError(404, "组件包已下载或已过期")
         try:
             self.set_header('Content-Type', 'application/zip')
-            self.set_header('Content-Disposition', 'attachment; filename="PlasticityAssetTool-components.zip"')
+            self.set_header('Content-Disposition', 'attachment; filename="plasticityassettool-components.zip"')
             self.set_header('Cache-Control', 'no-store')
             while chunk := await asyncio.to_thread(output.read, 1024*1024):
                 self.write(chunk)

@@ -55,7 +55,7 @@ class WindowsBridge:
         # EmptyClipboard needs an owner window for SetClipboardData to succeed.
         self.u.CreateWindowExW.argtypes = [W.DWORD, W.LPCWSTR, W.LPCWSTR, W.DWORD, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, W.HWND, W.HMENU, W.HINSTANCE, ctypes.c_void_p]
         self.u.CreateWindowExW.restype = W.HWND
-        self.owner = self.u.CreateWindowExW(0, "STATIC", "Plasticity Asset Tool Clipboard", 0, 0, 0, 0, 0, W.HWND(-3), None, None, None)
+        self.owner = self.u.CreateWindowExW(0, "STATIC", "plasticity asset tool clipboard", 0, 0, 0, 0, 0, W.HWND(-3), None, None, None)
         self.last_active_hwnd = None
         if not self.owner:
             raise ctypes.WinError(ctypes.get_last_error())
@@ -183,7 +183,7 @@ class WindowsBridge:
             title = ctypes.create_unicode_buffer(1024)
             self.u.GetWindowTextW(foreground, title, len(title))
             path = self.process_path(foreground)
-            if title.value.startswith(("Plasticity Asset Tool — Component Library", "Plasticity 模型组件库")) and path and Path(path).name.lower() == "msedge.exe":
+            if title.value.startswith(("plasticity asset tool — component library", "Plasticity 模型组件库")) and path and Path(path).name.lower() == "msedge.exe":
                 library_window = foreground
         minimized = False
         try:

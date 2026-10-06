@@ -13,7 +13,7 @@ $ErrorActionPreference = 'Stop'
 $installerRoot = $PSScriptRoot
 $installerRuntime = Join-Path $installerRoot '.runtime'
 New-Item -ItemType Directory -Path $installerRuntime -Force | Out-Null
-$installerExe = Join-Path $installerRuntime 'PlasticityAssetTool.PluginInstaller.exe'
+$installerExe = Join-Path $installerRuntime 'plasticityassettool.plugininstaller.exe'
 $installerCompiler = Join-Path $env:WINDIR 'Microsoft.NET/Framework64/v4.0.30319/csc.exe'
 if (-not (Test-Path -LiteralPath $installerCompiler)) { throw '需要 Windows .NET Framework 4 编译器。' }
 & $installerCompiler /nologo /target:winexe /codepage:65001 /reference:System.Windows.Forms.dll /reference:System.Drawing.dll /reference:System.Web.Extensions.dll "/out:$installerExe" "/win32manifest:$(Join-Path $installerRoot 'installer/PluginInstaller.manifest.xml')" "/win32icon:$(Join-Path $installerRoot 'plasticity-asset-tool-app/src/assets/favicon.ico')" (Join-Path $installerRoot 'installer/PluginInstaller.cs')

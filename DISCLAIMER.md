@@ -1,6 +1,6 @@
 # 第三方声明与使用风险说明
 
-Plasticity Asset Tool 是独立开发的第三方工具，非 Plasticity 官方产品。项目目前未取得官方针对本工具注入与内部接口调用方式的明确授权，不代表 Plasticity 或其开发团队，也不宣称获得其认可或支持。
+plasticity asset tool 是独立开发的第三方工具，非 Plasticity 官方产品。项目目前未取得官方针对本工具注入与内部接口调用方式的明确授权，不代表 Plasticity 或其开发团队，也不宣称获得其认可或支持。
 
 内嵌模式会修改 Plasticity 的程序入口、注入自有脚本并调用内部接口。它可能因宿主版本更新而失效，也可能出现启动异常、连接失败、计算错误或数据损失。软件提供恢复备份和事务保护，但不保证在所有故障情况下均能恢复。
 
@@ -14,7 +14,7 @@ Plasticity Asset Tool 是独立开发的第三方工具，非 Plasticity 官方�
 
 ## Third-party notice and usage risks
 
-Plasticity Asset Tool is an independently developed third-party tool, not an official Plasticity product. The project has not obtained explicit official authorization for its code injection and use of internal APIs. It does not represent Plasticity or its development team and does not claim their endorsement or support.
+plasticity asset tool is an independently developed third-party tool, not an official Plasticity product. The project has not obtained explicit official authorization for its code injection and use of internal APIs. It does not represent Plasticity or its development team and does not claim their endorsement or support.
 
 Embedded mode modifies Plasticity's application entry point, injects project scripts and calls internal APIs. Host updates may break compatibility. Startup failures, connection failures, incorrect calculations and data loss are possible. Backups and transaction safeguards do not guarantee recovery from every failure.
 

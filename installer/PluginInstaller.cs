@@ -12,10 +12,10 @@ using System.Threading;
 using System.Web.Script.Serialization;
 using System.Windows.Forms;
 
-[assembly: AssemblyTitle("Plasticity Asset Tool Plugin Installer")]
-[assembly: AssemblyDescription("plasticityAssetTool 插件安装与升级；支持组件默认布尔置入")]
-[assembly: AssemblyProduct("Plasticity Asset Tool")]
-[assembly: AssemblyCompany("plasticityAssetTool 开源项目")]
+[assembly: AssemblyTitle("plasticity asset tool plugin installer")]
+[assembly: AssemblyDescription("plasticityassettool 插件安装与升级；支持组件默认布尔置入")]
+[assembly: AssemblyProduct("plasticity asset tool")]
+[assembly: AssemblyCompany("plasticityassettool 开源项目")]
 [assembly: AssemblyVersion("1.0.0.0")]
 [assembly: AssemblyFileVersion("1.0.0.0")]
 
@@ -40,8 +40,8 @@ internal static class PluginInstaller {
             Bounds=new Rectangle(16,52,578,267), BackColor=form.BackColor, ForeColor=form.ForeColor,
             ScrollBars=ScrollBars.Vertical,
             TabStop=false,
-            Text="来源：plasticityAssetTool 开源项目\r\n" +
-                "项目：https://github.com/mianxiu/plasticityAssetTool\r\n\r\n" +
+            Text="来源：plasticityassettool 开源项目\r\n" +
+                "项目：https://github.com/mianxiu/plasticityassettool\r\n\r\n" +
                 "本次操作："+Text(request,"description")+"\r\n" +
                 "需要权限：更新 Plasticity 安装目录中的插件入口。\r\n" +
                 "目标文件："+Text(request,"target")+"\r\n" +

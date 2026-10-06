@@ -6,7 +6,7 @@ Copyright (c) 2024 mianxiu
 
 This is a separate, alternative copyright license from mianxiu (the Grantor) to **Plastic Software LLC**, the company identified in the Plasticity EULA at <https://www.plasticity.xyz/eula> (the Company). It is not a change to the GNU General Public License and is not an additional restriction on recipients using GPL-3.0-only.
 
-This permission covers only the Grantor's copyright interest in Plasticity Asset Tool code distributed with this document and an accompanying NOTICE that expressly references this permission (the Covered Material). It does not automatically cover future versions that omit that reference, third-party dependencies, user models, or contributions owned by others unless their copyright holders expressly grant equivalent permission. No ownership is transferred.
+This permission covers only the Grantor's copyright interest in plasticity asset tool code distributed with this document and an accompanying NOTICE that expressly references this permission (the Covered Material). It does not automatically cover future versions that omit that reference, third-party dependencies, user models, or contributions owned by others unless their copyright holders expressly grant equivalent permission. No ownership is transferred.
 
 ## 2. Official integration rights
 

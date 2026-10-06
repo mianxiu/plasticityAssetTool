@@ -8,17 +8,17 @@ options=parser.parse_args()
 import uuid
 folder=root/'.runtime/release-verification'/('发布验证 空格 '+uuid.uuid4().hex)
 folder.mkdir(parents=True)
-archive=root/'.runtime/releases/PlasticityAssetTool-windows-x64.zip'
+archive=root/'.runtime/releases/plasticityassettool-windows-x64.zip'
 with zipfile.ZipFile(archive) as z:
  assert not any('/library/' in n or '/.runtime/' in n or '/.venv/' in n or '/node_modules/' in n for n in z.namelist())
  z.extractall(folder)
-package=folder/'PlasticityAssetTool'
+package=folder/'plasticityassettool'
 config=json.loads((package/'config.json').read_text(encoding='utf8'))
 with socket.socket() as s:s.bind(('127.0.0.1',0));port=s.getsockname()[1]
 config['server']['http_port']=port
 config['plasticity']['cdp_endpoints']=[]
 (package/'config.json').write_text(json.dumps(config),encoding='utf8')
-exe=package/'PlasticityAssetTool.exe'
+exe=package/'plasticityassettool.exe'
 python=package/'runtime/python/python.exe'
 if options.venv:
  # Exercise the source checkout launcher path, with its Windows redirector

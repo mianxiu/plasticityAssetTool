@@ -93,11 +93,11 @@ export function ControlCenter() {
   const enabled=()=>state()?.model_enabled !== false;
   const elapsed=()=>{const minutes=Math.floor((state()?.uptime_seconds || 0)/60);return minutes<60 ? t("{p0} 分钟",{p0:minutes}) : t("{p0} 小时 {p1} 分钟",{p0:Math.floor(minutes/60),p1:minutes%60});};
   const previousTitle=document.title;
-  onMount(()=>{stopUiUpdates=installUiUpdates({canReload:()=>online() && !busy() && !detecting() && !checkingUpdates() && !pluginPending() && !confirmPlugin() && !confirmQuit() && !quitting() && !installPath().trim()});document.title="Plasticity Asset Tool — Control Center";refresh();timer=setInterval(refresh,3000);});
+  onMount(()=>{stopUiUpdates=installUiUpdates({canReload:()=>online() && !busy() && !detecting() && !checkingUpdates() && !pluginPending() && !confirmPlugin() && !confirmQuit() && !quitting() && !installPath().trim()});document.title="plasticity asset tool — control center";refresh();timer=setInterval(refresh,3000);});
   onCleanup(()=>{stopUiUpdates();disposed=true;clearInterval(timer);document.title=previousTitle;});
   return <div class="control-shell">
     <aside class="control-sidebar">
-      <div class="brand" title="Plasticity Asset Tool"><Cube/><strong>Plasticity Asset Tool</strong></div>
+      <div class="brand" title="plasticity asset tool"><Cube/><strong>plasticity asset tool</strong></div>
       <div class="sidebar-label">{t("工作空间")}</div>
       <div class="nav-item active">{t("◈ 控制中心")}</div>
       <a class="nav-item" href="/">{t("◇ 模型组件库")}</a>

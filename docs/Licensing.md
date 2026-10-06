@@ -2,7 +2,7 @@
 
 ## 公众许可证
 
-Plasticity Asset Tool 对公众采用 **GNU GPL version 3 only（GPL-3.0-only）**，完整条款见 [LICENSE](../LICENSE)，项目声明见 [NOTICE](../NOTICE)。允许使用、修改与商用；分发受 GPL 覆盖的修改版或衍生作品时，须遵循 GPL，包括保留声明和提供相应源码等要求。私人使用的修改无需仅因此公开。
+plasticity asset tool 对公众采用 **GNU GPL version 3 only（GPL-3.0-only）**，完整条款见 [LICENSE](../LICENSE)，项目声明见 [NOTICE](../NOTICE)。允许使用、修改与商用；分发受 GPL 覆盖的修改版或衍生作品时，须遵循 GPL，包括保留声明和提供相应源码等要求。私人使用的修改无需仅因此公开。
 
 GPL 不禁止改名、套壳或收费，其作用是约束受 GPL 覆盖代码的闭源分发。只改软件名称并不能免除 GPL 义务。
 
@@ -28,4 +28,4 @@ Python、Tornado、Solid、Three.js 等依赖遵循各自的许可证。本项�
 
 ## 发布包
 
-后续 Windows 发布包包含 `LICENSE`、`NOTICE`、`OFFICIAL-LICENSE.md` 和 `DISCLAIMER.md`。公众重新分发时须遵循 GPL 的源码及声明要求，对应版本源码见 [标签](https://github.com/mianxiu/plasticityAssetTool/tags) 与 [Releases](https://github.com/mianxiu/plasticityAssetTool/releases)。仅指向未来最新代码的链接不能代替对应源码。官方依赖单独授权分发时，遵循该授权及第三方依赖各自的要求。
+后续 Windows 发布包包含 `LICENSE`、`NOTICE`、`OFFICIAL-LICENSE.md` 和 `DISCLAIMER.md`。公众重新分发时须遵循 GPL 的源码及声明要求，对应版本源码见 [标签](https://github.com/mianxiu/plasticityassettool/tags) 与 [Releases](https://github.com/mianxiu/plasticityassettool/releases)。仅指向未来最新代码的链接不能代替对应源码。官方依赖单独授权分发时，遵循该授权及第三方依赖各自的要求。

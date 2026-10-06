@@ -1,13 +1,13 @@
 <p align="center">
-  <img src="docs/images/app-icon.png" width="80" height="80" alt="Plasticity Asset Tool 图标" />
+  <img src="docs/images/app-icon.png" width="80" height="80" alt="plasticity asset tool 图标" />
 </p>
 
-<h1 align="center">Plasticity Asset Tool</h1>
+<h1 align="center">plasticity asset tool</h1>
 
 <p align="center">把常用模型变成组件，在 Plasticity 内浏览、保存与置入。</p>
 
 <p align="center">
-  <a href="https://github.com/mianxiu/plasticityAssetTool/releases">下载 Windows 发布包</a> ·
+  <a href="https://github.com/mianxiu/plasticityassettool/releases">下载 Windows 发布包</a> ·
   <a href="docs/wiki/Plugin-Installation.md">安装说明</a> ·
   <a href="docs/wiki/Home.md">使用文档</a> ·
   <a href="TODO.md">开发计划</a>
@@ -32,8 +32,8 @@
 
 ## 下载与安装
 
-1. 在 [Releases](https://github.com/mianxiu/plasticityAssetTool/releases) 下载 `PlasticityAssetTool-windows-x64.zip`，解压完整目录。
-2. 双击 `PlasticityAssetTool.exe`，打开后台控制中心。发布包自带运行环境，无需另外安装 Python 或 Node.js；EXE 需要与发布目录一起使用。
+1. 在 [Releases](https://github.com/mianxiu/plasticityassettool/releases) 下载 `plasticityassettool-windows-x64.zip`，解压完整目录。
+2. 双击 `plasticityassettool.exe`，打开后台控制中心。发布包自带运行环境，无需另外安装 Python 或 Node.js；EXE 需要与发布目录一起使用。
 3. 进入 **插件安装 → 检测安装**，选择 Plasticity 26.1.3。未找到时可输入安装目录重新检测。
 4. 自行保存文档并关闭该版本的所有 Plasticity 窗口，点击 **安装插件**。核对目标与备份位置，确认 Windows 权限请求。
 5. 安装完成后重新打开 Plasticity，按 **Tab** 打开组件库，再按一次关闭。
@@ -133,8 +133,8 @@ UI、文档和普通后台修改不会触发内嵌插件安装。插件检测会
 | --- | --- |
 | `library/library.sqlite3` | 本地组件数据库；保存组件时写入这里 |
 | `.patasset` | 单组件交换包，包含原始模型、编辑信息及可选图片 |
-| `PlasticityAssetTool-components.zip` | 批量导出包，内部是多个独立 `.patasset` |
-| `PlasticityAssetTool-windows-x64.zip` | 程序发布包，包含启动器、后台和运行环境 |
+| `plasticityassettool-components.zip` | 批量导出包，内部是多个独立 `.patasset` |
+| `plasticityassettool-windows-x64.zip` | 程序发布包，包含启动器、后台和运行环境 |
 | `.runtime/` | 本机设置、缓存、日志和插件恢复备份 |
 
 单组件可从编辑侧栏导出；批量导出支持多选、当前分类或当前库。**批量 ZIP 需要先解压，再逐个导入其中的 `.patasset`**，目前不直接导入外层 ZIP。

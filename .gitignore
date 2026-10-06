@@ -219,7 +219,7 @@ plasticityAssetToolCache/
 /.runtime/
 /Include/
 /Plasticity 模型组件库.exe
-/PlasticityAssetTool.exe
+/plasticityassettool.exe
 /PluginInstaller.exe
 /Lib/
 /pyvenv.cfg

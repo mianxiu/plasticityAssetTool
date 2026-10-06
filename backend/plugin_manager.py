@@ -199,9 +199,9 @@ class PluginManager:
             return self.snapshot()
 
     def run_installer(self, request):
-        exe = self.root / 'PluginInstaller.exe'
+        exe = self.root / 'plugininstaller.exe'
         if not exe.is_file():
-            exe = self.root / '.runtime/PlasticityAssetTool.PluginInstaller.exe'
+            exe = self.root / '.runtime/plasticityassettool.plugininstaller.exe'
         if not exe.is_file():
             subprocess.run(['powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', str(self.root / 'install-plugin.ps1'), '-BuildOnly'],
                            cwd=self.root, capture_output=True, check=True, creationflags=subprocess.CREATE_NO_WINDOW)

@@ -22,11 +22,11 @@ def build(python_runtime, dependencies):
         '-File', str(ROOT / 'build-launcher.ps1')], cwd=ROOT, check=True)
     subprocess.run(['powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass',
         '-File', str(ROOT / 'install-plugin.ps1'), '-BuildOnly'], cwd=ROOT, check=True)
-    stage = ROOT / '.runtime/release-staging' / uuid.uuid4().hex / 'PlasticityAssetTool'
+    stage = ROOT / '.runtime/release-staging' / uuid.uuid4().hex / 'plasticityassettool'
     stage.mkdir(parents=True)
-    shutil.copy2(ROOT / '.runtime/PlasticityAssetTool.PluginInstaller.exe', stage / 'PluginInstaller.exe')
+    shutil.copy2(ROOT / '.runtime/plasticityassettool.plugininstaller.exe', stage / 'plugininstaller.exe')
     for name in ['main.py', 'start.ps1', 'config.json', 'LICENSE', 'NOTICE', 'OFFICIAL-LICENSE.md', 'DISCLAIMER.md', 'requirements.txt',
-                 'install-plugin.ps1', 'PlasticityAssetTool.exe']:
+                 'install-plugin.ps1', 'plasticityassettool.exe']:
         shutil.copy2(ROOT / name, stage / name)
     excluded = shutil.ignore_patterns('__pycache__', '*.pyc', 'node_modules', 'test', 'tests', 'site-packages')
     for name in ['backend', 'installer', 'plasticity-javascript-payloads']:
@@ -46,9 +46,9 @@ def build(python_runtime, dependencies):
         if path.is_dir():
             shutil.copytree(path, site / path.name, ignore=excluded)
     # Model stores and status/settings are created locally on first launch.
-    (stage / 'Readme.txt').write_text(
-        f'Plasticity Asset Tool v{APP_VERSION}\n'
-        '解压整个目录，双击 PlasticityAssetTool.exe。无需另外安装 Python 或 Node.js。\n'
+    (stage / 'readme.txt').write_text(
+        f'plasticity asset tool v{APP_VERSION}\n'
+        '解压整个目录，双击 plasticityassettool.exe。无需另外安装 Python 或 Node.js。\n'
         '后台由托盘控制退出；重复打开复用已有实例。\n'
         '在后台控制中心的“插件安装”检测 Plasticity 版本和目录，选择安装或更新内嵌插件。\n'
         '安装前自行保存并关闭对应 Plasticity 窗口，再在安装窗口确认 Windows 权限请求。\n'
@@ -59,10 +59,10 @@ def build(python_runtime, dependencies):
         '第三方声明与使用风险见 DISCLAIMER.md；本工具非官方产品，尚未取得对注入方式的明确官方授权。\n'
         '安装前确认所需权限，备份文档与组件库，并先在独立测试文档中验证。\n'
         '第三方组件保留各自的许可证；用户模型数据不因使用本工具而采用 GPL。\n'
-        '源码：https://github.com/mianxiu/plasticityAssetTool\n', encoding='utf-8-sig')
+        '源码：https://github.com/mianxiu/plasticityassettool\n', encoding='utf-8-sig')
     releases = ROOT / '.runtime/releases'
     releases.mkdir(exist_ok=True)
-    archive = releases / 'PlasticityAssetTool-windows-x64.zip'
+    archive = releases / 'plasticityassettool-windows-x64.zip'
     with zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED) as bundle:
         for path in stage.rglob('*'):
             if path.is_file():

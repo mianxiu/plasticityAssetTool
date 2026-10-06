@@ -164,7 +164,7 @@ class ServiceTray:
             return 0
         self._procedure = proc_type(procedure)
         instance = k.GetModuleHandleW(None)
-        name = f'PlasticityAssetToolTray{os.getpid()}'
+        name = f'plasticityassettooltray{os.getpid()}'
         window_class = WindowClass(0,self._procedure,0,0,instance,icons[0],None,None,None,name)
         registered = u.RegisterClassW(ctypes.byref(window_class))
         try:
