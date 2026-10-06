@@ -29,6 +29,10 @@ const kernel=kernelSnapCandidates({parts:[{kernel_snaps:[0,0,0,0,.25,1,0,2,2,0,0
 assert.deepEqual(kernel.map(point=>point.type),['顶点','曲线参数中点','边中点']);
 assert.ok(kernel.every(point=>point.kernel));
 assert.deepEqual(kernelSnapCandidates({parts:[{}]}),[],'Old cached meshes remain valid without native snap data');
+const {preferredSnapCandidates}=await import('../plasticity-asset-tool-app/src/previewSnapping.mjs');
+const previewTargets=[{point:[1,0,0],type:'顶点'},{point:[.5,0,0],type:'边中点'},{point:[.5,.5,0],type:'面中心'}];
+assert.deepEqual(preferredSnapCandidates(previewTargets,kernel),[previewTargets[2],...kernel],'Kernel targets replace approximate edges while preserving planar face centers');
+assert.deepEqual(preferredSnapCandidates(previewTargets,[]),previewTargets,'Missing kernel targets retain the original snapping fallback');
 const rectangle={positions:[0,0,0,4,0,0,4,2,0,0,2,0,.25,.75,0],indices:[0,1,4,1,2,4,2,3,4,3,0,4],edges:[],edge_groups:[]};
 const faceCenters=planarFaceCenters(rectangle);
 assert.equal(faceCenters.length,1,'Merge the triangles of one planar face into a single target');

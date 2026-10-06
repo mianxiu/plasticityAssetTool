@@ -338,5 +338,7 @@
   "内核 · 顶点": "Kernel · Vertex",
   "内核 · 边中点": "Kernel · Edge midpoint",
   "内核 · 曲线参数中点": "Kernel · Curve parameter midpoint",
-  "曲线参数中点": "Curve parameter midpoint"
+  "曲线参数中点": "Curve parameter midpoint",
+  "内核捕捉已启用": "Kernel snapping enabled",
+  "已回退到预览吸附：{reason}": "Using preview snapping: {reason}"
 }

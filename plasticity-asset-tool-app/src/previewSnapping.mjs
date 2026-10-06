@@ -79,6 +79,11 @@ export function kernelSnapCandidates(mesh) {
   return candidates;
 }
 
+// Kernel coordinates replace tessellated edge targets; planar centers stay available.
+export function preferredSnapCandidates(preview,kernel) {
+  return kernel.length ? [...preview.filter(point=>point.type==='面中心'),...kernel] : preview;
+}
+
 export function closestSnap(candidates,model,camera,rect,pointer,maxDepth=Infinity,depthTolerance=0.0001) {
   let best=null;
   for(const candidate of candidates) {
