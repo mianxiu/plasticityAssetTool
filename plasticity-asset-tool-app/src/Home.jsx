@@ -509,15 +509,30 @@ export function Home() {
 
   function ThumbnailPicker() {
     const preview=()=>form().preview || (dialog()!=='capture' && form().preview===undefined && selected()?.has_preview ? previewUrl(selected()) : '');
+    const [menuOpen,setMenuOpen]=createSignal(false);
+    let picker,clearItem;
+    const closeMenu=()=>setMenuOpen(false);
+    const outside=event=>{if(!picker?.contains(event.target))closeMenu();};
+    onMount(()=>document.addEventListener('pointerdown',outside,true));
+    onCleanup(()=>document.removeEventListener('pointerdown',outside,true));
+    const openMenu=event=>{
+      event.preventDefault();event.stopPropagation();
+      setMenuOpen(true);queueMicrotask(()=>clearItem?.focus());
+    };
     const clearPreview=event=>{
       event.preventDefault();event.stopPropagation();
       if(!busy() && !previewReading())setField('preview','');
+      closeMenu();picker?.querySelector('input')?.focus();
     };
-    return <div class="thumbnail-picker-controls" onContextMenu={clearPreview} onKeyDown={event=>{if(event.key==='Delete' || event.key==='Backspace')clearPreview(event);}}>
-      <label class="thumbnail-picker" aria-busy={previewReading()} title={previewReading()?t("正在处理图片…"):t("左键选择缩略图，右键清空；超过 512×512 自动缩小")}>
+    return <div class="thumbnail-picker-controls" ref={picker} onContextMenu={openMenu} onKeyDown={event=>{
+      if(event.key==='Escape'){event.preventDefault();event.stopPropagation();closeMenu();picker?.querySelector('input')?.focus();}
+      else if(event.key==='ContextMenu' || event.shiftKey && event.key==='F10')openMenu(event);
+    }}>
+      <label class="thumbnail-picker" aria-busy={previewReading()} title={previewReading()?t("正在处理图片…"):t("左键选择缩略图，右键打开菜单；超过 512×512 自动缩小")}>
         <input type="file" accept="image/jpeg,image/png,image/webp" aria-label={t("选择缩略图")} disabled={busy() || previewReading()} onChange={readPreview}/>
         <Show when={preview()} fallback={<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8" cy="8" r="1.5"/><path d="m4 18 6-7 4 4 3-3 4 6"/></svg>}><img src={preview()} alt={t("组件预览")}/></Show>
       </label>
+      <Show when={menuOpen()}><div class="thumbnail-context-menu" role="menu" aria-label={t("缩略图菜单")}><button ref={clearItem} type="button" role="menuitem" disabled={busy() || previewReading() || !preview()} onClick={clearPreview}>{t("清空缩略图")}</button></div></Show>
     </div>;
   }
   function AssetForm(props) {

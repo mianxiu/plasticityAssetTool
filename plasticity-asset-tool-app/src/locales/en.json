@@ -347,5 +347,8 @@
   "缩略图": "Thumbnail",
   "请选择 JPEG、PNG 或 WebP 图片": "Choose a JPEG, PNG or WebP image",
   "无法处理图片，请重新选择": "Unable to process the image. Choose another image.",
-  "左键选择缩略图，右键清空；超过 512×512 自动缩小": "Left-click to choose a thumbnail, right-click to clear; images larger than 512×512 are reduced"
+  "左键选择缩略图，右键清空；超过 512×512 自动缩小": "Left-click to choose a thumbnail, right-click to clear; images larger than 512×512 are reduced",
+  "左键选择缩略图，右键打开菜单；超过 512×512 自动缩小": "Left-click to choose a thumbnail, right-click for menu; images larger than 512×512 are reduced",
+  "缩略图菜单": "Thumbnail menu",
+  "清空缩略图": "Clear thumbnail"
 }
