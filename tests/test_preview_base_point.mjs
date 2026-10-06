@@ -33,3 +33,20 @@ assert.equal(closestSnap(snaps,model,camera,{width:200,height:200},{x:100,y:100}
 const orientation=new THREE.Quaternion().fromArray(normalOrientation([1,0,0]));
 assert.ok(new THREE.Vector3(0,0,1).applyQuaternion(orientation).distanceTo(new THREE.Vector3(1,0,0))<1e-8);
 console.log('Snapping: endpoints, arc midpoint, screen threshold, depth rejection and native Z orientation verified');
+
+const {rotateBaseOrientation,directionMarker}=await import('../plasticity-asset-tool-app/src/previewOrientation.mjs');
+const originalOrientation=normalOrientation([1,2,3]);
+for(const axis of [0,1,2]) {
+  const flipped=new THREE.Quaternion().fromArray(rotateBaseOrientation(originalOrientation,axis,180));
+  const before=new THREE.Vector3(0,0,1).applyQuaternion(new THREE.Quaternion().fromArray(originalOrientation));
+  const after=new THREE.Vector3(0,0,1).applyQuaternion(flipped);
+  assert.ok(after.distanceTo(before.clone().multiplyScalar(axis===2?1:-1))<1e-8);
+  const restored=new THREE.Quaternion().fromArray(rotateBaseOrientation(flipped.toArray(),axis,180));
+  assert.ok(1-Math.abs(restored.dot(new THREE.Quaternion().fromArray(originalOrientation)))<1e-8);
+}
+const gizmo=directionMarker(2);
+assert.equal(gizmo.children.length,4);
+assert.equal(gizmo.children[0].geometry.attributes.position.count,65);
+gizmo.traverse(object=>{if(object.material)assert.equal(object.material.depthTest,false);});
+gizmo.traverse(object=>{object.geometry?.dispose();object.material?.dispose();});
+console.log('Direction ring and local-axis flips verified for a tilted base frame');

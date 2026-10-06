@@ -208,3 +208,11 @@ body:has(.component-first){background:#181818}
 .base-point-fullscreen input{background:#222;color:#ddd;border:1px solid #555;border-radius:4px}
 .base-point-fullscreen .base-point-presets{display:flex}
 .base-point-fullscreen .base-point-presets button{flex:1}
+
+.preview-direction-axes{position:absolute;top:6px;right:6px;width:88px;height:88px;pointer-events:none;background:#26262899;border-radius:50%;font-size:12px;font-weight:600;stroke-width:2}
+.preview-point-annotation{position:absolute;padding:4px 7px;border-radius:5px;background:#333e;color:#ddd;font-size:12px;pointer-events:none;white-space:nowrap}
+.base-point-flips{display:flex;gap:4px;margin:6px 0;flex-wrap:wrap}
+.base-point-flips button{flex:1}
+.base-point-editor-backdrop{position:fixed;inset:0;z-index:10000;background:#0009;display:flex;align-items:center;justify-content:center;padding:12px}
+.base-point-editor-backdrop .base-point-fullscreen{position:relative;inset:auto;width:min(1100px,100%);height:calc(100dvh - 24px);max-height:900px;box-sizing:border-box;border:1px solid #555;border-radius:12px;box-shadow:0 16px 60px #0008}
+@media(max-width:480px){.base-point-fullscreen header{flex-wrap:wrap}.base-point-fullscreen header span{flex-basis:100%;order:3}.preview-direction-axes{width:64px;height:64px}.base-point-fullscreen .base-point-options{gap:5px}}

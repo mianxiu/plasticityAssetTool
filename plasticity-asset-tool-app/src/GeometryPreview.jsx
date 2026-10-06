@@ -4,6 +4,7 @@ import {Portal} from 'solid-js/web';
 import {snapCandidates,closestSnap,normalOrientation} from './previewSnapping.mjs';
 import * as THREE from 'three';
 import {sceneFor} from './geometryScene.mjs';
+import {directionMarker, rotateBaseOrientation} from './previewOrientation.mjs';
 import {meshBounds, presetBasePoint} from './previewBasePoint.mjs';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
@@ -26,15 +27,28 @@ export function GeometryPreview(props) {
   const [picking,setPicking] = createSignal(false);
   const [expanded,setExpanded] = createSignal(false);
   const [snapping,setSnapping] = createSignal(true);
-  const [alignNormal,setAlignNormal] = createSignal(false);
+  const [alignNormal,setAlignNormal] = createSignal(true);
+  const [axisDirections,setAxisDirections] = createSignal([]);
+  const [annotation,setAnnotation] = createSignal(null);
   const [snapLabel,setSnapLabel] = createSignal('');
   const [draftPoint,setDraftPoint] = createSignal(null);
   const [draftOrientation,setDraftOrientation] = createSignal(null);
   const [bounds,setBounds] = createSignal(null);
-  let marker, ghost, candidates=[], pickObjects=[];
-  const openExpanded=()=>{setDraftPoint([...props.basePoint]);setDraftOrientation([...(props.orientation || [0,0,0,1])]);setExpanded(true);};
-  const closeExpanded=()=>setExpanded(false);
-  const escape=event=>{if(expanded() && event.key==='Escape'){event.preventDefault();event.stopImmediatePropagation();closeExpanded();}};
+  let marker, ghost, editor, previousFocus, candidates=[], pickObjects=[];
+  const openExpanded=()=>{setDraftPoint([...(props.basePoint || [0,0,0])]);setDraftOrientation([...(props.orientation || [0,0,0,1])]);setExpanded(true);previousFocus=document.activeElement;queueMicrotask(()=>editor?.querySelector('button')?.focus());};
+  const closeExpanded=()=>{setExpanded(false);previousFocus?.focus();};
+  const escape=event=>{
+    if(!expanded())return;
+    if(event.key==='Escape'){event.preventDefault();event.stopImmediatePropagation();closeExpanded();}
+    if(event.key==='Tab'){
+      event.stopImmediatePropagation();
+      const inputs=[...editor.querySelectorAll('button:not(:disabled),input:not(:disabled),[tabindex="0"]')];
+      const index=inputs.indexOf(document.activeElement);
+      if(index<0 || !event.shiftKey && index===inputs.length-1 || event.shiftKey && index===0){
+        event.preventDefault();inputs[event.shiftKey ? inputs.length-1 : 0]?.focus();
+      }
+    }
+  };
   onMount(()=>window.addEventListener('keydown',escape,true));
   onCleanup(()=>window.removeEventListener('keydown',escape,true));
   const digest = createMemo(()=>props.asset?.digest);
@@ -53,7 +67,25 @@ export function GeometryPreview(props) {
     view.camera.lookAt(0,0,0);draw();
   };
   const destroy = () => {controls?.dispose();view?.dispose();controls = null;view = null;marker=null;ghost=null;candidates=[];pickObjects=[];};
-  const draw = () => {if(renderer && view){marker?.scale.setScalar(1/view.camera.zoom);ghost?.scale.setScalar(1/view.camera.zoom);renderer.render(view.scene,view.camera);}};
+  const draw = () => {
+    if(!renderer || !view)return;
+    marker?.scale.setScalar(1/view.camera.zoom);ghost?.scale.setScalar(1/view.camera.zoom);
+    renderer.render(view.scene,view.camera);
+    const inverse=view.camera.quaternion.clone().invert();
+    setAxisDirections([[1,0,0],[0,1,0],[0,0,1]].map(axis=>{
+      const v=new THREE.Vector3().fromArray(axis).transformDirection(view.model.matrixWorld).applyQuaternion(inverse);
+      return {x:44+v.x*27,y:44-v.y*27};
+    }));
+    const anchor=ghost?.visible ? ghost : marker?.visible ? marker : null;
+    if(anchor){
+      const point=anchor.getWorldPosition(new THREE.Vector3()).project(view.camera);
+      setAnnotation(point.z>=-1 && point.z<=1 && Math.abs(point.x)<=1 && Math.abs(point.y)<=1 ? {
+        x:Math.max(8,Math.min(container.clientWidth-100,(point.x+1)*container.clientWidth/2+14)),
+        y:Math.max(8,Math.min(container.clientHeight-26,(1-point.y)*container.clientHeight/2+14)),
+        hover:!!ghost?.visible
+      } : null);
+    }else setAnnotation(null);
+  };
   const updateMarker = () => {
     if(!view || !props.editBasePoint)return;
     if(!marker){
@@ -65,11 +97,9 @@ export function GeometryPreview(props) {
       cross.renderOrder=1000;
       const dot=new THREE.Mesh(new THREE.SphereGeometry(radius*0.16,12,8),new THREE.MeshBasicMaterial({color:0xffcc55,depthTest:false,depthWrite:false}));
       dot.renderOrder=1001;marker.add(cross,dot);
-      for(const [axis,color] of [[new THREE.Vector3(1,0,0),0xff6666],[new THREE.Vector3(0,1,0),0x66dd88],[new THREE.Vector3(0,0,1),0x66aaff]]){
-        const arrow=new THREE.ArrowHelper(axis,new THREE.Vector3(),radius*3,color,radius*.6,radius*.35);
-        for(const object of [arrow.line,arrow.cone]){object.material.depthTest=false;object.material.depthWrite=false;object.renderOrder=1002;}marker.add(arrow);
-      }
-      ghost=new THREE.Mesh(new THREE.SphereGeometry(radius*.22,12,8),new THREE.MeshBasicMaterial({color:0xffcc55,depthTest:false,depthWrite:false}));ghost.visible=false;ghost.renderOrder=1003;view.model.add(marker,ghost);
+      marker.add(directionMarker(radius*2.3));
+      ghost=directionMarker(radius*2.3);ghost.visible=false;
+      view.model.add(marker,ghost);
     }
     const point=props.basePoint;
     marker.visible=Array.isArray(point) && point.length===3 && point.every(Number.isFinite);
@@ -96,17 +126,18 @@ export function GeometryPreview(props) {
   };
   const hoverPoint = event => {
     const hit=pointerHit(event);setSnapLabel(hit?.type || '');
-    if(ghost){ghost.visible=!!hit;if(hit)ghost.position.fromArray(hit.point);draw();}
+    if(ghost){ghost.visible=!!hit;if(hit){ghost.position.fromArray(hit.point);ghost.quaternion.fromArray(alignNormal() && hit.normal ? normalOrientation(hit.normal.toArray()) : (props.orientation || [0,0,0,1]));}draw();}
   };
   const pickPoint = event => {
-    if(event.button!==0)return;
+    if(event.button!==0 || event.buttons & 2)return;
     const hit=pointerHit(event);
-    if(hit){props.onBasePointChange?.(hit.point);if(alignNormal() && hit.normal)props.onOrientationChange?.(normalOrientation(hit.normal.toArray()));setPicking(false);if(ghost)ghost.visible=false;draw();}
+    if(hit){props.onBasePointChange?.(hit.point);if(alignNormal() && hit.normal)props.onOrientationChange?.(normalOrientation(hit.normal.toArray()));setPicking(false);setSnapLabel('');if(ghost)ghost.visible=false;draw();}
   };
   const angles = ()=>new THREE.Euler().setFromQuaternion(new THREE.Quaternion().fromArray(props.orientation || [0,0,0,1]).normalize(),'XYZ').toArray().slice(0,3).map(THREE.MathUtils.radToDeg);
   const inputAngle=(axis,event)=>{
     if(!event.currentTarget.validity.valid || event.currentTarget.value==='')return;
-    const values=angles();values[axis]=Number(event.currentTarget.value);
+    const value=Number(event.currentTarget.value);if(!Number.isFinite(value))return;
+    const values=angles();values[axis]=value;
     props.onOrientationChange?.(new THREE.Quaternion().setFromEuler(new THREE.Euler(...values.map(THREE.MathUtils.degToRad),'XYZ')).toArray());
   };
   const preset = mode => {const point=presetBasePoint(bounds(),mode);if(point){props.onBasePointChange?.(point);setPicking(false);}};
@@ -157,18 +188,19 @@ export function GeometryPreview(props) {
     }).catch(e=>{if(current===revision)setError(e.message);}).finally(()=>{if(current===revision)setLoading(false);});
   });
   onCleanup(()=>{revision++;window.removeEventListener('pointermove',rotateHeld,true);resize?.disconnect();destroy();renderer?.dispose();renderer?.forceContextLoss();});
-  return <><div class="geometry-viewer" title={props.heldOrigin ? t("按住右键移动旋转，松开恢复") : t("右键拖动旋转 · 滚轮缩放")}><div class="geometry-canvas" classList={{'base-point-picking':picking()}} ref={container} onClick={pickPoint} onPointerMove={hoverPoint} onPointerLeave={()=>{if(ghost){ghost.visible=false;draw();}setSnapLabel('');}}/><Show when={picking()}><span class="base-point-pick-status">{snapLabel()?t(snapLabel()):t("点击表面或曲线设置基点")}</span></Show><Show when={loading()}><p class="geometry-message">{t("正在生成几何预览…")}</p></Show><Show when={error()}><p class="geometry-message geometry-error" role="status">{error()}</p></Show></div>
+  return <><div class="geometry-viewer" title={props.heldOrigin ? t("按住右键移动旋转，松开恢复") : t("右键拖动旋转 · 滚轮缩放")}><div class="geometry-canvas" classList={{'base-point-picking':picking()}} ref={container} onClick={pickPoint} onPointerMove={hoverPoint} onPointerLeave={()=>{if(ghost){ghost.visible=false;draw();}setSnapLabel('');}}/><svg class="preview-direction-axes" viewBox="0 0 88 88" role="img" aria-label={t("方向：红 X / 绿 Y / 蓝 Z")}><circle cx="44" cy="44" r="3" fill="#ddd"/>{axisDirections().map((axis,i)=><g stroke={['#ff6666','#66dd88','#669fff'][i]}><line x1="44" y1="44" x2={axis.x} y2={axis.y}/><text x={axis.x} y={axis.y-5} fill={['#ff6666','#66dd88','#669fff'][i]} stroke="none" text-anchor="middle">{['X','Y','Z'][i]}</text></g>)}</svg><Show when={annotation()}>{label=><span class="preview-point-annotation" style={{left:`${label().x}px`,top:`${label().y}px`}}>{label().hover ? t(snapLabel() || '表面') : t('基点')} · Z</span>}</Show><Show when={picking()}><span class="base-point-pick-status">{snapLabel()?t(snapLabel()):t("点击表面或曲线设置基点")}</span></Show><Show when={loading()}><p class="geometry-message">{t("正在生成几何预览…")}</p></Show><Show when={error()}><p class="geometry-message geometry-error" role="status">{error()}</p></Show></div>
     <Show when={props.editBasePoint}><fieldset class="preview-base-point" disabled={props.disabled || !props.basePoint}>
       <legend>{t("组件基点")}<span class="help-tip" tabindex="0" data-tip={t("黄色十字表示基点。修改后点击保存修改；坐标使用模型原生单位。表面拾取基于预览网格。")}>?</span></legend>
-      <Show when={!props.fullscreen}><button type="button" class="secondary base-point-expand" disabled={!bounds()} onClick={openExpanded}>{t("放大编辑基点")}</button></Show><div class="base-point-presets"><button type="button" class="secondary" classList={{active:picking()}} disabled={!bounds()} onClick={()=>setPicking(!picking())}>{picking()?t("取消拾取"):t("预览拾取")}</button><button type="button" class="secondary" onClick={()=>preset('world')}>{t("世界原点")}</button><button type="button" class="secondary" disabled={!bounds()} onClick={()=>preset('center')}>{t("模型中心")}</button><button type="button" class="secondary" disabled={!bounds()} onClick={()=>preset('bottom')}>{t("底部中心")}</button></div>
+      <Show when={!props.fullscreen}><button type="button" class="secondary base-point-expand" disabled={!bounds()} onClick={openExpanded}>{t("放大编辑基点")}</button></Show><div class="base-point-presets"><button type="button" class="secondary" classList={{active:picking()}} disabled={!bounds()} onClick={()=>props.fullscreen ? setPicking(!picking()) : openExpanded()}>{picking()?t("取消拾取"):t("预览拾取")}</button><button type="button" class="secondary" onClick={()=>preset('world')}>{t("世界原点")}</button><button type="button" class="secondary" disabled={!bounds()} onClick={()=>preset('center')}>{t("模型中心")}</button><button type="button" class="secondary" disabled={!bounds()} onClick={()=>preset('bottom')}>{t("底部中心")}</button></div>
       <div class="base-point-coordinates">{['X','Y','Z'].map((axis,i)=><label>{axis}<input type="number" step="any" min="-1e12" max="1e12" aria-label={t("基点坐标 ")+axis} value={props.basePoint?.[i] ?? ''} onInput={event=>inputCoordinate(i,event)}/></label>)}</div>
       <div class="base-point-options"><label><input type="checkbox" checked={snapping()} onChange={e=>setSnapping(e.currentTarget.checked)}/>{t("吸附端点 / 边中点")}</label><label><input type="checkbox" checked={alignNormal()} onChange={e=>setAlignNormal(e.currentTarget.checked)}/>{t("按面法线定向")}</label></div>
       <div class="base-point-coordinates">{['X','Y','Z'].map((axis,i)=><label>{axis}°<input type="number" step="1" aria-label={t("基点旋转 ")+axis} value={Number(angles()[i].toFixed(3))} onInput={event=>inputAngle(i,event)}/></label>)}</div>
+      <div class="base-point-flips">{['X','Y','Z'].map((axis,i)=><button type="button" class="secondary" onClick={()=>props.onOrientationChange?.(rotateBaseOrientation(props.orientation,i,180))}>{t('绕 {axis} 反转 180°',{axis})}</button>)}</div>
       <button type="button" class="secondary" onClick={()=>props.onOrientationChange?.([0,0,0,1])}>{t("重置方向")}</button>
     </fieldset></Show>
-    <Show when={expanded()}><Portal><div class="base-point-fullscreen component-first" role="dialog" aria-modal="true" aria-label={t("基点编辑器")} onClick={e=>e.stopPropagation()} onContextMenu={e=>e.preventDefault()}>
+    <Show when={expanded()}><Portal><div class="base-point-editor-backdrop" onClick={e=>e.stopPropagation()}><div class="base-point-fullscreen component-first" ref={editor} role="dialog" aria-modal="true" aria-label={t("基点编辑器")} onClick={e=>e.stopPropagation()} onContextMenu={e=>e.preventDefault()}>
       <header><strong>{t("基点编辑器")}</strong><span>{t("右键拖动旋转 · 滚轮缩放")} · {t("方向：红 X / 绿 Y / 蓝 Z")}</span><button type="button" class="secondary" onClick={closeExpanded}>{t("取消")}</button></header>
       <GeometryPreview asset={props.asset} load={props.load} fullscreen editBasePoint basePoint={draftPoint()} orientation={draftOrientation()} onBasePointChange={setDraftPoint} onOrientationChange={setDraftOrientation} disabled={props.disabled}/>
       <footer><span>{t("确认后仍需保存修改")}</span><button type="button" class="secondary" onClick={closeExpanded}>{t("取消")}</button><button type="button" disabled={props.disabled} onClick={()=>{props.onBasePointChange?.(draftPoint());props.onOrientationChange?.(draftOrientation());closeExpanded();}}>{t("确认基点")}</button></footer>
-    </div></Portal></Show></>;
+    </div></div></Portal></Show></>;
 }

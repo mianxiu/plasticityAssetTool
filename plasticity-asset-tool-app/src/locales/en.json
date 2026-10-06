@@ -323,5 +323,7 @@
   "基点编辑器": "Base point editor",
   "方向：红 X / 绿 Y / 蓝 Z": "Axes: red X / green Y / blue Z",
   "确认后仍需保存修改": "Save changes after confirming",
-  "确认基点": "Confirm base point"
+  "确认基点": "Confirm base point",
+  "基点": "Base point",
+  "绕 {axis} 反转 180°": "Flip around {axis} 180°"
 }
