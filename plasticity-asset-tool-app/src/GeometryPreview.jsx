@@ -4,7 +4,7 @@ import {Portal} from 'solid-js/web';
 import {snapCandidates,closestSnap,normalOrientation} from './previewSnapping.mjs';
 import * as THREE from 'three';
 import {sceneFor} from './geometryScene.mjs';
-import {directionMarker, rotateBaseOrientation} from './previewOrientation.mjs';
+import {directionMarker, basePointMarker, rotateBaseOrientation} from './previewOrientation.mjs';
 import {meshBounds, presetBasePoint} from './previewBasePoint.mjs';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
@@ -87,17 +87,10 @@ export function GeometryPreview(props) {
     }else setAnnotation(null);
   };
   const updateMarker = () => {
-    if(!view || !props.editBasePoint)return;
+    if(!view)return;
     if(!marker){
-      marker=new THREE.Group();
       const radius=view.radius*0.045;
-      const geometry=new THREE.BufferGeometry();
-      geometry.setAttribute('position',new THREE.Float32BufferAttribute([-radius,0,0,radius,0,0,0,-radius,0,0,radius,0,0,0,-radius,0,0,radius],3));
-      const cross=new THREE.LineSegments(geometry,new THREE.LineBasicMaterial({color:0xffcc55,depthTest:false,depthWrite:false}));
-      cross.renderOrder=1000;
-      const dot=new THREE.Mesh(new THREE.SphereGeometry(radius*0.16,12,8),new THREE.MeshBasicMaterial({color:0xffcc55,depthTest:false,depthWrite:false}));
-      dot.renderOrder=1001;marker.add(cross,dot);
-      marker.add(directionMarker(radius*2.3));
+      marker=basePointMarker(radius);
       ghost=directionMarker(radius*2.3);ghost.visible=false;
       view.model.add(marker,ghost);
     }

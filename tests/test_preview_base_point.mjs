@@ -34,7 +34,7 @@ const orientation=new THREE.Quaternion().fromArray(normalOrientation([1,0,0]));
 assert.ok(new THREE.Vector3(0,0,1).applyQuaternion(orientation).distanceTo(new THREE.Vector3(1,0,0))<1e-8);
 console.log('Snapping: endpoints, arc midpoint, screen threshold, depth rejection and native Z orientation verified');
 
-const {rotateBaseOrientation,directionMarker}=await import('../plasticity-asset-tool-app/src/previewOrientation.mjs');
+const {rotateBaseOrientation,directionMarker,basePointMarker}=await import('../plasticity-asset-tool-app/src/previewOrientation.mjs');
 const originalOrientation=normalOrientation([1,2,3]);
 for(const axis of [0,1,2]) {
   const flipped=new THREE.Quaternion().fromArray(rotateBaseOrientation(originalOrientation,axis,180));
@@ -46,7 +46,19 @@ for(const axis of [0,1,2]) {
 }
 const gizmo=directionMarker(2);
 assert.equal(gizmo.children.length,4);
-assert.equal(gizmo.children[0].geometry.attributes.position.count,65);
-gizmo.traverse(object=>{if(object.material)assert.equal(object.material.depthTest,false);});
+assert.equal(gizmo.children[0].children[1].geometry.type,'TorusGeometry');
+for(const [index,axis] of [[1,[1,0,0]],[2,[0,1,0]],[3,[0,0,1]]]) {
+  const arrow=gizmo.children[index];
+  assert.ok(new THREE.Vector3(0,1,0).applyQuaternion(arrow.quaternion).distanceTo(new THREE.Vector3(...axis))<1e-8);
+  const [outline,shaft]=arrow.children[0].children;
+  assert.equal(shaft.geometry.type,'CylinderGeometry');
+  assert.ok(outline.geometry.parameters.radiusTop>shaft.geometry.parameters.radiusTop);
+  assert.ok(outline.renderOrder<shaft.renderOrder);
+  assert.equal(arrow.children[2].geometry.type,'ConeGeometry');
+}
+gizmo.traverse(object=>{if(object.material){assert.equal(object.material.depthTest,false);assert.equal(object.material.depthWrite,false);}});
 gizmo.traverse(object=>{object.geometry?.dispose();object.material?.dispose();});
-console.log('Direction ring and local-axis flips verified for a tilted base frame');
+const baseMarker=basePointMarker(1);
+assert.equal(baseMarker.children.length,6);
+baseMarker.traverse(object=>{if(object.material)assert.equal(object.material.depthTest,false);object.geometry?.dispose();object.material?.dispose();});
+console.log('Outlined mesh arrows, base cross and local-axis flips verified for a tilted base frame');
