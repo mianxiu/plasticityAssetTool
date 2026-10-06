@@ -328,5 +328,7 @@
   "绕 {axis} 反转 180°": "Flip around {axis} 180°",
   "概览": "Overview",
   "偏好设置": "Preferences",
-  "编辑基点": "Edit base point"
+  "编辑基点": "Edit base point",
+  "面中心": "Face center",
+  "吸附端点 / 边中点 / 面中心": "Snap endpoints / edge midpoints / face centers"
 }
