@@ -510,10 +510,9 @@ export function Home() {
   function ThumbnailPicker() {
     const preview=()=>form().preview || (dialog()!=='capture' && form().preview===undefined && selected()?.has_preview ? previewUrl(selected()) : '');
     return <div class="thumbnail-picker-controls">
-      <label class="thumbnail-picker" title={t("选择缩略图；超过 512×512 自动缩小")}>
+      <label class="thumbnail-picker" aria-busy={previewReading()} title={previewReading()?t("正在处理图片…"):t("选择缩略图；超过 512×512 自动缩小")}>
         <input type="file" accept="image/jpeg,image/png,image/webp" aria-label={t("选择缩略图")} disabled={busy() || previewReading()} onChange={readPreview}/>
         <Show when={preview()} fallback={<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8" cy="8" r="1.5"/><path d="m4 18 6-7 4 4 3-3 4 6"/></svg>}><img src={preview()} alt={t("组件预览")}/></Show>
-        <span>{previewReading()?t("正在处理图片…"):t("缩略图")}</span>
       </label>
       <Show when={preview()}><button type="button" class="thumbnail-remove" aria-label={t("移除预览图")} title={t("移除预览图")} disabled={busy() || previewReading()} onClick={()=>setField('preview','')}>×</button></Show>
     </div>;
