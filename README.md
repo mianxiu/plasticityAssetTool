@@ -2,7 +2,7 @@
   <img src="docs/images/app-icon.png" width="80" height="80" alt="plasticity asset tool 图标" />
 </p>
 
-<h1 align="center">plasticity asset tool</h1>
+<h1 align="center">Plasticity Asset Tool</h1>
 
 <p align="center">把常用模型变成组件，在 Plasticity 内浏览、保存与置入。</p>
 
