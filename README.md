@@ -25,9 +25,7 @@ Plasticity 本地模型组件库：把常用实体、曲线和组合模型保存
 
 ## 操作演示
 
-[![Plasticity Asset Tool 操作演示](docs/media/plasticity-asset-tool-demo.gif)](https://github.com/mianxiu/plasticityassettool/blob/main/docs/media/plasticity-asset-tool-demo.mp4)
-
-[查看完整视频](https://github.com/mianxiu/plasticityassettool/blob/main/docs/media/plasticity-asset-tool-demo.mp4)
+![Plasticity Asset Tool 操作演示](docs/media/plasticity-asset-tool-demo.gif)
 
 ## 开始使用
 

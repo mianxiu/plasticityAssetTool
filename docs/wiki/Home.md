@@ -16,7 +16,7 @@ Windows 上的 Plasticity 本地模型组件库。当前实机验证版本为 **
 
 ## 演示与项目资料
 
-- [操作演示视频](https://github.com/mianxiu/plasticityassettool/blob/main/docs/media/plasticity-asset-tool-demo.mp4)
+- [操作演示动画](https://github.com/mianxiu/plasticityassettool#操作演示)
 - [许可证说明](../Licensing.md)
 - [第三方声明与使用风险](../../DISCLAIMER.md)
 - [项目源码](https://github.com/mianxiu/plasticityassettool)
