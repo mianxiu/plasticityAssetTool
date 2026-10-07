@@ -77,6 +77,34 @@ class NativeTransportTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaisesRegex(ValueError,'未连接'):
             await self.transport.request('hwnd:999','capture')
 
+    async def test_capture_format_diagnostic_reaches_caller_without_model_contents(self):
+        model = model_bytes('PRIVATE_MODEL_NAME', source='PRIVATE_DOCUMENT_NAME')
+        cases = [(model.replace(b'[]', b'xx', 1), '选择信息'),
+                 (model.replace(b'PS\0\0\0', b'XX\0\0\0', 1), '几何数据'),
+                 (model + b'PRIVATE_TRAILING_DATA', '尾部数据')]
+        for data, stage in cases:
+            pending = asyncio.create_task(self.transport.request(self.target, 'capture'))
+            await asyncio.sleep(0)
+            job = self.transport.worker(self.target, self.token)
+            self.transport.worker(self.target, self.token, {
+                'id': job['id'], 'value': {'model': base64.b64encode(data).decode()}})
+            with self.assertRaises(ValueError) as caught:
+                await pending
+            message = str(caught.exception)
+            self.assertIn(stage, message)
+            self.assertIn('偏移', message)
+            self.assertIn(f'共 {len(data)} 字节', message)
+            self.assertNotIn('PRIVATE', message)
+            self.assertNotIn(base64.b64encode(data).decode(), message)
+
+    async def test_capture_encoding_error_is_distinct_from_model_format(self):
+        pending = asyncio.create_task(self.transport.request(self.target, 'capture'))
+        await asyncio.sleep(0)
+        job = self.transport.worker(self.target, self.token)
+        self.transport.worker(self.target, self.token, {'id': job['id'], 'value': {'model': '!invalid'}})
+        with self.assertRaisesRegex(ValueError, '传输编码错误'):
+            await pending
+
     async def test_bad_model_never_queued_and_wrong_token_rejected(self):
         with self.assertRaises(ValueError):await self.transport.request(self.target,'insert',b'bad')
         self.assertFalse(self.transport.jobs)

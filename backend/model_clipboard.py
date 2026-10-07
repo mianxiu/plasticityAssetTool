@@ -15,6 +15,13 @@ from collections import OrderedDict
 MAX_BYTES = 64 * 1024 * 1024
 
 
+class ModelFormatError(ValueError):
+    """Framing diagnostics contain offsets only, never model contents."""
+    def __init__(self, stage, offset, size):
+        self.diagnostic = f'{stage}，偏移 {offset}，共 {size} 字节'
+        super().__init__(f'数据不是完整的 Plasticity 模型（{self.diagnostic}），已阻止置入')
+
+
 def model_base_point(data):
     validate_model(data)
     return list(struct.unpack_from('<3d', data))
@@ -43,12 +50,15 @@ def with_base_point(data, point, orientation=None):
 
 
 def _parse_model(data):
+    offset = 0
+    stage = '数据长度'
     def invalid():
-        return ValueError("数据不是完整的 Plasticity 模型，已阻止置入。请在 Plasticity 中重新复制模型")
+        return ModelFormatError(stage, offset, len(data) if isinstance(data, bytes) else 0)
 
     if not isinstance(data, bytes) or not 68 <= len(data) <= MAX_BYTES:
         raise invalid()
     offset = 56
+    stage = '定位头'
 
     def integer():
         nonlocal offset
@@ -75,25 +85,31 @@ def _parse_model(data):
 
     if not all(math.isfinite(value) for value in struct.unpack_from("<7d", data)):
         raise invalid()
+    stage = '文档标识'
     try:
         block().decode("utf-8")  # Optional source document identifier.
     except UnicodeError as exc:
         raise invalid() from exc
+    stage = '选择信息'
     if not isinstance(json_block(), (list, dict)):
         raise invalid()
+    stage = '对象数量'
     count = integer()
     if not 0 < count <= (len(data) - offset) // 8:
         raise invalid()
     bodies = []
     for _ in range(count):
+        stage = '几何数据'
         geometry = block()
         if not geometry.startswith(b"PS\x00\x00\x003: TRANSMIT FILE"):
             raise invalid()
+        stage = '对象元数据'
         metadata = json_block()
         if not isinstance(metadata, dict):
             raise invalid()
         bodies.append((geometry, metadata))
     # Win32 allocations may contain null padding; no other trailing payload.
+    stage = '尾部数据'
     if any(data[offset:]):
         raise invalid()
     return bodies

@@ -4,7 +4,7 @@ import base64
 import binascii
 import time
 import uuid
-from .model_clipboard import validate_model, encoded_model, MAX_BYTES
+from .model_clipboard import validate_model, encoded_model, MAX_BYTES, ModelFormatError
 from .group_recipe import validate_recipe
 
 
@@ -55,11 +55,13 @@ class NativeTransport:
                     if job['action'] in ('capture','capture-group','rebase'):
                         encoded=value.get('model') if isinstance(value,dict) else None
                         if not isinstance(encoded,str) or len(encoded)>MAX_BYTES*4//3+4:
-                            raise ValueError('原生模型数据无效')
+                            raise ValueError('原生模型数据无效（未收到模型编码或超过 64 MB）')
                         try:
                             model=validate_model(base64.b64decode(encoded,validate=True))
+                        except ModelFormatError as exc:
+                            raise ValueError(f'原生模型数据无效（{exc.diagnostic}）。当前版本的模型格式可能不兼容，请反馈此提示及 Plasticity 版本号') from exc
                         except (binascii.Error,ValueError) as exc:
-                            raise ValueError('原生模型数据无效') from exc
+                            raise ValueError('原生模型数据无效（传输编码错误）') from exc
                         if job['action'] == 'capture' and job.get('with_metadata'):
                             kind = value.get('kind', 'unknown')
                             if kind not in ('solid', 'curve', 'mixed', 'unknown'):
