@@ -61,7 +61,7 @@ def build(python_runtime, dependencies):
         f'plasticity asset tool v{APP_VERSION}\n'
         '解压整个目录，双击 plasticityassettool.exe。无需另外安装 Python 或 Node.js。\n'
         '后台由托盘控制退出；重复打开复用已有实例。\n'
-        '在后台控制中心的“插件安装”检测 Plasticity 版本和目录，选择安装或更新内嵌插件。\n'
+        '在后台控制中心的“更新与安装”查看下一步操作，选择安装、更新或重新安装内嵌插件。\n'
         '安装前自行保存并关闭对应 Plasticity 窗口，再在安装窗口确认 Windows 权限请求。\n'
         '用户组件保存在 library/，运行日志及插件恢复备份保存在 .runtime/。\n'
         '更新前请保留这两个目录。EXE 必须与整个发布目录一起使用。\n'
