@@ -2,7 +2,7 @@ function startNativeWorker(win, baseURL, target) {
   const http = require('http');
   let token = require('crypto').randomUUID(), group = 'pat-native-'+token, generation=0;
   const debuggerAPI = win.webContents.debugger;
-  let editor, paste, copyWithPlacement, cancellation, operationType, booleanFactory, stopped=false, timer, result=null;
+  let editor, paste, copyWithPlacement, cancellation, operationType, booleanFactory, vector3, quaternion, stopped=false, timer, result=null;
   const call = (method,params) => debuggerAPI.sendCommand(method,params);
   async function discover() {
     if (!debuggerAPI.isAttached()) debuggerAPI.attach('1.3');
@@ -22,6 +22,8 @@ function startNativeWorker(win, baseURL, target) {
         if (value.name==='PasteCommand' && value.value?.objectId) paste=value.value.objectId;
         if (value.name==='OperationType' && value.value?.objectId) operationType=value.value.objectId;
         if (value.name==='BooleanFactory' && value.value?.objectId) booleanFactory=value.value.objectId;
+        if (value.name==='Vector3' && value.value?.objectId) vector3=value.value.objectId;
+        if (value.name==='Quaternion' && value.value?.objectId) quaternion=value.value.objectId;
       }
     }
     if (!editor || !paste) {editor=null;throw new Error('当前版本不支持原生模型传输');}
@@ -44,20 +46,21 @@ function startNativeWorker(win, baseURL, target) {
     try {
       if (!editor) await discover();
       if(!isCurrent()) throw new Error('原生窗口上下文已更换');
-      const response=await send({target_id:target,token,result,wait_ms:2000,capabilities:['boolean-placement-v1','group-recipe-v1','selection-kind-v1',...(copyWithPlacement ? ['base-point-v1'] : []),...(copyWithPlacement && cancellation ? ['asset-base-point-v1'] : [])]});
+      const response=await send({target_id:target,token,result,wait_ms:2000,capabilities:[...(vector3 && quaternion ? ['encoding-probe-v1'] : []),'boolean-placement-v1','group-recipe-v1','selection-kind-v1',...(copyWithPlacement ? ['base-point-v1'] : []),...(copyWithPlacement && cancellation ? ['asset-base-point-v1'] : [])]});
       if(!isCurrent()) throw new Error('原生窗口上下文已更换');
       result=null;
       delay=response.wait_supported ? 10 : 750;
       if (response.job) {
         const job=response.job;
-        if (!/^[a-f0-9]{32}$/.test(job.id) || !['capture','insert','inspect-group','capture-group','rebase'].includes(job.action)) throw new Error('无效模型任务');
+        if (!/^[a-f0-9]{32}$/.test(job.id) || !['capture','insert','inspect-group','capture-group','rebase','inspect-encoding'].includes(job.action)) throw new Error('无效模型任务');
         try {
           // Scope references can expire after a native command/frame lifecycle.
           // Discover afresh before execution; never retry an executed command.
-          editor=null;paste=null;copyWithPlacement=null;cancellation=null;operationType=null;booleanFactory=null;
+          editor=null;paste=null;copyWithPlacement=null;cancellation=null;operationType=null;booleanFactory=null;vector3=null;quaternion=null;
           await discover();
           if(!isCurrent()) throw new Error('原生窗口上下文已更换');
           const declarations={
+            'inspect-encoding':'function(V,Q){return globalThis.__plasticityAssetTransport.inspectEncoding(this,V,Q)}',
             rebase:'function(args,CopyCommand,PasteCommand,Cancel){return globalThis.__plasticityAssetTransport.rebaseModel(this,args,CopyCommand,PasteCommand,Cancel)}',
             capture:'function(pick,CopyCommand){return pick ? globalThis.__plasticityAssetTransport.captureWithBasePoint(this,CopyCommand) : globalThis.__plasticityAssetTransport.captureSelection(this)}',
             'inspect-group':'function(){return globalThis.__plasticityAssetTransport.inspectGroup(this)}',
@@ -65,7 +68,7 @@ function startNativeWorker(win, baseURL, target) {
             insert:'function(args,PasteCommand,OperationType,BooleanFactory){return globalThis.__plasticityAssetTransport.insertModel(this,args,PasteCommand,OperationType,BooleanFactory)}'
           };
           const declaration=declarations[job.action];
-          const args=job.action==='rebase'?[{value:{model:job.model,base_mode:job.base_mode}},copyWithPlacement?{objectId:copyWithPlacement}:{value:null},{objectId:paste},cancellation?{objectId:cancellation}:{value:null}]:job.action==='insert'?[{value:{model:job.model,placement:job.placement,insert_mode:job.insert_mode,recipe:job.recipe}},{objectId:paste},operationType?{objectId:operationType}:{value:null},booleanFactory?{objectId:booleanFactory}:{value:null}]:job.action==='capture-group'?[{value:job.signature},{value:job.base_mode==='pick'},copyWithPlacement?{objectId:copyWithPlacement}:{value:null}]:job.action==='capture'?[{value:job.base_mode==='pick'},copyWithPlacement?{objectId:copyWithPlacement}:{value:null}]:[];
+          const args=job.action==='inspect-encoding'?[vector3?{objectId:vector3}:{value:null},quaternion?{objectId:quaternion}:{value:null}]:job.action==='rebase'?[{value:{model:job.model,base_mode:job.base_mode}},copyWithPlacement?{objectId:copyWithPlacement}:{value:null},{objectId:paste},cancellation?{objectId:cancellation}:{value:null}]:job.action==='insert'?[{value:{model:job.model,placement:job.placement,insert_mode:job.insert_mode,recipe:job.recipe}},{objectId:paste},operationType?{objectId:operationType}:{value:null},booleanFactory?{objectId:booleanFactory}:{value:null}]:job.action==='capture-group'?[{value:job.signature},{value:job.base_mode==='pick'},copyWithPlacement?{objectId:copyWithPlacement}:{value:null}]:job.action==='capture'?[{value:job.base_mode==='pick'},copyWithPlacement?{objectId:copyWithPlacement}:{value:null}]:[];
           if (job.action==='insert' || job.action==='rebase' || job.base_mode==='pick') {
             win.show();win.focus();
             await win.webContents.executeJavaScript('(()=>{window.__plasticityAssetToolPanel?.hide();return true})()');
@@ -89,7 +92,7 @@ function startNativeWorker(win, baseURL, target) {
     const oldGroup=group;
     generation++;
     token=require('crypto').randomUUID();group='pat-native-'+token;
-    editor=null;paste=null;copyWithPlacement=null;cancellation=null;operationType=null;booleanFactory=null;result=null;
+    editor=null;paste=null;copyWithPlacement=null;cancellation=null;operationType=null;booleanFactory=null;vector3=null;quaternion=null;result=null;
     if(debuggerAPI.isAttached()) call('Runtime.releaseObjectGroup',{objectGroup:oldGroup}).catch(()=>{});
   };
   win.webContents.on('destroyed',()=>{stopped=true;clearTimeout(timer);});

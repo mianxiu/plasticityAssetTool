@@ -41,6 +41,15 @@ class FakeDesktop:
             self.number += 1
 
 class ServiceTests(unittest.IsolatedAsyncioTestCase):
+    async def test_encoding_probe_registers_source_window_version_without_clipboard(self):
+        from test_native_layout import report
+        self.service.native.request=AsyncMock(return_value=report())
+        result=await self.call('target.inspect_encoding',{'target_id':'hwnd:42'})
+        self.assertTrue(result['verified'])
+        self.assertEqual(result['source_version'],'26.1.3')
+        self.service.native.request.assert_awaited_once_with('hwnd:42','inspect-encoding')
+        self.assertEqual(self.desktop.calls,[])
+
     async def test_kernel_snap_request_and_paused_cache_rules(self):
         enriched = {'parts':[{'kernel_snaps':[0,0,0,0]}]}
         self.service.geometry.generate = AsyncMock(return_value=enriched)

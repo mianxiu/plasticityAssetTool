@@ -35,6 +35,18 @@ class NativeTransportTests(unittest.IsolatedAsyncioTestCase):
             self.transport.worker(self.target,self.token,{'id':job['id'],'value':value})
             self.assertEqual(await pending,{'model':model,'kind':expected})
 
+    async def test_encoding_probe_requires_capability_and_validates_receipt(self):
+        from test_native_layout import report
+        with self.assertRaisesRegex(ValueError,'更新内嵌插件'):
+            await self.transport.request(self.target,'inspect-encoding')
+        caps=['encoding-probe-v1']
+        self.transport.worker(self.target,self.token,capabilities=caps)
+        pending=asyncio.create_task(self.transport.request(self.target,'inspect-encoding'))
+        await asyncio.sleep(0)
+        job=self.transport.worker(self.target,self.token,capabilities=caps)
+        self.transport.worker(self.target,self.token,{'id':job['id'],'value':report()},capabilities=caps)
+        self.assertEqual(await pending,report())
+
     async def test_group_capture_and_inspection_keep_metadata_window_bound(self):
         self.transport.worker(self.target,self.token,capabilities=['group-recipe-v1'])
         for action,payload,expected in [

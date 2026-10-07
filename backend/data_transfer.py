@@ -26,9 +26,14 @@ def fingerprint(db):
     return hashlib.sha256(json.dumps(data, ensure_ascii=False).encode()).hexdigest()
 
 
-def insert_asset(db, row):
+def insert_asset(db, row, source=None):
     db.execute('INSERT OR REPLACE INTO assets (' + ','.join(ASSET_COLUMNS) + ') VALUES (' + ','.join('?' for _ in ASSET_COLUMNS) + ')',
                [row[column] for column in ASSET_COLUMNS])
+    if source is not None:
+        with source.connect() as stage:
+            calibration = stage.execute('SELECT report FROM native_model_layouts WHERE digest=?', (row['digest'],)).fetchone()
+        if calibration:
+            db.execute('INSERT OR REPLACE INTO native_model_layouts VALUES (?,?)', (row['digest'],calibration[0]))
 
 
 class DataTransfer:
@@ -250,14 +255,14 @@ class DataTransfer:
                         shutil.copyfileobj(output,file)
                 finally:
                     output.close()
-                for table in ('assets','geometry_cache','folders','libraries'):
+                for table in ('assets','geometry_cache','folders','libraries','native_formats','native_model_layouts'):
                     db.execute('DELETE FROM '+table)
                 with plan['stage'].connect() as stage:
                     for table,columns in [('libraries','id,name,created_at'),('folders','id,library_id,parent_id,name,created_at')]:
                         for row in stage.execute('SELECT '+columns+' FROM '+table):
                             db.execute('INSERT INTO '+table+' VALUES ('+','.join('?' for _ in row)+')',tuple(row))
                 for item in plan['items']:
-                    insert_asset(db,dict(plan['stage'].get(item['stage_id'])) | item['row'])
+                    insert_asset(db,dict(plan['stage'].get(item['stage_id'])) | item['row'],plan['stage'])
                 counts={'imported':len(plan['items']),'skipped':0,'overwritten':0}
             else:
                 counts={'imported':0,'skipped':0,'overwritten':0}
@@ -285,6 +290,6 @@ class DataTransfer:
                             suffix=f' ({number})';row['name']=original[:120-len(suffix)]+suffix;number+=1
                         counts['imported']+=1
                     row['updated_at']=datetime.now(timezone.utc).isoformat()
-                    insert_asset(db,row)
+                    insert_asset(db,row,plan['stage'])
         self.discard(token)
         return counts | {'rollback_backup':str(rollback) if rollback else None}

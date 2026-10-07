@@ -228,3 +228,5 @@ plasticityAssetToolCache/
 recent_path.db
 readme.rst
 /旧版本/
+/tools/*.bin
+/tools/*.cl7

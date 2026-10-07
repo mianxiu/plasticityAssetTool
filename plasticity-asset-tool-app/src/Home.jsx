@@ -377,6 +377,17 @@ export function Home() {
     }
   }
 
+  async function inspectEncoding() {
+    const result = await operate('target.inspect_encoding',{target_id:targetId()});
+    if(!result)return;
+    const blob=new Blob([JSON.stringify(result,null,2)],{type:'application/json'});
+    const url=URL.createObjectURL(blob),link=document.createElement('a');
+    link.href=url;link.download='plasticity-model-format.json';link.click();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+    if(selected() && detailsOpen())await openEdit(selected());
+    showNotice(result.message,!result.verified);
+  }
+
   async function insert(asset, placement = true) {
     setSelectedId(asset.id);
     const result = await operate("asset.insert", { id: asset.id, target_id: embedded ? preferredTarget || targetId() : targetId(), follow_active:!embedded && followActive(), placement, transport:"native" });
@@ -411,7 +422,7 @@ export function Home() {
     try {
       const result = await client.request('library.base_point',{id:asset.id});
       if(revision===editRevision && detailsOpen() && selectedId()===asset.id)
-        setForm(current=>({...current,base_point:result.base_point,base_orientation:result.base_orientation,model_digest:result.digest}));
+        setForm(current=>({...current,base_point:result.base_point,base_orientation:result.base_orientation,model_digest:result.digest,requires_native_detection:result.requires_native_detection,orientation_editable:result.orientation_editable}));
     }catch(error){if(revision===editRevision)showNotice(error.message,true);}
   }
   async function save(event) {
@@ -422,8 +433,11 @@ export function Home() {
       showNotice("请先连接目标 Plasticity 窗口，再直接保存选中的模型", true);
       return;
     }
+    const fields = {...form()};
+    if(fields.base_point == null) delete fields.base_point;
+    if(fields.base_orientation == null || fields.orientation_editable === false) delete fields.base_orientation;
     const result = await operate(capturing ? "library.capture" : "library.update", {
-      ...form(), base_mode:capturing && copySelection() ? form().base_mode || "world" : "world", id: selectedId(), target_id: capturing && form().recipe ? form().capture_target || preferredTarget || targetId() : targetId(), copy_selection: copySelection(), auto_preview:autoPreview(), preview_mode:'geometry', transport:"native",
+      ...fields, base_mode:capturing && copySelection() ? form().base_mode || "world" : "world", id: selectedId(), target_id: capturing && form().recipe ? form().capture_target || preferredTarget || targetId() : targetId(), copy_selection: copySelection(), auto_preview:autoPreview(), preview_mode:'geometry', transport:"native",
       follow_active:!embedded && followActive() && !form().recipe,
     }, capturing ? "组件已保存，可重复置入" : "组件信息已更新");
     if (result) {
@@ -443,7 +457,7 @@ export function Home() {
   async function rebaseAsset(mode) {
     const result=await operate("library.rebase",{id:selectedId(),target_id:embedded ? preferredTarget || targetId() : targetId(),base_mode:mode},"组件基点已更新");
     if(embedded) hostChannel.send({type:"pat:show"});
-    if(result){setForm(current=>({...current,base_point:result.base_point,base_orientation:result.base_orientation,model_digest:result.digest}));await refresh();}
+    if(result){setForm(current=>({...current,base_point:result.base_point,base_orientation:result.base_orientation,model_digest:result.digest,requires_native_detection:result.requires_native_detection,orientation_editable:result.orientation_editable}));await refresh();}
   }
   const [previewReading,setPreviewReading]=createSignal(false);
   async function readPreview(event) {
@@ -528,7 +542,7 @@ export function Home() {
     return <form class="asset-edit-form" onSubmit={save}><label><input aria-label={t("组件名称")} title={t("组件名称")} required maxlength="120" autofocus placeholder={t("例如：六角螺栓 M8")} value={form().name} onInput={event => setField("name", event.currentTarget.value)}/></label>
       <div class="form-row"><label><input aria-label={t("分类")} title={t("分类")} maxlength="80" placeholder={t("未分类")} list="asset-categories" value={form().category} onInput={event => setField("category", event.currentTarget.value)}/></label><label><input aria-label={t("标签")} title={t("标签")} maxlength="300" placeholder={t("螺栓，紧固件")} value={form().tags} onInput={event => setField("tags", event.currentTarget.value)}/></label></div><datalist id="asset-categories"><For each={categories()}>{name => <option value={name}/>}</For></datalist>
       <div class="form-row"><label><select title={t("资产库")} aria-label={t("组件所属资产库")} onChange={event => changeFormLibrary(event.currentTarget.value)}><For each={libraries()}>{item => <option value={item.id} selected={form().library_id === item.id}>{item.name}</option>}</For></select></label><label><select aria-label={t("组件类型标注")} disabled={!!form().recipe} title={form().recipe ? t("连续布尔组仅支持实体组件") : t("直接保存时按实际选择自动识别；剪贴板保存由此标注")} onChange={event => setField("kind",event.currentTarget.value)}><For each={Object.entries(kindNames)}>{item => <option value={item[0]} selected={form().kind === item[0]}>{t(item[1])}</option>}</For></select></label></div>
-      <Show when={!props.capture}><GeometryPreview asset={selected()} load={loadGeometry} loadKernel={loadKernelGeometry} editBasePoint thumbnailPicker={<ThumbnailPicker/>} basePoint={form().base_point} orientation={form().base_orientation} onBasePointChange={point=>setField('base_point',point)} onOrientationChange={value=>setField('base_orientation',value)} onNativePick={()=>rebaseAsset("pick")} nativeDisabled={busy() || !target() || !modelEnabled()} disabled={busy() || archived()}/><dl><dt>{t("保存时间")}</dt><dd>{new Date(selected().created_at).toLocaleDateString(locale())}</dd><dt>{t("模型大小")}</dt><dd>{(selected().bytes / 1024).toFixed(1)} KB</dd><dt>{t("来源版本")}</dt><dd>{selected().source_version === "unknown" ? t("未记录") : selected().source_version}</dd></dl></Show>
+      <Show when={!props.capture}><GeometryPreview asset={selected()} load={loadGeometry} loadKernel={loadKernelGeometry} editBasePoint={!form().requires_native_detection} thumbnailPicker={<ThumbnailPicker/>} basePoint={form().base_point} orientation={form().base_orientation} onBasePointChange={point=>setField('base_point',point)} onOrientationChange={form().orientation_editable === false ? undefined : value=>setField('base_orientation',value)} onNativePick={()=>rebaseAsset("pick")} nativeDisabled={busy() || !target() || !modelEnabled()} disabled={busy() || archived()}/><dl><dt>{t("保存时间")}</dt><dd>{new Date(selected().created_at).toLocaleDateString(locale())}</dd><dt>{t("模型大小")}</dt><dd>{(selected().bytes / 1024).toFixed(1)} KB</dd><dt>{t("来源版本")}</dt><dd>{selected().source_version === "unknown" ? t("未记录") : selected().source_version}</dd></dl></Show>
       <Show when={supportsBoolean(form())}><Show when={form().recipe} fallback={<fieldset class="insert-mode-picker" title={t("布尔模式使用置入前选中的实体作为目标。原位置粘贴始终保持独立对象。")}><legend>{t("默认置入模式")}</legend><div class="insert-mode-options"><For each={Object.entries(insertModes)}>{item=><label><input type="radio" name="insert_mode" value={item[0]} checked={(form().insert_mode || "new-body") === item[0]} onChange={()=>setField("insert_mode",item[0])}/><span>{t(item[1])}</span></label>}</For></div></fieldset>}><fieldset class="group-recipe"><legend>{t("组：")}{form().recipe?.name}{t(" · 按顺序执行")}</legend><ol><For each={form().recipe?.parts}>{part=><li><span>{part.name}</span><small>{t(insertModes[part.mode])}</small></li>}</For></ol></fieldset></Show></Show>
       <label>{t("分组")}<select aria-label={t("组件所属分组")} disabled={foldersLoading()} onChange={event => setField("folder_id",event.currentTarget.value || null)}><option value="" selected={!form().folder_id}>{foldersLoading() ? t("正在加载分组…") : t("库根目录")}</option><For each={formFolders()}>{item => <option value={item.id} selected={form().folder_id === item.id}>{folderLabel(item.id,formFolders())}</option>}</For></select></label>
       <label>{t("备注")}<textarea maxlength="2000" rows="3" placeholder={t("尺寸、用途或使用说明")} value={form().note} onInput={event => setField("note", event.currentTarget.value)}/></label>
@@ -579,6 +593,7 @@ export function Home() {
         <select aria-label={t("Plasticity 目标窗口")} onChange={event => {setTargetId(event.currentTarget.value);setFollowActive(false);}} disabled={busy() || (embedded && !!preferredTarget)}><option value="" selected={!targetId()}>{targets().length ? t("请选择 Plasticity 窗口") : t("未发现 Plasticity 窗口")}</option><For each={targets()}>{item => <option value={item.id} selected={targetId() === item.id}>{item.title} · {item.mode === "cdp" ? "CDP" : t("原生")} · {item.target_id?.slice(0, 6) || item.hwnd}</option>}</For></select>
         <Show when={!embedded}><button class="secondary" disabled={!ready()} aria-pressed={followActive()} onClick={() => {setFollowActive(!followActive());refreshConnection().catch(error => showNotice(error.message,true));}}>{followActive() ? t("跟随激活窗口") : t("固定所选窗口")}</button></Show>
         <button class="icon-button" aria-label={t("刷新窗口")} disabled={!ready()} onClick={() => refreshConnection().catch(error => showNotice(error.message, true))}>↻</button>
+        <button class="secondary" disabled={!ready() || !target() || !modelEnabled()} title={t("选中一个测试实体，自动核对模型格式与基点字段，并导出检测报告")} onClick={inspectEncoding}>{t("自动检测模型格式")}</button>
         <Show when={target()?.mode === "cdp"}><button class="secondary" disabled={!ready()} onClick={() => operate("target.embed", { target_id: targetId() }, "面板已嵌入")}>{t("嵌入面板")}</button></Show>
         <Show when={embedded}><button class="secondary" onClick={hidePanel}>{t("收起")}</button></Show>
       </section>

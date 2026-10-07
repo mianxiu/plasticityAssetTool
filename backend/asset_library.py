@@ -43,6 +43,8 @@ class AssetLibrary:
                 if name not in columns:
                     db.execute(f"ALTER TABLE assets ADD COLUMN {name} {declaration}")
             db.execute("CREATE TABLE IF NOT EXISTS libraries (id TEXT PRIMARY KEY,name TEXT NOT NULL,created_at TEXT NOT NULL)")
+            db.execute('CREATE TABLE IF NOT EXISTS native_formats (source_version TEXT PRIMARY KEY,report TEXT NOT NULL)')
+            db.execute('CREATE TABLE IF NOT EXISTS native_model_layouts (digest TEXT PRIMARY KEY,report TEXT NOT NULL)')
             db.execute("CREATE TABLE IF NOT EXISTS folders (id TEXT PRIMARY KEY,library_id TEXT NOT NULL,parent_id TEXT,name TEXT NOT NULL,created_at TEXT NOT NULL)")
             db.execute("INSERT OR IGNORE INTO libraries VALUES ('default','默认库',?)", (datetime.now(timezone.utc).isoformat(),))
             db.execute("CREATE INDEX IF NOT EXISTS assets_library_archive ON assets(library_id,archived)")
@@ -161,13 +163,40 @@ class AssetLibrary:
     def base_point(self, asset_id):
         # Read only the placement prefix, never the full model for details.
         import struct
+        from .model_clipboard import placement_offset, direction_orientation
         with self.connect() as db:
-            row = db.execute('SELECT substr(model,1,56),digest FROM assets WHERE id=?', (asset_id,)).fetchone()
+            row = db.execute('SELECT substr(model,1,88),digest FROM assets WHERE id=?', (asset_id,)).fetchone()
         if row is None:
             raise ValueError('组件不存在，请刷新组件库')
         prefix = row[0]
-        return {'base_point':list(struct.unpack_from('<3d', prefix)) if len(prefix) >=24 else None,
-                'base_orientation':list(struct.unpack_from('<4d',prefix,24)) if len(prefix)==56 else None,'digest':row[1]}
+        layout = self.native_layout(row[1])
+        if placement_offset(prefix) and layout is None:
+            return {'base_point':None,'base_orientation':None,'digest':row[1], 'requires_native_detection':True}
+        point = layout['point'] if layout else 0
+        orientation = layout['orientation'] if layout else 24
+        return {'base_point':list(struct.unpack_from('<3d', prefix, point)),
+                'base_orientation':list(struct.unpack_from('<4d',prefix,orientation)) if not layout or layout['orientation_kind']=='quaternion' else direction_orientation(prefix,orientation),
+                'orientation_editable':not layout or layout['orientation_kind']=='quaternion','digest':row[1]}
+
+    def native_layout(self, digest):
+        with self.connect() as db:
+            row = db.execute('SELECT report FROM native_model_layouts WHERE digest=?', (digest,)).fetchone()
+        return json.loads(row[0])['layout'] if row else None
+
+    def register_native_format(self, source_version, report):
+        from .native_layout import validate_probe
+        from .model_clipboard import placement_offset
+        validate_probe(report)
+        if report['layout'] is None:
+            return False
+        encoded = json.dumps(report)
+        with self.connect() as db:
+            db.execute('INSERT OR REPLACE INTO native_formats VALUES (?,?)', (source_version,encoded))
+            for row in db.execute('SELECT digest,substr(model,1,88) FROM assets WHERE source_version=?', (source_version,)):
+                family = 'count-first' if placement_offset(row[1]) else 'modern'
+                if family == report['format']:
+                    db.execute('INSERT OR REPLACE INTO native_model_layouts VALUES (?,?)', (row[0],encoded))
+        return True
 
     @staticmethod
     def validate_preview(preview):
@@ -246,6 +275,10 @@ class AssetLibrary:
                 timestamp, timestamp, source_version,
                 hashlib.sha256(model).hexdigest(), model, preview, *location, fields["insert_mode"], json.dumps(recipe,ensure_ascii=False),
             ))
+            from .model_clipboard import placement_offset
+            calibration = db.execute('SELECT report FROM native_formats WHERE source_version=?', (source_version,)).fetchone()
+            if calibration and json.loads(calibration[0])['format'] == ('count-first' if placement_offset(model) else 'modern'):
+                db.execute('INSERT OR REPLACE INTO native_model_layouts VALUES (?,?)', (hashlib.sha256(model).hexdigest(),calibration[0]))
         return self.details(asset_id)
 
     def update(self, asset_id, fields):
@@ -258,7 +291,7 @@ class AssetLibrary:
             model = self.model_row(asset_id)
             if model['archived'] or model['digest'] != expected_digest:
                 raise ValueError('组件已变化，未保存基点，请重新打开编辑')
-            updated_model = with_base_point(bytes(model['model']), point, fields.get('base_orientation'))
+            updated_model = with_base_point(bytes(model['model']), point, fields.get('base_orientation'), self.native_layout(model['digest']))
             new_digest = hashlib.sha256(updated_model).hexdigest()
         location = self.organization(fields, current)
         update_preview = "preview" in fields
@@ -276,6 +309,7 @@ class AssetLibrary:
                     raise ValueError('组件已变化，未保存基点，请重新打开编辑')
                 db.execute('INSERT OR IGNORE INTO geometry_cache(digest,mesh,thumbnail) SELECT ?,mesh,thumbnail FROM geometry_cache WHERE digest=?',
                            (new_digest,expected_digest))
+                db.execute('INSERT OR IGNORE INTO native_model_layouts SELECT ?,report FROM native_model_layouts WHERE digest=?', (new_digest,expected_digest))
             db.execute("UPDATE assets SET name=?,category=?,tags=?,note=?,updated_at=?,library_id=?,folder_id=?,kind=?,insert_mode=? WHERE id=?", (
                 fields["name"], fields["category"], fields["tags"], fields["note"], datetime.now(timezone.utc).isoformat(), *location, fields["insert_mode"], asset_id,
             ))
@@ -284,8 +318,8 @@ class AssetLibrary:
         result = self.details(asset_id)
         if updated_model is not None:
             result['base_point'] = point
-            import struct
-            result['base_orientation'] = list(struct.unpack_from('<4d',updated_model,24))
+            from .model_clipboard import model_orientation
+            result['base_orientation'] = model_orientation(updated_model, self.native_layout(new_digest))
         return result
 
     def archive(self, asset_id, archived):
@@ -294,28 +328,32 @@ class AssetLibrary:
             db.execute("UPDATE assets SET archived=? WHERE id=?", (int(archived), asset_id))
 
     def rebase(self, asset_id, expected_digest, model):
-        from .model_clipboard import validate_model
+        from .model_clipboard import validate_model, same_model_content
         validate_model(model)
         new_digest = hashlib.sha256(model).hexdigest()
         with self.connect() as db:
             current = db.execute('SELECT model,digest,archived FROM assets WHERE id=?', (asset_id,)).fetchone()
             if current is None or current['archived'] or current['digest'] != expected_digest:
                 raise ValueError('组件在拾取期间已变化，未修改基点，请重试')
-            if bytes(current['model'])[56:] != model[56:]:
+            if not same_model_content(bytes(current['model']), model):
                 raise ValueError('基点修改不能改变模型几何或子部件信息')
             db.execute('UPDATE assets SET model=?,digest=?,updated_at=? WHERE id=?',
                        (model,new_digest,datetime.now(timezone.utc).isoformat(),asset_id))
             # Placement changes leave tessellation and thumbnail geometry intact.
             db.execute('INSERT OR IGNORE INTO geometry_cache(digest,mesh,thumbnail) SELECT ?,mesh,thumbnail FROM geometry_cache WHERE digest=?',
                        (new_digest,expected_digest))
+            db.execute('INSERT OR IGNORE INTO native_model_layouts SELECT ?,report FROM native_model_layouts WHERE digest=?', (new_digest,expected_digest))
         return self.details(asset_id)
 
     def export(self, asset_id):
         row = self.get(asset_id)
         output = io.BytesIO()
+        with self.connect() as db:
+            calibration = db.execute('SELECT report FROM native_model_layouts WHERE digest=?', (row['digest'],)).fetchone()
         with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as archive:
             archive.writestr("manifest.json", json.dumps({
                 "format": "plasticity-asset-tool", "version": 1, **self.metadata(row),
+                **({'native_encoding':json.loads(calibration[0])} if calibration else {}),
             }, ensure_ascii=False))
             archive.writestr("model.bin", row["model"])
             if row["preview"]:
@@ -369,6 +407,17 @@ class AssetLibrary:
                 if hashlib.sha256(model).hexdigest() != manifest.get("digest"):
                     raise ValueError("组件包模型校验失败")
                 preview = archive.read("preview.jpg") if "preview.jpg" in archive.namelist() else None
-                return self.add(model, manifest | {"library_id": library_id, "folder_id": folder_id}, preview, manifest.get("source_version", "unknown"))
+                calibration = manifest.get('native_encoding')
+                if calibration is not None:
+                    from .native_layout import validate_probe
+                    from .model_clipboard import placement_offset
+                    validate_probe(calibration)
+                    if calibration['layout'] is None or calibration['format'] != ('count-first' if placement_offset(model) else 'modern'):
+                        raise ValueError('组件包定位格式与模型不匹配')
+                result = self.add(model, manifest | {"library_id": library_id, "folder_id": folder_id}, preview, manifest.get("source_version", "unknown"))
+                if calibration is not None:
+                    with self.connect() as db:
+                        db.execute('INSERT OR REPLACE INTO native_model_layouts VALUES (?,?)', (manifest['digest'],json.dumps(calibration)))
+                return result
         except (zipfile.BadZipFile, KeyError, json.JSONDecodeError, UnicodeError, AttributeError) as exc:
             raise ValueError("无效的 .patasset 组件包") from exc

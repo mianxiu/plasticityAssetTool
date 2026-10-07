@@ -11,7 +11,7 @@ function worker(target) {
     if(method==='Runtime.getProperties') {
       if(params.objectId==='fn')return {internalProperties:[{name:'[[Scopes]]',value:{objectId:'scopes'}}]};
       if(params.objectId==='scopes')return {result:[{value:{objectId:'closure',description:'Closure'}}]};
-      return {result:['editor','PasteCommand','CopyWithPlacementCommand','Cancel','OperationType','BooleanFactory'].map(name=>({name,value:{objectId:name}}))};
+      return {result:['editor','PasteCommand','CopyWithPlacementCommand','Cancel','OperationType','BooleanFactory','Vector3','Quaternion'].map(name=>({name,value:{objectId:name}}))};
     }
     if(method==='Runtime.callFunctionOn'){calls.push(params);return {result:{value:{started:true}}};}
     return {};
@@ -60,6 +60,13 @@ const job=id=>({id:id.repeat(32),action:'insert',model:'payload',placement:true}
   assert.equal(pointWorker.calls[0].arguments[0].value,true);
   assert.equal(pointWorker.calls[0].arguments[1].objectId,'CopyWithPlacementCommand');
   assert.equal(pointWorker.intervals.size,0,'Interactive heartbeat is cleaned after the command');pointWorker.destroy();
+  const encodingWorker=worker('hwnd:48');await flush();
+  assert(encodingWorker.requests[0].data.capabilities.includes('encoding-probe-v1'));
+  encodingWorker.requests[0].reply({id:'a'.repeat(32),action:'inspect-encoding'});await flush();
+  assert.equal(encodingWorker.calls[0].arguments[0].objectId,'Vector3');
+  assert.equal(encodingWorker.calls[0].arguments[1].objectId,'Quaternion');
+  assert(encodingWorker.calls[0].functionDeclaration.includes('inspectEncoding'));
+  encodingWorker.destroy();
   const rebaseWorker=worker('hwnd:47');await flush();
   assert(rebaseWorker.requests[0].data.capabilities.includes('asset-base-point-v1'));
   rebaseWorker.requests[0].reply({id:'f'.repeat(32),action:'rebase',base_mode:'pick',model:'saved-model'});await flush();

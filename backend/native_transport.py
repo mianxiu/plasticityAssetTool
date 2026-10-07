@@ -77,6 +77,9 @@ class NativeTransport:
                         value = {'recipe': recipe, 'signature': value.get('signature')}
                         if recipe and (not isinstance(value['signature'],str) or len(value['signature'])>40000):
                             raise ValueError('组选择标识无效')
+                    elif job['action']=='inspect-encoding':
+                        from .native_layout import validate_probe
+                        value=validate_probe(value)
                     elif not isinstance(value,dict) or value.get('started') is not True:
                         raise ValueError('原生置入没有启动')
                     job['future'].set_result(value)
@@ -114,13 +117,15 @@ class NativeTransport:
     async def request(self, target, action, model=None, placement=True, insert_mode="new-body", recipe=None, signature=None, with_metadata=False, base_mode=None):
         if target not in self.connected_targets():
             raise ValueError('目标窗口的原生模型插件未连接，请重新打开已安装插件的 Plasticity')
-        if action not in ('capture','insert','inspect-group','capture-group','rebase'):
+        if action not in ('capture','insert','inspect-group','capture-group','rebase','inspect-encoding'):
             raise ValueError('未知的原生模型操作')
         if any(job['target']==target for job in self.jobs.values()):
             if any(job['target']==target and job['future'].done() for job in self.jobs.values()):
                 raise ValueError('上次原生操作结果尚未确认，已阻止重复投递；请检查视口并等待连接回执')
             raise ValueError('目标窗口正在处理组件，请稍后重试')
         payload={}
+        if action=='inspect-encoding' and 'encoding-probe-v1' not in self.workers[target]['capabilities']:
+            raise ValueError('请更新内嵌插件并重新打开 Plasticity，再自动检测模型格式')
         if base_mode is not None:
             if action not in ('capture','capture-group','rebase') or base_mode not in ('world','pick'):
                 raise ValueError('无效的组件基点模式')

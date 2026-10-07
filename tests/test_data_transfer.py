@@ -11,6 +11,23 @@ from test_group_recipe import recipe
 
 
 class DataTransferTests(unittest.TestCase):
+    def test_batch_import_and_backup_restore_keep_native_calibration(self):
+        from test_native_layout import report
+        from model_fixture import count_first_model_bytes
+        source=AssetLibrary(Path(self.temp.name)/'calibrated')
+        source.register_native_format('25.2.5',report())
+        asset=source.add(count_first_model_bytes(),{'name':'legacy'},source_version='25.2.5')
+        source.update(asset['id'],{'name':'legacy','base_point':[10,20,30],'model_digest':asset['digest']})
+        plan=self.transfer.preview([('legacy.patasset',source.export(asset['id']))])
+        self.transfer.commit(plan['token'],[{'mode':'copy'}])
+        imported=self.library.list()[0]
+        self.assertEqual(self.library.base_point(imported['id'])['base_point'],[10,20,30])
+        with self.transfer.backup() as output:
+            payload=output.read()
+        plan=self.transfer.preview([('backup.zip',payload)],kind='restore')
+        self.transfer.commit(plan['token'],confirm_restore=True)
+        self.assertEqual(self.library.base_point(imported['id'])['base_point'],[10,20,30])
+
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory()
         self.library=AssetLibrary(Path(self.temp.name)/'library')

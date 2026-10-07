@@ -5,13 +5,87 @@ const modelFormat = 'application/vnd.plasticity.items';
 let transportBusy = false;
 let calculation = null;
 function calculationStatus() {return calculation ? {...calculation} : null;}
+function nativeModelLayout(data) {
+  const signature=NativeBuffer.from('PS\0\0\x003: TRANSMIT FILE');
+  if(data.subarray(64,64+signature.length).equals(signature)) {
+    return {placement:4,count:0,bodies:60};
+  }
+  let offset=56;
+  for(let i=0;i<2;i++) {
+    if(offset+4>data.length) throw new Error('模型封装不完整');
+    const size=data.readUInt32LE(offset);offset+=4+size;
+    if(offset>data.length) throw new Error('模型封装不完整');
+  }
+  if(offset+4>data.length) throw new Error('模型对象数量缺失');
+  return {placement:0,count:offset,bodies:offset+4};
+}
+function inspectEncoding(editor,Vector3,Quaternion) {
+  requireIdle(editor);
+  if(!editor.selection.selected.size) throw new Error('请先选中一个测试实体，再自动检测模型格式');
+  if(typeof Vector3!=='function' || typeof Quaternion!=='function') throw new Error('当前版本无法取得原生坐标类型');
+  if(editor.clipboard.copy.constructor.name==='AsyncFunction') throw new Error('异步模型编码接口暂不支持自动检测');
+  const points=[[123.125,-456.5,789.75],[11.375,22.625,-33.875]];
+  const directions=[[1,2,3],[-2,3,1]].map(v=>v.map(n=>n/Math.hypot(...v)));
+  const quaternions=[[1,2,3,1],[-2,3,1,4]].map(v=>v.map(n=>n/Math.hypot(...v)));
+  const close=(a,b)=>Number.isFinite(a)&&Math.abs(a-b)<=1e-10*Math.max(1,Math.abs(b));
+  let last,lastReport;
+  transportBusy=true;
+  try {
+    for(const kind of ['quaternion','direction']) {
+      const probes=[],headers=[];
+      let format;
+      try {
+        for(let index=0;index<2;index++) {
+          const write=transportClipboard.writeBuffer;
+          let data,writes=0;
+          try {
+            transportClipboard.writeBuffer=(name,buffer)=>{
+              if(name!==modelFormat || ++writes!==1)throw new Error('原生检测模型格式不支持');
+              data=NativeBuffer.from(buffer);
+            };
+            const orientation=kind==='quaternion'?new Quaternion(...quaternions[index]):new Vector3(...directions[index]);
+            const returned=editor.clipboard.copy(new Vector3(...points[index]),orientation);
+            if(returned?.then) throw new Error('异步模型编码接口暂不支持自动检测');
+          } finally {transportClipboard.writeBuffer=write;}
+          if(!data || data.length>64*1024*1024)throw new Error('原生检测模型无效');
+          let layout;
+          try {layout=nativeModelLayout(data);} catch {}
+          const current=layout?(layout.count===0?'count-first':'modern'):'unknown';
+          if(format && current!==format)throw new Error('检测期间模型格式发生变化');
+          format=current;
+          const header=data.subarray(0,Math.min(layout?.bodies || 512,4096));
+          headers.push(header);probes.push({header:header.toString('base64'),
+            content_digest:layout?nativeRequire('crypto').createHash('sha256').update(data.subarray(layout.bodies)).digest('hex'):null});
+        }
+      } catch(error) {last=error;continue;}
+      const find=values=>{
+        const matches=[];
+        const minimum=format==='count-first'?4:0,maximum=format==='count-first'?60:56;
+        for(let offset=minimum;offset+values[0].length*8<=Math.min(maximum,...headers.map(h=>h.length));offset++) {
+          if(headers.every((h,index)=>values[index].every((v,j)=>close(h.readDoubleLE(offset+j*8),v))))matches.push(offset);
+        }
+        return matches.length===1?matches[0]:null;
+      };
+      const point=find(points),orientation=find(kind==='quaternion'?quaternions:directions);
+      const orientationSize=kind==='quaternion'?32:24;
+      const disjoint=point!==null && orientation!==null && (point+24<=orientation || orientation+orientationSize<=point);
+      const stable=probes[0].content_digest && probes[0].content_digest===probes[1].content_digest;
+      const layout=format!=='unknown' && disjoint && stable?{point,orientation,orientation_kind:kind}:null;
+      const report={format,layout,probes};
+      if(layout)return report;
+      lastReport=report;
+    }
+    if(lastReport)return lastReport;
+    throw last || new Error('未取得原生格式检测结果');
+  } finally {transportBusy=false;}
+}
 function labelGroupModel(data,recipe) {
   // Paste/placement may return bodies in a different order. Bind each body to
   // its recipe step with a unique temporary name, never the user's name.
-  let offset=56;
+  const layout=nativeModelLayout(data);
+  let offset=layout.bodies;
   const block=()=>{const n=data.readUInt32LE(offset);offset+=4;const value=data.subarray(offset,offset+n);offset+=n;if(offset>data.length)throw new Error('组模型数据不完整');return value;};
-  block();block();
-  const count=data.readUInt32LE(offset);offset+=4;
+  const count=data.readUInt32LE(layout.count);
   if(count!==recipe.parts.length)throw new Error('组子部件与模型数量不一致');
   const chunks=[data.subarray(0,offset)],names=[];
   const token=nativeRequire('crypto').randomUUID().replace(/-/g,'');
@@ -111,21 +185,21 @@ function captureGroup(editor, signature) {
   const groupId = Array.from(editor.selection.selected.groupIds)[0];
   const keys = Array.from(editor.groups.getChildren(groupId));
   const selected = editor.selection.selected, saved = selected.saveToMemento();
-  const chunks = []; let header;
+  const chunks = []; let header, countOffset;
   try {
     for (const key of keys) {
       selected.removeAll(); selected.add(editor.db.key2item(key));
       const data = NativeBuffer.from(captureSelection(editor).model,'base64');
-      let offset = 56;
-      for (let i=0;i<2;i++) {const n=data.readUInt32LE(offset);offset+=4+n;}
-      if (data.readUInt32LE(offset) !== 1) throw new Error('子部件模型编码不兼容');
-      if (!header) header = NativeBuffer.from(data.subarray(0,offset+4));
-      offset += 4; const start=offset;
+      const layout=nativeModelLayout(data);
+      if (data.readUInt32LE(layout.count) !== 1) throw new Error('子部件模型编码不兼容');
+      if (!header) {header = NativeBuffer.from(data.subarray(0,layout.bodies));countOffset=layout.count;}
+      if(countOffset!==layout.count) throw new Error('子部件模型封装不一致');
+      let offset=layout.bodies; const start=offset;
       for (let i=0;i<2;i++) {const n=data.readUInt32LE(offset);offset+=4+n;}
       chunks.push(data.subarray(start,offset));
     }
   } finally {selected.restoreFromMemento(saved);}
-  header.writeUInt32LE(keys.length,header.length-4);
+  header.writeUInt32LE(keys.length,countOffset);
   const model=NativeBuffer.concat([header,...chunks]);
   if (model.length > 64*1024*1024) throw new Error('组模型超过 64 MB');
   return {model:model.toString('base64'),recipe:inspected.recipe};
@@ -290,7 +364,9 @@ async function captureGroupWithBasePoint(editor, signature, CopyWithPlacementCom
   if(inspectGroup(editor).signature !== signature) throw new Error('组或模型已变化，未保存组件');
   // Preserve ordered bodies and opaque native placement bytes as a unit.
   const data=NativeBuffer.from(group.model,'base64');
-  NativeBuffer.from(captured.model,'base64').copy(data,0,0,56);
+  const reference=NativeBuffer.from(captured.model,'base64');
+  const targetLayout=nativeModelLayout(data),sourceLayout=nativeModelLayout(reference);
+  reference.copy(data,targetLayout.placement,sourceLayout.placement,sourceLayout.placement+56);
   return {...group,model:data.toString('base64')};
 }
 async function insertModel(editor, args, PasteCommand, OperationType, BooleanFactory) {
@@ -493,4 +569,4 @@ function configureGroupPlacement(editor,command,factory,recipe,targets,Operation
     return results;
   };
 }
-globalThis.__plasticityAssetTransport = Object.freeze({captureSelection,captureWithBasePoint,rebaseModel,captureGroupWithBasePoint,captureGroup,inspectGroup,insertModel,calculationStatus});
+globalThis.__plasticityAssetTransport = Object.freeze({captureSelection,captureWithBasePoint,rebaseModel,captureGroupWithBasePoint,captureGroup,inspectGroup,inspectEncoding,insertModel,calculationStatus});

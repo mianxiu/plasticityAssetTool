@@ -86,8 +86,16 @@ class AssetService:
         if action == "asset.geometry.thumbnail":
             return await asyncio.to_thread(self.geometry.save_thumbnail, args.get("id"), args.get("digest"), decode_preview(args.get("preview")))
         async with self.lock:
-            if not self.model_enabled and (action.startswith("asset.") or action in ("target.command", "library.rebase") or (action == "library.capture" and args.get("copy_selection"))):
+            if not self.model_enabled and (action.startswith("asset.") or action in ("target.command", "target.inspect_encoding", "library.rebase") or (action == "library.capture" and args.get("copy_selection"))):
                 raise ValueError("模型连接已暂停，请在托盘控制中心恢复")
+            if action == 'target.inspect_encoding':
+                target_id = args.get('target_id')
+                report = await self.native.request(target_id, 'inspect-encoding')
+                target = self.bridge.target(target_id)
+                version = next((p[4:] for p in Path(target.get('path','')).parts if p.startswith('app-')), 'unknown')
+                verified = self.library.register_native_format(version, report) if version != 'unknown' else False
+                return {'report':report,'source_version':version,'verified':verified,
+                        'message':'模型格式已检测，可以继续测试基点' if verified else '检测报告已生成，定位结构尚未确认；原始模型保持不变'}
             if action == "panel.dismiss":
                 if self.launcher and self.launcher.panel:
                     await asyncio.to_thread(self.launcher.panel.dismiss)
@@ -177,11 +185,15 @@ class AssetService:
                 # Native copy is the authority for the placement envelope; do
                 # not guess coordinate order, units or quaternion conventions.
                 reference = await self.native.request(args.get('target_id'), 'rebase', model, base_mode=args['base_mode'])
-                updated = validate_model(reference[:56] + model[56:])
+                from .model_clipboard import copy_model_placement, model_orientation
+                updated = validate_model(copy_model_placement(model, reference))
                 result = await asyncio.to_thread(self.library.rebase, original['id'], original['digest'], updated)
                 from .model_clipboard import model_base_point
-                import struct
-                return result | {'base_point': model_base_point(updated),'base_orientation':list(struct.unpack_from('<4d',updated,24))}
+                layout = self.library.native_layout(hashlib.sha256(updated).hexdigest())
+                from .model_clipboard import placement_offset
+                return result | ({'base_point':None,'base_orientation':None,'requires_native_detection':True} if placement_offset(updated) and layout is None else
+                                 {'base_point': model_base_point(updated, layout),'base_orientation':model_orientation(updated, layout),
+                                  'orientation_editable':not layout or layout['orientation_kind']=='quaternion'})
             if action == "library.update":
                 fields = dict(args)
                 if "preview" in fields:
