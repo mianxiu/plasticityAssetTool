@@ -407,5 +407,8 @@
   "退出组件库后台，将完整发布包解压到原程序目录，保留 library/ 和 .runtime/，再运行启动器。随后在这里查看是否需要更新插件。": "Stop the library service, extract the full release into the original program directory, preserve library/ and .runtime/, then run the launcher. Check here whether a plugin update is needed.",
   "下载发布包 ↗": "Download release ↗",
   "上次操作未完成，请查看下方提示后重试": "The previous operation did not finish. Review the message below before retrying.",
-  "插件安装已完成，重新打开对应 Plasticity 版本后生效": "Plugin installation is complete. Reopen the corresponding Plasticity version to apply it."
+  "插件安装已完成，重新打开对应 Plasticity 版本后生效": "Plugin installation is complete. Reopen the corresponding Plasticity version to apply it.",
+  "重新安装插件": "Reinstall plugin",
+  "已是最新版时，仍可重新写入当前插件并保留恢复备份。请先保存并关闭该版本所有窗口。": "Reinstall the current plugin even when it is up to date, preserving recovery backups. Save and close all windows of this version first.",
+  "将重新写入当前版本插件，即使已是最新版；自动保存恢复备份，组件数据保留。": "Rewrites the current plugin even if it is up to date. Recovery backups are saved automatically and component data is preserved."
 }

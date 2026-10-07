@@ -23,6 +23,6 @@ assert.equal(summary(['current','restart-required','install-required'],{job:{sta
 for(const state of ['building','not-built'])assert.equal(summary([state,'current','current']),'下一步：等待界面构建完成');
 assert.equal(summary(['hot-update','current','current']),'界面将在当前操作结束后自动更新');
 for(const state of ['failed','cancelled'])assert.equal(summary(['current','current','current'],{job:{state}}),'上次操作未完成，请查看下方提示后重试');
-for(const action of ['install','update'])assert.equal(summary(['current','current','current'],{job:{state:'complete',action}}),'插件安装已完成，重新打开对应 Plasticity 版本后生效');
+for(const action of ['install','update','reinstall'])assert.equal(summary(['current','current','current'],{job:{state:'complete',action}}),'插件安装已完成，重新打开对应 Plasticity 版本后生效');
 assert.equal(summary(['current','current','current'],{job:{state:'complete',action:'restore'}}),'本地文件已就绪，无需手动更新');
 console.log('Update presentation: UI hot reload, current plugin and real installation requirements verified');

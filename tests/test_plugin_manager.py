@@ -94,6 +94,75 @@ class PluginManagerTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(state['installations'][0]['running'])
         self.assertEqual(state['installations'][0]['state'],'current')
 
+    async def test_reinstall_current_plugin_saves_new_backups_and_restores_original(self):
+        row = await self.perform('install')
+        original_patch = self.target.read_bytes()
+        self.assertFalse(row['can_update'])
+        self.assertTrue(row['can_reinstall'])
+        backups = set((self.root / '.runtime/plugin-backups').glob('*.js'))
+        for _ in range(2):
+            row = await self.perform('reinstall')
+            self.assertEqual(self.manager.job['action'], 'reinstall')
+            self.assertEqual(row['state'], 'current')
+            self.assertEqual(self.target.read_bytes(), original_patch)
+            backup = Path(self.manager.job['backup'])
+            self.assertNotIn(backup, backups)
+            self.assertEqual(backup.read_bytes(), original_patch)
+            self.assertTrue(backup.with_suffix('.manifest.json').is_file())
+            backups.add(backup)
+        await self.perform('restore')
+        self.assertEqual(self.target.read_bytes(), ORIGINAL)
+
+    async def test_reinstall_rechecks_running_windows_before_launch(self):
+        row = await self.perform('install')
+        self.assertTrue(row['can_reinstall'])
+        self.processes = [{'Path': str(self.folder / 'Plasticity.exe')}]
+        self.assertFalse(self.row()['can_reinstall'])
+        previous_job = self.manager.job.copy()
+        current = self.target.read_bytes()
+        with self.assertRaises(ValueError):
+            await self.manager.start(row['id'], 'reinstall')
+        self.assertEqual(self.manager.job, previous_job)
+        self.assertEqual(self.target.read_bytes(), current)
+
+    async def test_reinstall_rejects_missing_or_changed_backups(self):
+        await self.perform('install')
+        backup = Path(self.row()['previous_backup'])
+        backup.write_bytes(b'corrupt backup')
+        current = self.target.read_bytes()
+        row = self.row()
+        self.assertEqual(row['state'], 'backup-missing')
+        self.assertFalse(row['can_reinstall'])
+        with self.assertRaises(ValueError):
+            await self.manager.start(row['id'], 'reinstall')
+        self.assertEqual(self.target.read_bytes(), current)
+
+    async def test_reinstall_cancellation_and_false_success_preserve_entry(self):
+        await self.perform('install')
+        current = self.target.read_bytes()
+        for code, expected in [(1223, 'cancelled'), (0, 'failed')]:
+            self.manager.runner = lambda request: code
+            await self.manager.start(self.row()['id'], 'reinstall')
+            await self.manager.task
+            self.assertEqual(self.manager.job['state'], expected)
+            self.assertEqual(self.target.read_bytes(), current)
+
+    async def test_reinstall_respects_version_opt_in(self):
+        folder, target = fixture(self.root, '26.2.0')
+        await self.manager.update_settings(True)
+        self.manager.scan()
+        row = self.manager.inspect(folder, [])
+        await self.manager.start(row['id'], 'install')
+        await self.manager.task
+        await self.manager.update_settings(False)
+        self.assertFalse(self.manager.inspect(folder, [])['can_reinstall'])
+        with self.assertRaises(ValueError):
+            await self.manager.start(row['id'], 'reinstall')
+        await self.manager.update_settings(True)
+        await self.manager.start(row['id'], 'reinstall')
+        await self.manager.task
+        self.assertEqual(self.manager.job['state'], 'complete', self.manager.job)
+
     async def test_automatic_detection_failure_is_reported_without_losing_service_state(self):
         await self.perform('install')
         def unavailable():
@@ -228,8 +297,11 @@ class PluginManagerTests(unittest.IsolatedAsyncioTestCase):
         self.target.write_bytes(changed)
         row = self.row()
         self.assertEqual(row['state'], 'backup-missing')
+        self.assertFalse(row['can_reinstall'])
         with self.assertRaises(ValueError):
             await self.manager.start(row['id'], 'update')
+        with self.assertRaises(ValueError):
+            await self.manager.start(row['id'], 'reinstall')
         self.assertEqual(self.target.read_bytes(), changed)
 
     async def test_success_exit_without_write_is_detected_as_failure(self):

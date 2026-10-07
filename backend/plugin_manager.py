@@ -93,6 +93,7 @@ class PluginManager:
         allowed = row['supported'] or row['experimental']
         row['can_install'] = allowed and not row['running'] and not row['installed']
         row['can_update'] = allowed and not row['running'] and row['state'] == 'update'
+        row['can_reinstall'] = allowed and not row['running'] and row['installed'] and row['state'] == 'current' and bool(row.get('previous_backup') and row.get('base_backup'))
         row['can_restore'] = not row['running'] and bool(row.get('previous_backup') and row.get('base_backup'))
 
     def backups(self, target):
@@ -161,7 +162,7 @@ class PluginManager:
         async with self.lock:
             if self.task and not self.task.done():
                 raise ValueError('插件安装正在进行，请等待当前操作完成')
-            if not isinstance(action, str) or not isinstance(identity, str) or action not in ('install', 'update', 'restore') or identity not in self.records:
+            if not isinstance(action, str) or not isinstance(identity, str) or action not in ('install', 'update', 'reinstall', 'restore') or identity not in self.records:
                 raise ValueError('请先检测并选择有效的安装版本')
             processes = await asyncio.to_thread(self.process_reader)
             row = await asyncio.to_thread(self.inspect, self.records[identity]['path'], processes)
@@ -180,7 +181,7 @@ class PluginManager:
             args = ['--target', row['target'], '--backup', str(backup), '--expected-sha256', row['sha256'], '--managed']
             if row['experimental'] and action != 'restore':
                 args += ['--allow-unverified-version']
-            if action == 'update':
+            if action in ('update', 'reinstall'):
                 args += ['--upgrade-from', row['previous_backup'], '--base-backup', row['base_backup']]
             if action == 'restore':
                 args += ['--restore']
@@ -191,7 +192,7 @@ class PluginManager:
             if not python.is_file():
                 python = Path(sys.executable).with_name('python.exe') if os.name == 'nt' else Path(sys.executable)
             request.write_text(json.dumps({'root': str(self.root), 'python': str(python), 'target': row['target'], 'backup': str(backup),
-                                           'description': {'install': '安装组件库内嵌插件', 'update': '更新组件库内嵌插件', 'restore': '恢复 Plasticity 原始入口'}[action],
+                                           'description': {'install': '安装组件库内嵌插件', 'update': '更新组件库内嵌插件', 'reinstall': '重新安装组件库内嵌插件', 'restore': '恢复 Plasticity 原始入口'}[action],
                                            'arguments': args, 'result': str(result)}, ensure_ascii=False), encoding='utf-8')
             self.job = {'id': token, 'state': 'waiting', 'action': action, 'installation_id': identity, 'version': row['version'],
                         'path': row['path'], 'backup': str(backup), 'message': '请在插件安装窗口确认操作并批准 Windows 权限请求'}
@@ -221,6 +222,13 @@ class PluginManager:
                 processes = await asyncio.to_thread(self.process_reader)
                 updated = await asyncio.to_thread(self.inspect, row['path'], processes)
                 success = not updated['installed'] if self.job['action'] == 'restore' else updated['state'] == 'current'
+                if self.job['action'] == 'reinstall':
+                    # The entry was already current before this operation. Require
+                    # this job's new recovery pair as well as the final entry.
+                    backup = Path(self.job['backup'])
+                    manifest = json.loads(backup.with_suffix('.manifest.json').read_text(encoding='utf-8'))
+                    success = success and digest(backup.read_bytes()) == row['sha256'] and manifest == {
+                        'target': row['target'], 'original_sha256': row['sha256'], 'patched_sha256': updated['sha256']}
                 if not success:
                     raise RuntimeError('安装器结束后入口校验未通过，请保留备份并重新检测')
                 self.records[updated['id']] = updated

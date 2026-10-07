@@ -30,6 +30,6 @@ export function updateSummary(rows, plugins) {
   if(states.some(state=>['unverified','not-detected'].includes(state)))return '下一步：检查下方的插件安装信息';
   if(states.some(state=>['not-built','building'].includes(state)))return '下一步：等待界面构建完成';
   if(states.includes('hot-update'))return '界面将在当前操作结束后自动更新';
-  if(plugins?.job?.state==='complete' && ['install','update'].includes(plugins.job.action))return '插件安装已完成，重新打开对应 Plasticity 版本后生效';
+  if(plugins?.job?.state==='complete' && ['install','update','reinstall'].includes(plugins.job.action))return '插件安装已完成，重新打开对应 Plasticity 版本后生效';
   return '本地文件已就绪，无需手动更新';
 }
