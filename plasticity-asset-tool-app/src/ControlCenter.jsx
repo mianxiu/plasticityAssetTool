@@ -4,12 +4,12 @@ import {t, locale, setLocale} from "./i18n";
 import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { Cube } from "./Home";
 import "./ControlCenter.css";
-import {uiUpdateState,pluginUpdateState,pluginRunningMessage} from './updatePresentation.mjs';
+import {uiUpdateState,pluginUpdateState,pluginRunningMessage,updateSummary} from './updatePresentation.mjs';
 
 export function ControlCenter() {
-  const tabs=[['overview','概览'],['updates','更新状态'],['plugins','插件安装'],['connections','模型连接'],['data','备份与迁移'],['preferences','偏好设置']];
+  const tabs=[['overview','概览'],['updates','更新与安装'],['connections','模型连接'],['data','备份与迁移'],['preferences','偏好设置']];
   const tabKey='pat.controlCenter.tab';
-  const initialTab=()=>{try {const saved=sessionStorage.getItem(tabKey);return tabs.some(([id])=>id===saved) ? saved : 'overview';}catch{return 'overview';}};
+  const initialTab=()=>{try {const stored=sessionStorage.getItem(tabKey);const saved=stored==='plugins' ? 'updates' : stored;return tabs.some(([id])=>id===saved) ? saved : 'overview';}catch{return 'overview';}};
   const [activeTab,setActiveTab] = createSignal(initialTab());
   const selectTab=id=>{setActiveTab(id);try {sessionStorage.setItem(tabKey,id);}catch{/* Keep the current tab in memory. */}};
   const navigateTabs=event=>{
@@ -66,14 +66,14 @@ export function ControlCenter() {
     if(!disposed)setPlugins(result.data);
   }
   async function detectPlugins(custom=false) {
-    if(detecting() || pluginPending())return;
+    if(detecting() || busy() || checkingUpdates() || pluginPending() || !online())return;
     setDetecting(true);
     try {await pluginCommand("service.plugin_detect",custom ? {path:installPath().trim()} : {});}
     catch(error) {if(!disposed)setNotice(error.message);}
     finally {if(!disposed)setDetecting(false);}
   }
   async function checkUpdates() {
-    if(checkingUpdates() || pluginPending() || !online())return;
+    if(checkingUpdates() || busy() || detecting() || pluginPending() || !online())return;
     setCheckingUpdates(true);setNotice('');
     try {
       const response=await fetch('/api/service',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'service.updates',args:{}}),signal:AbortSignal.timeout(30000)});
@@ -88,17 +88,18 @@ export function ControlCenter() {
     {name:'后台',state:state()?.updates?.backend?.state || 'unknown',help:'后台代码变化只需重启组件库后台，无需关闭 Plasticity 或重新安装插件。'},
     {name:'内嵌插件',state:pluginUpdateState(plugins()),help:'只有内嵌入口发生变化才需要更新插件；安装前需自行保存并关闭对应 Plasticity 窗口。'},
   ];
+  const summary=()=>online() ? updateSummary(updateRows(),plugins()) : '连接后台后可检测更新';
   const updateLabels={'current':'已是最新版','hot-update':'等待安全热更新','building':'等待构建完成','not-built':'界面尚未构建','development':'开发模式热更新','unknown':'尚未检测','restart-required':'需重启后台','install-required':'需更新插件','not-installed':'需安装插件','not-detected':'未检测到安装','unverified':'需检查安装备份','check-failed':'检测暂不可用'};
   async function installPlugin() {
     const choice=confirmPlugin();
-    if(!choice || busy() || pluginPending())return;
+    if(!choice || !online() || busy() || detecting() || checkingUpdates() || pluginPending())return;
     setBusy(true);setNotice("");
     try {await pluginCommand("service.plugin_install",{id:choice.row.id,operation:choice.operation});setConfirmPlugin(null);}
     catch(error) {setNotice(error.message);}
     finally {setBusy(false);}
   }
   async function setExperimentalVersions(enabled) {
-    if(busy() || detecting() || pluginPending() || !online())return;
+    if(busy() || checkingUpdates() || detecting() || pluginPending() || !online())return;
     setBusy(true);setNotice("");
     try {await pluginCommand("service.plugin_settings",{allow_unverified_versions:enabled});}
     catch(error) {setNotice(error.message);}
@@ -135,20 +136,25 @@ export function ControlCenter() {
       </div>
       <div class="control-tab-panel" role="tabpanel" id="control-panel-updates" aria-labelledby="control-tab-updates" hidden={activeTab()!=='updates'} tabIndex="0">
       <section class="control-section update-section" aria-label={t('更新状态')}>
-        <div class="control-section-heading"><h2>{t('更新状态')}</h2><button class="secondary-button" disabled={!online() || checkingUpdates() || pluginPending()} onClick={checkUpdates}>{checkingUpdates()?t('正在检测…'):t('检查更新')}</button></div>
-        <div class="update-status-list"><For each={updateRows()}>{row=><div class="update-status-row" title={t(row.help)}><strong>{t(row.name)}</strong><span classList={{'update-required':['restart-required','install-required','not-installed'].includes(row.state)}}>{t(updateLabels[row.state] || '尚未检测')}</span><Show when={row.state==='restart-required'}><small>{t('请重启组件库后台，Plasticity 无需关闭')}</small></Show></div>}</For></div>
+        <div class="control-section-heading"><h2>{t('更新与安装')}</h2><button class="secondary-button" disabled={!online() || busy() || detecting() || checkingUpdates() || pluginPending()} onClick={checkUpdates}>{checkingUpdates()?t('正在检测…'):t('重新检测')}</button></div>
+        <p class="update-summary" role="status">{t(summary())}</p>
+        <p>{t('检测已放入本机的程序文件与插件，不会下载新版本。')}</p>
+        <details class="plugin-advanced"><summary>{t('如何更新程序包')}</summary><p>{t('退出组件库后台，将完整发布包解压到原程序目录，保留 library/ 和 .runtime/，再运行启动器。随后在这里查看是否需要更新插件。')}</p><a class="secondary-button" href="https://github.com/mianxiu/plasticityassettool/releases" target="_blank" rel="noreferrer">{t('下载发布包 ↗')}</a></details>
+        <div class="update-status-list"><For each={updateRows()}>{row=><div class="update-status-row" title={t(row.help)}><strong>{t(row.name)}</strong><span classList={{'update-required':['restart-required','install-required','not-installed'].includes(row.state)}}>{t(updateLabels[row.state] || '尚未检测')}</span><small class="update-help">{t(row.help)}</small><Show when={row.state==='restart-required'}><div class="control-actions"><button class="secondary-button" disabled={!online() || busy() || pluginPending() || transferPending()} onClick={()=>setConfirmQuit(true)}>{t('退出后台以重启')}</button><small>{t('退出后重新运行启动器即可。')}</small></div></Show></div>}</For></div>
       </section>
-      </div>
-      <div class="control-tab-panel" role="tabpanel" id="control-panel-plugins" aria-labelledby="control-tab-plugins" hidden={activeTab()!=='plugins'} tabIndex="0">
       <section class="control-section plugin-section">
-        <div class="control-section-heading"><div><h2 title={t("检测版本和目录，安装后重新启动 Plasticity 即可使用 Tab 面板。")}>{t("插件安装")} <span class="control-help" aria-label={t("检测版本和目录，安装后重新启动 Plasticity 即可使用 Tab 面板。")}>?</span></h2></div><button class="secondary-button" disabled={!online() || detecting() || pluginPending()} onClick={()=>detectPlugins()}>{detecting() ? t("正在检测…") : t("检测安装")}</button></div>
-        <Show when={plugins()} fallback={<p>{t("请重启后台，启用插件安装管理")}</p>}>
-          <p class="plugin-supported">{t("支持自动安装：")}{plugins()?.supported_versions?.join(", ")}</p>
-          <label class="plugin-experimental" title={t("其他版本尚未验证兼容性；安装仍会校验入口并保留恢复备份。设置自动保存。") }><input type="checkbox" checked={plugins()?.allow_unverified_versions === true} disabled={!online() || busy() || detecting() || pluginPending() || !!confirmPlugin()} onChange={event=>setExperimentalVersions(event.currentTarget.checked)}/>{t("允许测试其他版本")}</label>
-          <div class="plugin-directory"><input aria-label={t("Plasticity 安装目录")} placeholder={t("其他目录：输入 Plasticity 安装目录完整路径")} value={installPath()} onInput={event=>setInstallPath(event.currentTarget.value)} /><button class="secondary-button" disabled={!online() || detecting() || pluginPending() || !installPath().trim()} onClick={()=>detectPlugins(true)}>{t("检测目录")}</button></div>
-          <Show when={plugins()?.installations?.length} fallback={<p>{detecting() ? t("正在检测…") : t("未检测到安装，可输入其他安装目录。")}</p>}>
-            <div class="plugin-installations"><For each={plugins()?.installations}>{row=><article class="plugin-installation"><div><strong>Plasticity {row.version}</strong><small class="plugin-path">{row.path}</small><span class="plugin-status">{!row.supported && !row.experimental ? t("此版本尚未支持自动安装") : pluginLabels[row.state]?.() || row.state}<Show when={row.experimental}> · {t("未验证版本")}</Show><Show when={row.running}> · {t(pluginRunningMessage(row))}</Show></span></div><div class="control-actions"><Show when={!row.installed}><button class="secondary-button" disabled={!row.can_install || busy() || detecting() || pluginPending()} onClick={()=>setConfirmPlugin({row,operation:"install"})}>{t("安装插件")}</button></Show><Show when={row.state === "update"}><button class="secondary-button" disabled={!row.can_update || busy() || detecting() || pluginPending()} onClick={()=>setConfirmPlugin({row,operation:"update"})}>{t("更新插件")}</button></Show><Show when={row.can_restore}><button class="secondary-button" disabled={busy() || detecting() || pluginPending()} onClick={()=>setConfirmPlugin({row,operation:"restore"})}>{t("恢复原始入口")}</button></Show></div></article>}</For></div>
+        <div class="control-section-heading"><h2>{t("Plasticity 插件")}</h2></div>
+        <p>{t("有可更新版本时：保存并关闭对应版本窗口 → 更新插件 → 重新打开 Plasticity。")}</p>
+        <Show when={plugins()?.check_error}><p class="control-warning" role="alert">{t("插件检测失败：")}{plugins().check_error}</p></Show>
+        <Show when={plugins()} fallback={<p>{online() ? t("请重启后台，启用插件安装管理") : t('连接后台后可检测更新')}</p>}>
+          <Show when={plugins()?.installations?.length} fallback={<p>{detecting() ? t("正在检测…") : t("未检测到安装，请在高级安装选项中指定目录。")}</p>}>
+            <div class="plugin-installations"><For each={plugins()?.installations}>{row=><article class="plugin-installation"><div><strong>Plasticity {row.version}</strong><small class="plugin-path">{row.path}</small><span class="plugin-status">{!row.supported && !row.experimental ? t("此版本尚未支持自动安装") : pluginLabels[row.state]?.() || row.state}<Show when={row.experimental}> · {t("未验证版本")}</Show><Show when={row.running}> · {t(pluginRunningMessage(row))}</Show></span></div><div class="control-actions"><Show when={!row.installed}><button class="secondary-button" disabled={!online() || !row.can_install || busy() || checkingUpdates() || detecting() || pluginPending()} onClick={()=>setConfirmPlugin({row,operation:"install"})}>{t("安装插件")}</button></Show><Show when={row.state === "update"}><button class="secondary-button" disabled={!online() || !row.can_update || busy() || checkingUpdates() || detecting() || pluginPending()} onClick={()=>setConfirmPlugin({row,operation:"update"})}>{t("更新插件")}</button></Show><Show when={row.can_restore}><button class="secondary-button" disabled={!online() || busy() || checkingUpdates() || detecting() || pluginPending()} onClick={()=>setConfirmPlugin({row,operation:"restore"})}>{t("恢复原始入口")}</button></Show></div></article>}</For></div>
           </Show>
+          <details class="plugin-advanced"><summary>{t("高级安装选项")}</summary>
+          <p class="plugin-supported">{t("支持自动安装：")}{plugins()?.supported_versions?.join(", ")}</p>
+          <label class="plugin-experimental" title={t("其他版本尚未验证兼容性；安装仍会校验入口并保留恢复备份。设置自动保存。") }><input type="checkbox" checked={plugins()?.allow_unverified_versions === true} disabled={!online() || busy() || checkingUpdates() || detecting() || pluginPending() || !!confirmPlugin()} onChange={event=>setExperimentalVersions(event.currentTarget.checked)}/>{t("允许测试其他版本")}</label>
+          <div class="plugin-directory"><input aria-label={t("Plasticity 安装目录")} placeholder={t("其他目录：输入 Plasticity 安装目录完整路径")} value={installPath()} onInput={event=>setInstallPath(event.currentTarget.value)} /><button class="secondary-button" disabled={!online() || busy() || checkingUpdates() || detecting() || pluginPending() || !installPath().trim()} onClick={()=>detectPlugins(true)}>{t("检测目录")}</button></div>
+          </details>
           <Show when={plugins()?.job}><div class={`plugin-job plugin-job-${plugins()?.job.state}`} role="status"><strong>{plugins()?.job.state === "waiting" ? t("等待安装确认 / Windows 权限") : plugins()?.job.state === "complete" ? t("操作完成") : plugins()?.job.state === "cancelled" ? t("操作已取消") : t("操作失败")}</strong><span>{plugins()?.job.message}</span><small>{t("备份：")}{plugins()?.job.backup}</small></div></Show>
         </Show>
       </section>
@@ -175,7 +181,7 @@ export function ControlCenter() {
       </div>
       <footer class="control-footer">{t("关闭此页面会保留后台服务。退出后台后，模型置入需重新启动服务。")}</footer>
     </main>
-    <Show when={confirmPlugin()}><div class="dialog-backdrop"><section class="dialog control-quit-dialog" role="dialog" aria-modal="true" aria-labelledby="plugin-title"><h2 id="plugin-title">{operationLabels[confirmPlugin().operation]()}</h2><p>Plasticity {confirmPlugin().row.version}<br/><span class="plugin-path">{confirmPlugin().row.path}</span></p><p>{confirmPlugin().operation === "restore" ? t("将恢复已验证的原始入口，组件数据库保留。") : t("将修改此版本的内嵌入口，并自动保存可恢复备份。")}</p><Show when={!confirmPlugin().row.supported && confirmPlugin().operation !== "restore"}><p>{t("此版本尚未实机验证，继续将按测试模式安装。")}</p></Show><p>{t("请先自行保存并关闭该版本所有窗口；继续后在安装窗口确认 Windows 权限。")}</p><div class="control-actions"><button class="secondary-button" disabled={busy()} onClick={()=>setConfirmPlugin(null)}>{t("取消")}</button><button class="primary-button" disabled={busy()} onClick={installPlugin}>{t("继续安装流程")}</button></div></section></div></Show>
+    <Show when={confirmPlugin()}><div class="dialog-backdrop"><section class="dialog control-quit-dialog" role="dialog" aria-modal="true" aria-labelledby="plugin-title"><h2 id="plugin-title">{operationLabels[confirmPlugin().operation]()}</h2><p>Plasticity {confirmPlugin().row.version}<br/><span class="plugin-path">{confirmPlugin().row.path}</span></p><p>{confirmPlugin().operation === "restore" ? t("将恢复已验证的原始入口，组件数据库保留。") : t("将修改此版本的内嵌入口，并自动保存可恢复备份。")}</p><Show when={!confirmPlugin().row.supported && confirmPlugin().operation !== "restore"}><p>{t("此版本尚未实机验证，继续将按测试模式安装。")}</p></Show><p>{t("请先自行保存并关闭该版本所有窗口；继续后在安装窗口确认 Windows 权限。")}</p><div class="control-actions"><button class="secondary-button" disabled={busy()} onClick={()=>setConfirmPlugin(null)}>{t("取消")}</button><button class="primary-button" disabled={!online() || busy() || detecting() || checkingUpdates() || pluginPending()} onClick={installPlugin}>{t("继续安装流程")}</button></div></section></div></Show>
     <Show when={confirmQuit()}><div class="dialog-backdrop"><section class="dialog control-quit-dialog" role="dialog" aria-modal="true" aria-labelledby="quit-title"><h2 id="quit-title">{t("退出组件库后台？")}</h2><p>{t("组件数据会保留。Plasticity 会继续运行，组件库置入功能将在重新启动后台后恢复。")}</p><div class="control-actions"><button class="secondary-button" onClick={()=>setConfirmQuit(false)}>{t("取消")}</button><button class="control-quit" disabled={busy()} onClick={()=>command("service.quit")}>{t("退出后台服务")}</button></div></section></div></Show>
   </div>;
 }

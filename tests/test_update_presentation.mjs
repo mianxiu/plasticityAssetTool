@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {uiUpdateState,pluginUpdateState,pluginRunningMessage} from '../plasticity-asset-tool-app/src/updatePresentation.mjs';
+import {uiUpdateState,pluginUpdateState,pluginRunningMessage,updateSummary} from '../plasticity-asset-tool-app/src/updatePresentation.mjs';
 assert.equal(uiUpdateState({state:'ready',revision:'v1'},'v1'),'current');
 assert.equal(uiUpdateState({state:'ready',revision:'v2'},'v1'),'hot-update');
 assert.equal(uiUpdateState({state:'building',revision:'v2'},'v1'),'building');
@@ -10,4 +10,19 @@ assert.equal(pluginRunningMessage({state:'update',installed:true,running:true}),
 assert.equal(pluginRunningMessage({state:'update',installed:true,running:false}),'');
 assert.equal(pluginUpdateState({installations:[]}),'not-detected');
 assert.equal(pluginUpdateState({check_error:'failed',installations:[{state:'current'}]}),'check-failed');
+const summary=(states,plugins={})=>updateSummary(states.map(state=>({state})),plugins);
+assert.equal(summary(['current','current','current']),'本地文件已就绪，无需手动更新');
+assert.equal(summary(['development','current','current']),'本地文件已就绪，无需手动更新');
+assert.equal(summary(['hot-update','restart-required','install-required']),'下一步：重启组件库后台');
+assert.equal(summary(['hot-update','current','install-required']),'下一步：安装或更新下方对应版本的插件');
+assert.equal(summary(['current','current','not-installed']),'下一步：安装或更新下方对应版本的插件');
+for(const state of ['unverified','not-detected'])assert.equal(summary(['current','current',state]),'下一步：检查下方的插件安装信息');
+for(const state of ['unknown','check-failed'])assert.equal(summary(['current','current',state]),'检测尚未完成，请重新检测');
+assert.equal(summary(['current','current','current'],{check_error:'offline'}),'检测尚未完成，请重新检测');
+assert.equal(summary(['current','restart-required','install-required'],{job:{state:'waiting'}}),'正在安装，请完成安装窗口中的确认');
+for(const state of ['building','not-built'])assert.equal(summary([state,'current','current']),'下一步：等待界面构建完成');
+assert.equal(summary(['hot-update','current','current']),'界面将在当前操作结束后自动更新');
+for(const state of ['failed','cancelled'])assert.equal(summary(['current','current','current'],{job:{state}}),'上次操作未完成，请查看下方提示后重试');
+for(const action of ['install','update'])assert.equal(summary(['current','current','current'],{job:{state:'complete',action}}),'插件安装已完成，重新打开对应 Plasticity 版本后生效');
+assert.equal(summary(['current','current','current'],{job:{state:'complete',action:'restore'}}),'本地文件已就绪，无需手动更新');
 console.log('Update presentation: UI hot reload, current plugin and real installation requirements verified');
