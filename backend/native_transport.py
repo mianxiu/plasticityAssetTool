@@ -80,6 +80,9 @@ class NativeTransport:
                     elif job['action']=='inspect-encoding':
                         from .native_layout import validate_probe
                         value=validate_probe(value)
+                        if job['payload'].get('include_models'):
+                            from .model_samples import validate_samples
+                            validate_samples(value)
                     elif not isinstance(value,dict) or value.get('started') is not True:
                         raise ValueError('原生置入没有启动')
                     job['future'].set_result(value)
@@ -114,7 +117,7 @@ class NativeTransport:
             return None
         return self.worker(target, token, capabilities=capabilities)
 
-    async def request(self, target, action, model=None, placement=True, insert_mode="new-body", recipe=None, signature=None, with_metadata=False, base_mode=None):
+    async def request(self, target, action, model=None, placement=True, insert_mode="new-body", recipe=None, signature=None, with_metadata=False, base_mode=None, include_models=False):
         if target not in self.connected_targets():
             raise ValueError('目标窗口的原生模型插件未连接，请重新打开已安装插件的 Plasticity')
         if action not in ('capture','insert','inspect-group','capture-group','rebase','inspect-encoding'):
@@ -126,6 +129,10 @@ class NativeTransport:
         payload={}
         if action=='inspect-encoding' and 'encoding-probe-v1' not in self.workers[target]['capabilities']:
             raise ValueError('请更新内嵌插件并重新打开 Plasticity，再自动检测模型格式')
+        if include_models:
+            if action!='inspect-encoding' or 'encoding-samples-v1' not in self.workers[target]['capabilities']:
+                raise ValueError('请更新内嵌插件并重新打开 Plasticity，再收集测试样本')
+            payload['include_models'] = True
         if base_mode is not None:
             if action not in ('capture','capture-group','rebase') or base_mode not in ('world','pick'):
                 raise ValueError('无效的组件基点模式')

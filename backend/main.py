@@ -89,6 +89,19 @@ class ServiceHandler(LocalHandler):
             self.set_status(400)
             self.write({"ok":False,"error":str(exc)})
 
+class ModelSampleHandler(LocalHandler):
+    async def get(self, identity):
+        path = self.application.service.model_samples.path(identity)
+        try:
+            content = await asyncio.to_thread(path.read_bytes)
+        except FileNotFoundError:
+            raise web.HTTPError(404)
+        self.set_header('Content-Type', 'application/zip')
+        self.set_header('Cache-Control', 'no-store')
+        self.set_header('Content-Disposition', f'attachment; filename="plasticity-model-sample-{identity}.zip"')
+        self.finish(content)
+
+
 class PreviewHandler(LocalHandler):
     async def get(self, asset_id):
         try:
@@ -292,6 +305,7 @@ class Application(web.Application):
         super().__init__([
             (r"/websocket", WSHandler), (r"/api/health", HealthHandler),
             (r"/api/service", ServiceHandler),
+            (r"/api/model-samples/([a-f0-9]{32})\.zip", ModelSampleHandler),
             (r"/api/geometry/worker", GeometryWorkerHandler),
             (r"/api/native/worker", NativeWorkerHandler),
             (r"/api/assets/([a-f0-9]{32})/geometry(/preview)?", GeometryHandler),

@@ -50,6 +50,32 @@ class ServiceTests(unittest.IsolatedAsyncioTestCase):
         self.service.native.request.assert_awaited_once_with('hwnd:42','inspect-encoding')
         self.assertEqual(self.desktop.calls,[])
 
+    def test_portable_install_records_package_version_without_app_directory(self):
+        from pathlib import Path
+        from backend.asset_service import plasticity_version
+        folder=Path(self.directory.name)/'portable'
+        metadata=folder/'resources/app/package.json'
+        metadata.parent.mkdir(parents=True)
+        metadata.write_text(json.dumps({'version':'29.0.1'}),encoding='utf-8')
+        self.assertEqual(plasticity_version({'path':str(folder/'Plasticity.exe')}),'29.0.1')
+        self.assertEqual(plasticity_version({}),'unknown')
+
+    async def test_collect_version_sample_is_local_and_does_not_register_compatibility(self):
+        from test_model_samples import sample_report
+        self.service.native.request=AsyncMock(return_value=sample_report(True))
+        result=await self.call('target.collect_sample',{'target_id':'hwnd:42'})
+        self.assertEqual(result['source_version'],'26.1.3')
+        self.assertFalse(result['verified'])
+        self.assertTrue(self.service.model_samples.path(result['id']).is_file())
+        self.assertEqual(self.desktop.calls,[])
+        self.assertEqual(self.service.library.list(),[])
+        self.service.native.request.assert_awaited_once_with('hwnd:42','inspect-encoding',include_models=True)
+        self.service.native.request.reset_mock()
+        self.service.model_enabled=False
+        with self.assertRaisesRegex(ValueError,'暂停'):
+            await self.call('target.collect_sample',{'target_id':'hwnd:42'})
+        self.service.native.request.assert_not_awaited()
+
     async def test_kernel_snap_request_and_paused_cache_rules(self):
         enriched = {'parts':[{'kernel_snaps':[0,0,0,0]}]}
         self.service.geometry.generate = AsyncMock(return_value=enriched)

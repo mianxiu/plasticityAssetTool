@@ -19,7 +19,7 @@ function nativeModelLayout(data) {
   if(offset+4>data.length) throw new Error('模型对象数量缺失');
   return {placement:0,count:offset,bodies:offset+4};
 }
-function inspectEncoding(editor,Vector3,Quaternion) {
+function inspectEncoding(editor,Vector3,Quaternion,includeModels=false) {
   requireIdle(editor);
   if(!editor.selection.selected.size) throw new Error('请先选中一个测试实体，再自动检测模型格式');
   if(typeof Vector3!=='function' || typeof Quaternion!=='function') throw new Error('当前版本无法取得原生坐标类型');
@@ -48,6 +48,7 @@ function inspectEncoding(editor,Vector3,Quaternion) {
             if(returned?.then) throw new Error('异步模型编码接口暂不支持自动检测');
           } finally {transportClipboard.writeBuffer=write;}
           if(!data || data.length>64*1024*1024)throw new Error('原生检测模型无效');
+          if(includeModels && data.length>4*1024*1024)throw new Error('测试样本超过 4 MB，请选择更简单的测试模型');
           let layout;
           try {layout=nativeModelLayout(data);} catch {}
           const current=layout?(layout.count===0?'count-first':'modern'):'unknown';
@@ -56,6 +57,7 @@ function inspectEncoding(editor,Vector3,Quaternion) {
           const header=data.subarray(0,Math.min(layout?.bodies || 512,4096));
           headers.push(header);probes.push({header:header.toString('base64'),
             content_digest:layout?nativeRequire('crypto').createHash('sha256').update(data.subarray(layout.bodies)).digest('hex'):null});
+          if(includeModels)Object.assign(probes[index],{model:data.toString('base64'),model_sha256:nativeRequire('crypto').createHash('sha256').update(data).digest('hex'),bytes:data.length});
         }
       } catch(error) {last=error;continue;}
       const find=values=>{
@@ -72,6 +74,7 @@ function inspectEncoding(editor,Vector3,Quaternion) {
       const stable=probes[0].content_digest && probes[0].content_digest===probes[1].content_digest;
       const layout=format!=='unknown' && disjoint && stable?{point,orientation,orientation_kind:kind}:null;
       const report={format,layout,probes};
+      if(includeModels)report.test_inputs={points,orientations:kind==='quaternion'?quaternions:directions,orientation_kind:kind};
       if(layout)return report;
       lastReport=report;
     }

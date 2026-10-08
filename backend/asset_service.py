@@ -11,6 +11,7 @@ from .model_clipboard import validate_model
 from .geometry_preview import GeometryPreview
 from .native_transport import NativeTransport
 from .panel_settings import PanelSettings
+from .model_samples import ModelSamples
 
 
 def decode_preview(value):
@@ -24,6 +25,20 @@ def decode_preview(value):
         raise ValueError("预览图编码无效，请重新选择 JPEG") from exc
     return AssetLibrary.validate_preview(preview)
 
+def plasticity_version(target):
+    """Prefer the installed app metadata; directory names are a fallback."""
+    if not target or not target.get('path'):
+        return 'unknown'
+    executable = Path(target['path'])
+    try:
+        version = json.loads((executable.parent / 'resources/app/package.json').read_text(encoding='utf-8')).get('version')
+        if isinstance(version,str) and 0 < len(version) <= 80:
+            return version
+    except (OSError, ValueError, AttributeError):
+        pass
+    return next((p[4:] for p in executable.parts if p.startswith('app-') and len(p)>4), 'unknown')
+
+
 class AssetService:
     def __init__(self, config, root, desktop=None):
         self.config = config
@@ -31,6 +46,7 @@ class AssetService:
         self.library = AssetLibrary(Path(root) / "library")
         self.geometry = GeometryPreview(self.library)
         self.native = NativeTransport()
+        self.model_samples = ModelSamples(root)
         self.desktop = desktop
         self.desktop_error = ""
         if self.desktop is None:
@@ -86,13 +102,20 @@ class AssetService:
         if action == "asset.geometry.thumbnail":
             return await asyncio.to_thread(self.geometry.save_thumbnail, args.get("id"), args.get("digest"), decode_preview(args.get("preview")))
         async with self.lock:
-            if not self.model_enabled and (action.startswith("asset.") or action in ("target.command", "target.inspect_encoding", "library.rebase") or (action == "library.capture" and args.get("copy_selection"))):
+            if not self.model_enabled and (action.startswith("asset.") or action in ("target.command", "target.inspect_encoding", "target.collect_sample", "library.rebase") or (action == "library.capture" and args.get("copy_selection"))):
                 raise ValueError("模型连接已暂停，请在托盘控制中心恢复")
+            if action == 'target.collect_sample':
+                target_id = args.get('target_id')
+                target = self.bridge.target(target_id)
+                version = plasticity_version(target)
+                report = await self.native.request(target_id, 'inspect-encoding', include_models=True)
+                capabilities = self.native.workers.get(target_id, {}).get('capabilities', [])
+                return await asyncio.to_thread(self.model_samples.save, version, report, capabilities)
             if action == 'target.inspect_encoding':
                 target_id = args.get('target_id')
                 report = await self.native.request(target_id, 'inspect-encoding')
                 target = self.bridge.target(target_id)
-                version = next((p[4:] for p in Path(target.get('path','')).parts if p.startswith('app-')), 'unknown')
+                version = plasticity_version(target)
                 verified = self.library.register_native_format(version, report) if version != 'unknown' else False
                 return {'report':report,'source_version':version,'verified':verified,
                         'message':'模型格式已检测，可以继续测试基点' if verified else '检测报告已生成，定位结构尚未确认；原始模型保持不变'}
@@ -170,7 +193,7 @@ class AssetService:
                         preview = None
                 target = self.bridge.targets.get(target_id)
                 if target and target.get("path"):
-                    source_version = next((p[4:] for p in Path(target["path"]).parts if p.startswith("app-")), "unknown")
+                    source_version = plasticity_version(target)
                 result = await asyncio.to_thread(self.library.add, model, args | {"recipe": recipe}, preview, source_version)
                 if args.get("auto_preview", True) and preview is None and args.get("preview_mode") != "geometry":
                     result["preview_warning"] = "模型已保存，但未能生成预览。请重新加载内嵌插件，或在编辑组件时上传预览图。"

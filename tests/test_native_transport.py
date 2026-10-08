@@ -47,6 +47,22 @@ class NativeTransportTests(unittest.IsolatedAsyncioTestCase):
         self.transport.worker(self.target,self.token,{'id':job['id'],'value':report()},capabilities=caps)
         self.assertEqual(await pending,report())
 
+    async def test_sample_collection_requires_new_capability_and_accepts_unknown_format(self):
+        from test_model_samples import sample_report
+        self.transport.worker(self.target,self.token,capabilities=['encoding-probe-v1'])
+        with self.assertRaisesRegex(ValueError,'收集测试样本'):
+            await self.transport.request(self.target,'inspect-encoding',include_models=True)
+        self.assertFalse(self.transport.jobs)
+        caps=['encoding-probe-v1','encoding-samples-v1']
+        self.transport.worker(self.target,self.token,capabilities=caps)
+        pending=asyncio.create_task(self.transport.request(self.target,'inspect-encoding',include_models=True))
+        await asyncio.sleep(0)
+        job=self.transport.worker(self.target,self.token,capabilities=caps)
+        self.assertTrue(job['include_models'])
+        value=sample_report(True)
+        self.transport.worker(self.target,self.token,{'id':job['id'],'value':value},capabilities=caps)
+        self.assertEqual(await pending,value)
+
     async def test_group_capture_and_inspection_keep_metadata_window_bound(self):
         self.transport.worker(self.target,self.token,capabilities=['group-recipe-v1'])
         for action,payload,expected in [

@@ -232,3 +232,7 @@ body:has(.component-first){background:#181818}
 .thumbnail-context-menu button:hover,.thumbnail-context-menu button:focus-visible{background:#3b3b3b;outline:none}
 
 .component-first .held-model-preview[data-insert-mode]{border-color:var(--mode-color);border-radius:var(--asset-radius);overflow:hidden}
+
+.asset-source-version{font-size:10px;color:var(--text-muted,#999);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin:2px 0}.model-sample-help{font-size:11px;color:var(--text-muted,#999);line-height:1.5;max-width:540px}
+
+.component-first .target-bar:has(.model-sample-help){flex-wrap:wrap}.model-sample-help{flex:0 0 100%;max-width:none;margin:0}

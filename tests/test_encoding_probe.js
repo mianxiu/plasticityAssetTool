@@ -22,6 +22,15 @@ for(const legacy of [false,true]) {
   assert.equal(report.layout.point,legacy?8:0);assert.equal(report.layout.orientation,legacy?32:24);
   assert.equal(report.layout.orientation_kind,legacy?'direction':'quaternion');
   assert.equal(report.probes.length,2);assert.equal(clipboard.writeBuffer,originalWrite);assert.equal(editor.selection.selected,selected);
+  assert.equal(report.probes[0].model,undefined,'Normal diagnostics must not include raw geometry');
+  const collected=sandbox.__plasticityAssetTransport.inspectEncoding(editor,Vector3,Quaternion,true);
+  assert.equal(collected.test_inputs.orientation_kind,legacy?'direction':'quaternion');
+  for(const probe of collected.probes){
+    const bytes=Buffer.from(probe.model,'base64');
+    assert.equal(bytes.length,probe.bytes);
+    assert.equal(require('node:crypto').createHash('sha256').update(bytes).digest('hex'),probe.model_sha256);
+    assert.equal(bytes.subarray(0,Buffer.from(probe.header,'base64').length).toString('base64'),probe.header);
+  }
   changeContent=true;
   assert.equal(sandbox.__plasticityAssetTransport.inspectEncoding(editor,Vector3,Quaternion).layout,null,'Changing native geometry must not enable offline base point edits');
   editor.executor.activeCommand={};assert.throws(()=>sandbox.__plasticityAssetTransport.inspectEncoding(editor,Vector3,Quaternion),/建模操作/);
@@ -31,3 +40,11 @@ assert.throws(()=>sandbox.__plasticityAssetTransport.inspectEncoding(bad,Vector3
 assert.equal(clipboard.writeBuffer,originalWrite);assert.equal(osCalls,0);
 assert.throws(()=>sandbox.__plasticityAssetTransport.inspectEncoding({...bad,selection:{selected:{size:0}}},Vector3,Quaternion),/测试实体/);
 console.log('Native encoding probe: two controlled inputs, quaternion/direction discovery, active-tool guard and clipboard isolation passed');
+
+const futureEditor={executor:{},selection:{selected:{size:1}},clipboard:{copy(){clipboard.writeBuffer('application/vnd.plasticity.items',Buffer.alloc(600,7));}}};
+const futureReport=sandbox.__plasticityAssetTransport.inspectEncoding(futureEditor,Vector3,Quaternion,true);
+assert.equal(futureReport.format,'unknown');assert.equal(futureReport.layout,null);
+assert.equal(futureReport.probes.length,2);assert.equal(Buffer.from(futureReport.probes[0].model,'base64').length,600);
+const largeEditor={...futureEditor,clipboard:{copy(){clipboard.writeBuffer('application/vnd.plasticity.items',Buffer.alloc(4*1024*1024+1));}}};
+assert.throws(()=>sandbox.__plasticityAssetTransport.inspectEncoding(largeEditor,Vector3,Quaternion,true),/4 MB/);
+assert.equal(clipboard.writeBuffer,originalWrite);assert.equal(osCalls,0);

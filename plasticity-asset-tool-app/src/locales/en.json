@@ -410,5 +410,12 @@
   "插件安装已完成，重新打开对应 Plasticity 版本后生效": "Plugin installation is complete. Reopen the corresponding Plasticity version to apply it.",
   "重新安装插件": "Reinstall plugin",
   "已是最新版时，仍可重新写入当前插件并保留恢复备份。请先保存并关闭该版本所有窗口。": "Reinstall the current plugin even when it is up to date, preserving recovery backups. Save and close all windows of this version first.",
-  "将重新写入当前版本插件，即使已是最新版；自动保存恢复备份，组件数据保留。": "Rewrites the current plugin even if it is up to date. Recovery backups are saved automatically and component data is preserved."
+  "将重新写入当前版本插件，即使已是最新版；自动保存恢复备份，组件数据保留。": "Rewrites the current plugin even if it is up to date. Recovery backups are saved automatically and component data is preserved.",
+  "选中简单测试模型，收集两组原始样本、来源版本和检测结果，仅保存在本机": "Select a simple test model to collect two raw samples, its source version and the diagnostic report. Stored locally only.",
+  "收集版本测试包": "Collect version test package",
+  "测试包包含选中模型及其元数据，请使用简单测试模型。保存在 .runtime/model-samples/，不会自动上传；未知格式也可收集，不会自动开启兼容。": "The package contains the selected geometry and metadata. Use a simple test model. Saved in .runtime/model-samples/ with no automatic upload. Unknown formats can be collected without enabling compatibility.",
+  "来源版本（不代表跨版本兼容）": "Source version (does not imply cross-version compatibility)",
+  "Plasticity {p0}": "Plasticity {p0}",
+  "来源版本未记录": "Source version not recorded",
+  "测试包已保存在本机；包含选中模型，请确认内容后再手动分享": "Test package saved locally. It contains the selected geometry; review it before sharing manually."
 }
