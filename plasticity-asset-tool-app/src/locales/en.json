@@ -417,5 +417,14 @@
   "来源版本（不代表跨版本兼容）": "Source version (does not imply cross-version compatibility)",
   "Plasticity {p0}": "Plasticity {p0}",
   "来源版本未记录": "Source version not recorded",
-  "测试包已保存在本机；包含选中模型，请确认内容后再手动分享": "Test package saved locally. It contains the selected geometry; review it before sharing manually."
+  "测试包已保存在本机；包含选中模型，请确认内容后再手动分享": "Test package saved locally. It contains the selected geometry; review it before sharing manually.",
+  "版本筛选": "Version filter",
+  "尚未验证跨版本兼容，默认仅显示来源版本与目标版本一致的组件；未记录来源的组件可在显示全部中查看。": "Cross-version compatibility has not been verified. By default, only components with the same source version as the target are shown. Use Show all to see components with unrecorded versions.",
+  "自动按目标版本筛选": "Filter automatically by target version",
+  "目标版本：Plasticity {p0}": "Target: Plasticity {p0}",
+  "未识别目标版本，显示全部组件": "Target version unknown. Showing all components.",
+  "已隐藏 {count} 个其他或未记录版本的组件": "Hidden {count} components with other or unrecorded source versions",
+  "显示全部": "Show all",
+  "当前版本筛选隐藏了组件，点击显示全部可查看。": "Components are hidden by the version filter. Click Show all to see them.",
+  "组件来源版本与目标版本不一致，请切换目标窗口或显示全部后再测试": "The source version differs from the target. Switch target windows or choose Show all before testing."
 }

@@ -1,6 +1,7 @@
 import {createParentChannel} from "./hostMessaging.mjs";
 import {installUiUpdates, takeUiReloadState, saveUiReloadState} from "./uiUpdates.mjs";
 import {t, locale} from "./i18n";
+import {filterByVersion,knownVersion,matchesSourceVersion} from "./versionFilter.mjs";
 import {supportsBoolean,componentMode} from "./componentModes.mjs";
 import {VirtualAssetGrid} from "./VirtualAssetGrid";
 import {mergeLibrary} from "./librarySync.mjs";
@@ -62,6 +63,7 @@ export function Home() {
   const [foldersLoading, setFoldersLoading] = createSignal(false);
   const [folderId, setFolderId] = createSignal(typeof restoredUi.folderId === "string" ? restoredUi.folderId : null);
   const [kind, setKind] = createSignal(restored("kind", "all"));
+  const [compatibilityOnly,setCompatibilityOnly]=createSignal(restored("compatibilityOnly",true));
   const [organizationDialog, setOrganizationDialog] = createSignal(null);
   const [organizationName, setOrganizationName] = createSignal("");
   const [targets, setTargets] = createSignal([]);
@@ -130,6 +132,7 @@ export function Home() {
 
   const selected = createMemo(() => assets().find(asset => asset.id === selectedId()));
   const target = createMemo(() => targets().find(item => item.id === targetId()));
+  const targetVersion=createMemo(()=>knownVersion(target()?.source_version));
   const categories = createMemo(() => [...new Set(assets().map(asset => asset.category))].sort());
   const displayMode = componentMode;
   const modeLabel = asset => t(displayMode(asset) === "sequence" ? "连续布尔" : insertModes[displayMode(asset)]);
@@ -148,13 +151,15 @@ export function Home() {
     const labels = new Map(folders().map(row => [row.id, folderLabel(row.id)]));
     return assets().map(asset => ({asset, text:[asset.name,asset.category,asset.tags,asset.note,labels.get(asset.folder_id) || "库根目录"].join(" ").toLowerCase()}));
   });
-  const filtered = createMemo(() => {
+  const matching = createMemo(() => {
     const search = query().trim().toLowerCase();
     const rows = searchable().filter(({asset,text}) => (search || asset.folder_id === folderId()) &&
       (kind() === "all" || asset.kind === kind()) && (category() === "全部组件" || asset.category === category()) && text.includes(search)).map(row => row.asset);
     const mode = sortMode();
     return rows.sort((a,b) => mode === "name" ? a.name.localeCompare(b.name, "zh-CN") : mode === "oldest" ? a.created_at.localeCompare(b.created_at) : b.created_at.localeCompare(a.created_at));
   });
+  const filtered=createMemo(()=>filterByVersion(matching(),targetVersion(),compatibilityOnly()));
+  const hiddenByVersion=createMemo(()=>matching().length-filtered().length);
   const ready = () => status() === "connected" && !busy();
   const categoryExport = createMemo(() => assets().filter(asset => category() === "全部组件" || asset.category === category()));
   const selectedExport = createMemo(() => assets().filter(asset => exportSelection().has(asset.id)).map(asset => asset.id));
@@ -181,7 +186,7 @@ export function Home() {
     } catch (error) {showNotice(error.message, true);}
     finally {setExporting(false);}
   }
-  const canInsert = () => ready() && modelEnabled() && nativeTargets().includes(targetId()) && !archived();
+  const canInsert = asset => ready() && modelEnabled() && nativeTargets().includes(targetId()) && !archived() && (!asset || !compatibilityOnly() || matchesSourceVersion(asset,targetVersion()));
   const setField = (key, value) => setForm(current => ({ ...current, [key]: value, ...(key === "kind" && !supportsBoolean({kind:value}) ? {insert_mode:"new-body"} : {}) }));
   const [previewRevision, setPreviewRevision] = createSignal({});
   const previewUrl = asset => `${api}/api/assets/${asset.id}/${asset.has_preview ? 'preview' : 'geometry/preview'}?v=${encodeURIComponent(asset.updated_at || asset.created_at)}&render=${previewRevision()[asset.digest] || 0}`;
@@ -397,8 +402,9 @@ export function Home() {
   }
 
   async function insert(asset, placement = true) {
+    if(compatibilityOnly() && !matchesSourceVersion(asset,targetVersion())){showNotice(t("组件来源版本与目标版本不一致，请切换目标窗口或显示全部后再测试"),true);return;}
     setSelectedId(asset.id);
-    const result = await operate("asset.insert", { id: asset.id, target_id: embedded ? preferredTarget || targetId() : targetId(), follow_active:!embedded && followActive(), placement, transport:"native" });
+    const result = await operate("asset.insert", { id: asset.id, target_id: embedded ? preferredTarget || targetId() : targetId(), follow_active:!embedded && followActive(), placement, transport:"native", filter_source_version:compatibilityOnly() && !!targetVersion() });
     if (result) setDetailsOpen(false);
     if (result && embedded) hidePanel();
   }
@@ -498,7 +504,7 @@ export function Home() {
         !cardSizePending && !previewPending() && !pendingHost.size && !client.pending.size &&
         !previewClient.pending.size && !connectionClient.pending.size && !notice()?.error,
       beforeReload: () => saveUiReloadState({libraryId:libraryId(),folderId:folderId(),kind:kind(),query:query(),
-        category:category(),archived:archived(),sortMode:sortMode()}),
+        category:category(),archived:archived(),sortMode:sortMode(),compatibilityOnly:compatibilityOnly()}),
     });
     client.connect(); previewClient.connect(); connectionClient.connect();
     poll = setInterval(() => { if (panelVisible && ready()) {refresh().catch(() => {});refreshConnection().catch(() => {});} }, 10000);
@@ -616,13 +622,18 @@ export function Home() {
       <Show when={!target()}><div class="connection-hint" title={t("打开 Plasticity，在连接设置中选择目标窗口。")}>{t("未连接 Plasticity 窗口")}</div></Show>
 
       <div class="library-toolbar"><div class="section-name">{category() === "全部组件" ? t("全部组件") : category()}<span>{filtered().length}{t(" 个组件")}</span></div><div class="type-tabs" aria-label={t("组件类型")}><For each={[["all",t("全部")],["solid","Solid"],["curve","Curve"],["mixed",t("混合")],["unknown",t("未标注")]]}>{item => <button class={kind() === item[0] ? "active" : ""} aria-pressed={kind() === item[0]} onClick={() => {setKind(item[0]);setSelectedId("");}}>{item[1]}</button>}</For><span>{t("直接保存时自动识别类型")}</span></div></div>
+      <div class="version-filter-bar" role="group" aria-label={t("版本筛选")}>
+        <label title={t("尚未验证跨版本兼容，默认仅显示来源版本与目标版本一致的组件；未记录来源的组件可在显示全部中查看。")}><input type="checkbox" checked={compatibilityOnly()} onChange={event=>setCompatibilityOnly(event.currentTarget.checked)}/>{t("自动按目标版本筛选")}</label>
+        <span>{targetVersion() ? t("目标版本：Plasticity {p0}",{p0:targetVersion()}) : t("未识别目标版本，显示全部组件")}</span>
+        <Show when={hiddenByVersion()>0}><span>{t("已隐藏 {count} 个其他或未记录版本的组件",{count:hiddenByVersion()})}</span><button class="secondary" onClick={()=>setCompatibilityOnly(false)}>{t("显示全部")}</button></Show>
+      </div>
       <Show when={exportMode() || exporting()}><div class="batch-export-toolbar" role="group" aria-label={t("批量导出选择")}><Show when={exportMode()}><span>{t("已选 {count} 个组件",{count:selectedExport().length})}</span><button class="secondary" onClick={()=>setExportSelection(current=>new Set([...current,...filtered().map(asset=>asset.id)]))}>{t("全选当前结果")}</button><button class="secondary" disabled={!selectedExport().length} onClick={()=>setExportSelection(new Set())}>{t("清空选择")}</button><button class="primary" disabled={!ready() || exporting() || !selectedExport().length} onClick={()=>exportComponents(selectedExport())}>{exporting() ? t("正在打包…") : t("导出所选")}</button><button class="secondary" onClick={()=>{setExportMode(false);setExportSelection(new Set());}}>{t("完成选择")}</button></Show><Show when={exporting() && !exportMode()}><span role="status">{t("正在打包…")}</span></Show></div></Show>
       <Show when={!query().trim() && !archived() && childFolders().length}><section class="folder-grid" aria-label={t("子分组")}><For each={childFolders()}>{item => <button class="folder-card" onClick={() => enterFolder(item.id)}><span>▱</span><strong>{item.name}</strong><small>{assets().filter(asset => folderPath(asset.folder_id).some(parent => parent.id === item.id)).length}{t(" 个组件 · ")}{folders().filter(row => row.parent_id === item.id).length}{t(" 个子分组")}</small><span>→</span></button>}</For></section></Show>
 
       <Show when={heldPreview()} keyed>{preview => <section class="held-model-preview" data-insert-mode={displayMode(preview.asset)} role="status" aria-label={t("旋转预览 ") + preview.asset.name} style={{left:`${preview.left}px`,top:`${preview.top}px`}}><strong>{preview.asset.name}</strong><GeometryPreview asset={preview.asset} load={loadGeometry} heldOrigin={preview.origin} basePoint={heldBasePoint()?.base_point} orientation={heldBasePoint()?.base_orientation}/><span>{t("按住右键移动旋转 · 松开恢复")}</span></section>}</Show>
       <div class="library-layout">
         <section class="asset-grid" aria-label={t("组件列表")}>
-          <Show when={filtered().length} fallback={<div class="empty-state"><div class="empty-cube"><Cube /></div><h2>{query() || category() !== "全部组件" || kind() !== "all" ? t("没有匹配的组件") : archived() ? t("没有归档组件") : folderId() || childFolders().length ? t("当前分组没有直接保存的组件") : t("从你的第一个组件开始")}</h2><p>{query() ? t("换个关键词，或者查看全部组件。") : archived() ? t("归档的组件会保留模型数据，随时可以恢复。") : t("在 Plasticity 中选中模型，\n点击保存组件即可直接读取并保存。以后只需一点，即可原生置入。")}</p><Show when={!archived() && !query()}><button class="primary" disabled={!ready() || !clipboardSupported()} onClick={openCapture}>{t("＋ 保存组件")}</button></Show></div>}>
+          <Show when={filtered().length} fallback={<div class="empty-state"><div class="empty-cube"><Cube /></div><h2>{query() || category() !== "全部组件" || kind() !== "all" || hiddenByVersion()>0 ? t("没有匹配的组件") : archived() ? t("没有归档组件") : folderId() || childFolders().length ? t("当前分组没有直接保存的组件") : t("从你的第一个组件开始")}</h2><p>{hiddenByVersion()>0 ? t("当前版本筛选隐藏了组件，点击显示全部可查看。"): query() ? t("换个关键词，或者查看全部组件。") : archived() ? t("归档的组件会保留模型数据，随时可以恢复。") : t("在 Plasticity 中选中模型，\n点击保存组件即可直接读取并保存。以后只需一点，即可原生置入。")}</p><Show when={!archived() && !query()}><button class="primary" disabled={!ready() || !clipboardSupported()} onClick={openCapture}>{t("＋ 保存组件")}</button></Show></div>}>
             <VirtualAssetGrid items={filtered()} size={cardSize()}>{asset => <article data-insert-mode={displayMode(asset)} class={selectedId() === asset.id ? "asset-card selected" : "asset-card"} classList={{"export-selected":exportMode() && exportSelection().has(asset.id)}}>
               <button class="asset-preview" data-insert-mode={displayMode(asset)} aria-label={(exportMode() ? t("选择 ") : t("置入 ")) + asset.name} aria-pressed={exportMode() ? exportSelection().has(asset.id) : undefined} aria-disabled={exportMode() ? false : !canInsert()} onClick={() => {if(exportMode())toggleExport(asset.id);else if(canInsert())insert(asset);}} onPointerDown={event=>previewPointerDown(event,asset)} onContextMenu={event=>event.preventDefault()}><Show when={asset.has_geometry_preview || asset.has_preview} fallback={<div class="model-placeholder"><Cube /><span>{t("原生模型")}</span></div>}><img loading="lazy" decoding="async" classList={{"geometry-thumbnail":!asset.has_preview}} src={previewUrl(asset)} alt={asset.name} draggable="false"/></Show><span class="asset-format">{t(kindNames[asset.kind])}</span><Show when={displayMode(asset) !== "new-body"}><span class="asset-insert-mode" title={asset.recipe ? t("按组内子部件顺序执行") : t("默认置入：") + modeLabel(asset)}>{modeLabel(asset)}</span></Show></button>
               <Show when={exportMode()}><label class="asset-export-check"><input type="checkbox" aria-label={t("选择 ")+asset.name} checked={exportSelection().has(asset.id)} onChange={()=>toggleExport(asset.id)}/></label></Show><div class="asset-body"><div class="asset-name">{asset.name}</div><div class="asset-meta" title={asset.recipe ? t("连续布尔 · ") + asset.recipe.parts.length + t(" 个子部件") : t("默认置入：") + modeLabel(asset)}>{asset.category}<span>{Math.max(1, Math.round(asset.bytes / 1024))} KB</span></div><div class="asset-source-version" title={t("来源版本（不代表跨版本兼容）")}>{asset.source_version && asset.source_version !== "unknown" ? t("Plasticity {p0}",{p0:asset.source_version}) : t("来源版本未记录")}</div><div class="card-footer"><span title={asset.tags}>{asset.tags || ""}</span><button class="insert-button" aria-label={t("编辑 ") + asset.name} onClick={() => openEdit(asset)}>{t("编辑")}</button></div></div>
@@ -632,7 +643,7 @@ export function Home() {
         <Show when={detailsOpen() && selected()}><div class="asset-details-backdrop" onClick={()=>setDetailsOpen(false)}><aside class="details-panel" role="dialog" aria-modal="true" aria-label={t("组件详情")} onClick={event=>event.stopPropagation()}><button class="details-dismiss" aria-label={t("关闭组件详情")} onClick={()=>setDetailsOpen(false)}>×</button><Show when={selected()} fallback={<div class="detail-placeholder"><Cube /><h3>{t("组件详情")}</h3><p>{t("选择一个组件，查看信息或置入到当前模型。")}</p></div>}>
           <div class="detail-heading"><span>{t("编辑组件")}</span></div>
           <AssetForm capture={false} onCancel={()=>setDetailsOpen(false)}/>
-          <Show when={!archived()}><button class="primary full-width" disabled={!canInsert()} onClick={() => insert(selected())}>{t("置入组件")}</button><button class="secondary full-width" disabled={!canInsert() || !!selected()?.recipe} title={selected()?.recipe ? t("组组件使用定位置入，保留部件顺序与组信息") : ""} onClick={() => insert(selected(), false)}>{t("原位置粘贴")}</button><button class="secondary full-width" disabled={!ready() || !modelEnabled() || !clipboardSupported()} onClick={() => operate("asset.copy", { id: selectedId() })}>{t("仅复制到剪贴板")}</button></Show>
+          <Show when={!archived()}><button class="primary full-width" disabled={!canInsert(selected())} onClick={() => insert(selected())}>{t("置入组件")}</button><button class="secondary full-width" disabled={!canInsert(selected()) || !!selected()?.recipe} title={selected()?.recipe ? t("组组件使用定位置入，保留部件顺序与组信息") : ""} onClick={() => insert(selected(), false)}>{t("原位置粘贴")}</button><button class="secondary full-width" disabled={!ready() || !modelEnabled() || !clipboardSupported()} onClick={() => operate("asset.copy", { id: selectedId() })}>{t("仅复制到剪贴板")}</button></Show>
           <div class="detail-actions"><a href={`${api}/api/assets/${selectedId()}/export`} download>{t("导出组件包")}</a></div><button class="archive-button" disabled={!ready()} onClick={archiveSelected}>{archived() ? t("恢复到组件库") : t("归档组件")}</button>
         </Show></aside></div></Show>
       </div>

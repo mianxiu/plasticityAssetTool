@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import {knownVersion,matchesSourceVersion,filterByVersion} from '../plasticity-asset-tool-app/src/versionFilter.mjs';
+const assets=[{id:'same',source_version:'26.1.3'},{id:'patch',source_version:'26.1.4'},{id:'legacy',source_version:'25.2.5'},{id:'unknown',source_version:'unknown'},{id:'missing'}];
+assert.deepEqual(filterByVersion(assets,'26.1.3').map(a=>a.id),['same']);
+assert.deepEqual(filterByVersion(assets,'25.2.5').map(a=>a.id),['legacy']);
+for(const version of ['',undefined,null,'unknown','26','garbage'])assert.equal(filterByVersion(assets,version),assets);
+assert.equal(filterByVersion(assets,'26.1.3',false),assets);
+assert.equal(knownVersion(' v26.1.3 '),'26.1.3');
+assert.equal(knownVersion('26.1.3-beta.1'),'26.1.3-beta.1');
+assert.equal(matchesSourceVersion({source_version:'26.1.3-beta.1'},'26.1.3'),false);
+assert.equal(matchesSourceVersion({source_version:'unknown'},'26.1.3'),false);
+assert.equal(matchesSourceVersion({source_version:'26.1.3'},'26.1.4'),false);
+assert.equal(assets.length,5);
+console.log('Version filter: exact matches, target switching, unknown versions and explicit show-all verified');

@@ -236,3 +236,5 @@ body:has(.component-first){background:#181818}
 .asset-source-version{font-size:10px;color:var(--text-muted,#999);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin:2px 0}.model-sample-help{font-size:11px;color:var(--text-muted,#999);line-height:1.5;max-width:540px}
 
 .component-first .target-bar:has(.model-sample-help){flex-wrap:wrap}.model-sample-help{flex:0 0 100%;max-width:none;margin:0}
+
+.version-filter-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:4px 0 8px;font-size:11px;color:#999}.version-filter-bar label{display:flex;align-items:center;gap:4px;color:#ccc}.version-filter-bar input{accent-color:var(--accent,#009b73)}

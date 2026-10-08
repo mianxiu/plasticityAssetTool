@@ -213,7 +213,7 @@ class AssetLibrary:
 
     def model_row(self, asset_id):
         with self.connect() as db:
-            row = db.execute("SELECT id,digest,model,archived,kind,insert_mode,recipe_json FROM assets WHERE id=?", (asset_id,)).fetchone()
+            row = db.execute("SELECT id,digest,model,archived,kind,insert_mode,recipe_json,source_version FROM assets WHERE id=?", (asset_id,)).fetchone()
         if row is None:
             raise ValueError("组件不存在，请刷新组件库")
         return row

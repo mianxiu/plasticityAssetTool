@@ -60,6 +60,33 @@ class ServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(plasticity_version({'path':str(folder/'Plasticity.exe')}),'29.0.1')
         self.assertEqual(plasticity_version({}),'unknown')
 
+    async def test_connection_reports_target_source_version(self):
+        state=await self.service.connection_state()
+        self.assertEqual(state['targets'][0]['source_version'],'26.1.3')
+
+    async def test_version_filter_rechecks_followed_target_before_inserting(self):
+        asset=self.service.library.add(model_bytes(),{'name':'source'},source_version='25.2.5')
+        self.desktop.active_window=lambda:42
+        self.service.bridge.targets['hwnd:43']={'id':'hwnd:43','hwnd':43,'path':'C:/Plasticity/app-25.2.5/Plasticity.exe','mode':'cdp'}
+        self.service.native.request=AsyncMock(return_value={'started':True})
+        with self.assertRaisesRegex(ValueError,'来源版本'):
+            await self.call('asset.insert',{'id':asset['id'],'target_id':'hwnd:43','follow_active':True,'transport':'native','filter_source_version':True})
+        self.service.native.request.assert_not_awaited()
+        self.assertEqual(self.desktop.calls,[])
+        await self.call('asset.insert',{'id':asset['id'],'target_id':'hwnd:42','transport':'native','filter_source_version':False})
+        self.service.native.request.assert_awaited_once()
+
+    async def test_version_filter_accepts_same_version_and_rejects_unknown_source(self):
+        self.service.native.request=AsyncMock(return_value={'started':True})
+        asset=self.service.library.add(model_bytes(),{'name':'current'},source_version='26.1.3')
+        await self.call('asset.insert',{'id':asset['id'],'target_id':'hwnd:42','transport':'native','filter_source_version':True})
+        self.service.native.request.assert_awaited_once()
+        self.service.native.request.reset_mock()
+        unknown=self.service.library.add(model_bytes(),{'name':'unknown'})
+        with self.assertRaisesRegex(ValueError,'来源版本'):
+            await self.call('asset.insert',{'id':unknown['id'],'target_id':'hwnd:42','transport':'native','filter_source_version':True})
+        self.service.native.request.assert_not_awaited()
+
     async def test_collect_version_sample_is_local_and_does_not_register_compatibility(self):
         from test_model_samples import sample_report
         self.service.native.request=AsyncMock(return_value=sample_report(True))

@@ -76,6 +76,8 @@ class AssetService:
         native_targets = self.native.connected_targets()
         listed = {target['id'] for target in targets}
         targets += [{'id':target, 'hwnd':int(target[5:]), 'title':'Plasticity · '+target[5:], 'mode':'native'} for target in native_targets if target not in listed]
+        versions = await asyncio.gather(*(asyncio.to_thread(plasticity_version, target) for target in targets))
+        targets = [target | {'source_version':version} for target,version in zip(targets,versions)]
         return {"native_targets": self.native.connected_targets(), "geometry_targets": self.geometry.connected_targets(), "model_enabled": self.model_enabled, "launcher": self.launcher.snapshot() if self.launcher else {"registered": False, "message": "Ctrl+K 搜索"}, "targets": targets, "active_target_id": self.bridge.active_target_id, "connection_note": self.desktop_error or self.bridge.last_error, "clipboard_supported": self.desktop is not None}
 
     def clipboard(self):
@@ -239,6 +241,10 @@ class AssetService:
                         target_id = self.bridge.active_target_id
                         if not target_id:
                             raise ValueError('没有可用的激活 Plasticity 窗口，请激活目标窗口或选择固定目标')
+                    if args.get('filter_source_version') is True:
+                        version = plasticity_version(self.bridge.target(target_id))
+                        if version == 'unknown' or row['source_version'].strip().lstrip('vV') != version.strip().lstrip('vV'):
+                            raise ValueError('组件来源版本与目标版本不一致，请切换目标窗口或显示全部后再测试')
                     supported = row['kind'] not in ('curve', 'mixed')
                     recipe=json.loads(row['recipe_json']) if supported else None
                     mode = row["insert_mode"] if supported and args.get("placement", True) else "new-body"
